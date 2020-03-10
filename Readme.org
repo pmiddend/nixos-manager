@@ -1,0 +1,23 @@
+* nix-manager — manage your NixOS graphically
+
+** What’s the goal of this?
+
+The idea is to build something to *configure NixOS graphically*. To me, this means: managing the installed software packages, and managing the enabled services, as well as updating and garbage-collecting. For the moment, I’m focusing on a solution for a declarative, global configuration.
+
+The goal is *not* to make all of NixOS accessible via a GUI, and not give an alternative to writing Nix expressions for your configuration. This is a project to explore how far you can get graphically after installing NixOS (which, in the near future, should be possible via a GUI installer as well).
+
+** Approach
+
+Since the NixOS configuration is very “free-form”, I have to make some assumptions about the structure of your =configuration.nix= file, as such:
+
+- You have two additional =.nix= files, referenced from the =imports= section in your =configuration.nix=: =packages.nix= and =services.nix=
+- =packages.nix= is a flat list of packages
+- =services.nix= is a list of service definitions
+
+** Technology
+
+I’m using Haskell as the language of choice, simply because =hnix= is available and allows me to easily parse and serialize the relevant Nix configuration files. The GUI is made via =gi-gtk-declarative=, which serves me well and is pretty stable.
+
+** Current status
+
+The software is currently completely unusable. Please be patient.
