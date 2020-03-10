@@ -133,6 +133,10 @@ data ManagerEvent = ManagerEventClosed | ManagerEventSearchChanged Text
 packageMatches :: Text -> NixPackage -> Bool
 packageMatches t p = toLower t `isInfixOf` (p ^. npName . to toLower)
 
+mwhen :: Monoid m => Bool -> m -> m
+mwhen True  v = v
+mwhen False _ = mempty
+
 view' :: ManagerState -> AppView Gtk.Window ManagerEvent
 view' s =
   let buildResultRow pkg =
@@ -151,16 +155,21 @@ view' s =
         [ searchLabel
         , BoxChild (defaultBoxChildProperties { fill = True }) searchField
         ]
-      resultRows = if (s ^. msSearchString . to length) < 2
-        then []
-        else toVectorOf
-          ( msPackageCache
-          . folded
-          . filtered (packageMatches (s ^. msSearchString))
-          . to buildResultRow
-          )
-          s
-      resultBox = container Gtk.ListBox [] resultRows
+      searchValid = (s ^. msSearchString . to length) >= 2
+      resultRows  = mwhen searchValid $ toVectorOf
+        ( msPackageCache
+        . folded
+        . filtered (packageMatches (s ^. msSearchString))
+        . to buildResultRow
+        )
+        s
+      resultBox = if searchValid
+        then container Gtk.ListBox [] resultRows
+        else widget
+          Gtk.Label
+          [ #label := "Please enter a search term with at least two characters"
+          , #expand := True
+          ]
   in  bin
           Gtk.Window
           [ #title := "nix-manager 1.0"
@@ -171,7 +180,7 @@ view' s =
                     [searchBox, widget Gtk.HSeparator [], resultBox]
 
 update' :: ManagerState -> ManagerEvent -> Transition ManagerState ManagerEvent
-update' s ManagerEventClosed = Exit
+update' _ ManagerEventClosed = Exit
 update' s (ManagerEventSearchChanged t) =
   Transition (s & msSearchString .~ t) (pure Nothing)
 
