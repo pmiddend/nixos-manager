@@ -9,6 +9,9 @@ executable nix-manager
   other-modules:       NixManager.ManagerMain
                      , NixManager.Nix
                      , NixManager.ManagerState
+                     , NixManager.ManagerEvent
+                     , NixManager.View
+                     , NixManager.NixParser
   build-depends:       base
                      , containers
                      , lens
@@ -20,6 +23,7 @@ executable nix-manager
                      , lens-aeson
                      , gi-gtk
                      , haskell-gi-base
+                     , megaparsec
                      , gi-gtk-declarative-app-simple
                      , gi-gtk-declarative
                      , filepath

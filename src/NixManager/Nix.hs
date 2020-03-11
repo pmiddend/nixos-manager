@@ -26,6 +26,7 @@ import           Control.Lens                   ( (^.)
 import           Data.Text.Lens                 ( unpacked )
 import           Control.Monad                  ( mzero )
 
+
 data NixPackage = NixPackage {
     _npName :: Text
   , _npVersion :: Text

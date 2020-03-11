@@ -4,7 +4,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.ManagerMain where
 
-import           Data.Vector.Lens               ( toVectorOf )
 import           Control.Lens                   ( (^.)
                                                 , to
                                                 , (^..)
@@ -15,6 +14,8 @@ import           Control.Lens                   ( (^.)
                                                 )
 import           NixManager.ManagerState
 import           NixManager.Nix
+import           NixManager.ManagerEvent
+import           NixManager.View
 import           GI.Gtk.Declarative             ( bin
                                                 , padding
                                                 , defaultBoxChildProperties
@@ -128,56 +129,10 @@ readAppState = readIORef
 modifyAppState :: AppStateRef -> Endo AppState -> IO ()
 modifyAppState = modifyIORef
 
-data ManagerEvent = ManagerEventClosed | ManagerEventSearchChanged Text
-
-packageMatches :: Text -> NixPackage -> Bool
-packageMatches t p = toLower t `isInfixOf` (p ^. npName . to toLower)
-
 mwhen :: Monoid m => Bool -> m -> m
 mwhen True  v = v
 mwhen False _ = mempty
 
-view' :: ManagerState -> AppView Gtk.Window ManagerEvent
-view' s =
-  let buildResultRow pkg =
-          bin Gtk.ListBoxRow [] (widget Gtk.Label [#label := (pkg ^. npName)])
-      searchLabel = widget Gtk.Label [#label := "Search in packages:"]
-      processSearchChange w = ManagerEventSearchChanged <$> Gtk.getEntryText w
-      searchField = widget
-        Gtk.SearchEntry
-        [ #placeholderText := "Enter a package name or part of a name..."
-        , #maxWidthChars := 50
-        , onM #searchChanged processSearchChange
-        ]
-      searchBox = container
-        Gtk.Box
-        [#orientation := Gtk.OrientationHorizontal, #spacing := 10]
-        [ searchLabel
-        , BoxChild (defaultBoxChildProperties { fill = True }) searchField
-        ]
-      searchValid = (s ^. msSearchString . to length) >= 2
-      resultRows  = mwhen searchValid $ toVectorOf
-        ( msPackageCache
-        . folded
-        . filtered (packageMatches (s ^. msSearchString))
-        . to buildResultRow
-        )
-        s
-      resultBox = if searchValid
-        then container Gtk.ListBox [] resultRows
-        else widget
-          Gtk.Label
-          [ #label := "Please enter a search term with at least two characters"
-          , #expand := True
-          ]
-  in  bin
-          Gtk.Window
-          [ #title := "nix-manager 1.0"
-          , on #deleteEvent (const (True, ManagerEventClosed))
-          ]
-        $ container Gtk.Box
-                    [#orientation := Gtk.OrientationVertical, #spacing := 10]
-                    [searchBox, widget Gtk.HSeparator [], resultBox]
 
 update' :: ManagerState -> ManagerEvent -> Transition ManagerState ManagerEvent
 update' _ ManagerEventClosed = Exit
