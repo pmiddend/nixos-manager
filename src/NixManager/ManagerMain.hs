@@ -4,16 +4,23 @@
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.ManagerMain where
 
+import           Data.Fix                       ( Fix(Fix)
+                                                , cata
+                                                )
+import           Data.Text.IO                   ( putStrLn )
 import           Control.Lens                   ( (^.)
+                                                , ix
                                                 , to
                                                 , (^..)
                                                 , (&)
+                                                , (^?!)
                                                 , (.~)
                                                 , folded
                                                 , filtered
                                                 )
 import           NixManager.ManagerState
 import           NixManager.Nix
+import           NixManager.NixParser
 import           NixManager.ManagerEvent
 import           NixManager.View
 import           GI.Gtk.Declarative             ( bin
@@ -72,7 +79,9 @@ import           Data.Text                      ( pack
                                                 , Text
                                                 , unpack
                                                 )
-import           Prelude                 hiding ( length )
+import           Prelude                 hiding ( length
+                                                , putStrLn
+                                                )
 
 -- createRow t = do
 --   rowBox      <- Gtk.boxNew Gtk.OrientationHorizontal 0
@@ -139,17 +148,30 @@ update' _ ManagerEventClosed = Exit
 update' s (ManagerEventSearchChanged t) =
   Transition (s & msSearchString .~ t) (pure Nothing)
 
+readInstalledPackages :: IO [Text]
+readInstalledPackages = do
+  expr <- parseFile "packages.nix"
+  case expr of
+    Right (Fix (NixFunctionDecl _ (Fix (NixSet m)))) ->
+      pure (cata evalSymbols (m ^?! ix "environment.systemPackages"))
+    Left e -> do
+      putStrLn ("parse error " <> e)
+      error "parse error"
+    _ -> error "invalid packages.nix"
+
 nixMain :: IO ()
 nixMain = do
   putStrLn "Reading cache..."
-  cache <- nixSearchUnsafe ""
+  cache             <- nixSearchUnsafe ""
+  installedPackages <- readInstalledPackages
   putStrLn "Starting..."
   void $ run App
     { view         = view'
     , update       = update'
     , inputs       = []
-    , initialState = ManagerState { _msPackageCache = cache
-                                  , _msSearchString = ""
+    , initialState = ManagerState { _msPackageCache      = cache
+                                  , _msSearchString      = ""
+                                  , _msInstalledPackages = installedPackages
                                   }
     }
   -- sr <- nixSearch "kde"

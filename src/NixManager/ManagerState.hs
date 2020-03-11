@@ -8,6 +8,7 @@ import           Control.Lens                   ( makeLenses )
 data ManagerState = ManagerState {
      _msPackageCache :: [NixPackage]
    , _msSearchString :: Text
+   , _msInstalledPackages :: [Text]
    } deriving(Eq,Show)
 
 makeLenses ''ManagerState

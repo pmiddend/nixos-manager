@@ -1,22 +1,36 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveTraversable #-}
 module NixManager.NixParser where
 
+import           NixManager.Util
+import           Data.Foldable                  ( fold )
+import           Data.Bifunctor                 ( first )
 import           Control.Monad                  ( void )
 import           Data.Functor                   ( ($>) )
 import           Text.Megaparsec                ( Parsec
                                                 , manyTill
                                                 , sepBy
                                                 , many
+                                                , errorBundlePretty
                                                 , try
+                                                , parse
                                                 , (<|>)
                                                 , (<?>)
                                                 )
+import           Prelude                 hiding ( readFile
+                                                , unwords
+                                                )
 import           Data.Void                      ( Void )
+import           Data.Text.IO                   ( readFile )
 import           Data.Text                      ( Text
+                                                , intercalate
+                                                , unwords
                                                 , pack
                                                 )
 import           Data.Map.Strict                ( Map
                                                 , fromList
+                                                , toList
                                                 )
 import qualified Text.Megaparsec.Char.Lexer    as L
 import           Text.Megaparsec.Char           ( space1
@@ -26,18 +40,38 @@ import           Text.Megaparsec.Char           ( space1
                                                 , string
                                                 )
 import           Control.Applicative            ( empty )
+import           Data.Fix                       ( Fix(Fix) )
 
-
-data NixExpr = NixList [NixExpr]
-             | NixSet (Map Text NixExpr)
-             | NixFunctionDecl [Text] NixExpr
+data NixExprF r = NixList [r]
+             | NixSet (Map Text r)
+             | NixFunctionDecl [Text] r
              | NixSymbol Text
              | NixString Text
              | NixBoolean Bool
              | NixInt Integer
              | NixFloat Double
              | NixNull
-             deriving(Show)
+             deriving(Show, Functor, Traversable, Foldable)
+
+type NixExpr = Fix NixExprF
+
+evalSymbols :: NixExprF [Text] -> [Text]
+evalSymbols (NixSymbol r) = [r]
+evalSymbols e             = fold e
+
+prettyPrint :: NixExprF Text -> Text
+prettyPrint NixNull            = "null"
+prettyPrint (NixFloat   f    ) = showText f
+prettyPrint (NixInt     f    ) = showText f
+prettyPrint (NixBoolean True ) = "true"
+prettyPrint (NixBoolean False) = "false"
+prettyPrint (NixString  s    ) = "\"" <> s <> "\""
+prettyPrint (NixSymbol  s    ) = s
+prettyPrint (NixFunctionDecl args body) =
+  "{ " <> intercalate "," args <> " }: " <> body
+prettyPrint (NixList xs) = "[ " <> unwords xs <> " ]"
+prettyPrint (NixSet m) =
+  "{ " <> foldMap (\(k, v) -> k <> " = " <> v <> "; ") (toList m) <> " }"
 
 type Parser = Parsec Void Text
 
@@ -74,43 +108,46 @@ listParser = do
   void (lexeme (char '['))
   exprs <- many (lexeme exprParser)
   void (char ']')
-  pure (NixList exprs)
+  pure (Fix (NixList exprs))
 
 stringParser :: Parser NixExpr
-stringParser = NixString . pack <$> stringLiteral
+stringParser = Fix . NixString . pack <$> stringLiteral
 
 boolParser :: Parser NixExpr
 boolParser =
-  ((string "true" $> NixBoolean True) <|> (string "false" $> NixBoolean False))
+  (   (string "true" $> Fix (NixBoolean True))
+    <|> (string "false" $> Fix (NixBoolean False))
+    )
     <?> "boolean"
 
 intParser :: Parser NixExpr
-intParser = NixInt <$> signedInteger <?> "int"
+intParser = Fix . NixInt <$> signedInteger <?> "int"
 
 functionDeclParser :: Parser NixExpr
 functionDeclParser = do
   void (lexeme (char '{'))
-  symbols <- symbolParser' `sepBy` lexeme (char ',')
+  symbols <- lexeme symbolParser' `sepBy` lexeme (char ',')
   void (lexeme (char '}'))
   void (lexeme (char ':'))
   expr <- exprParser
-  pure (NixFunctionDecl symbols expr)
+  pure (Fix (NixFunctionDecl symbols expr))
 
 
 floatParser :: Parser NixExpr
-floatParser = NixFloat <$> signedFloat <?> "float"
+floatParser = Fix . NixFloat <$> signedFloat <?> "float"
 
 nullParser :: Parser NixExpr
-nullParser = (string "null" $> NixNull) <?> "null"
+nullParser = (string "null" $> Fix NixNull) <?> "null"
 
 symbolChar :: Parser Char
-symbolChar = alphaNumChar <|> char '.'
+symbolChar = alphaNumChar <|> char '.' <|> char '-'
 
 symbolParser' :: Parser Text
-symbolParser' = pack <$> ((:) <$> letterChar <*> many symbolChar)
+symbolParser' =
+  string "..." <|> (pack <$> ((:) <$> letterChar <*> many symbolChar))
 
 symbolParser :: Parser NixExpr
-symbolParser = NixSymbol <$> symbolParser' <?> "symbol"
+symbolParser = Fix . NixSymbol <$> symbolParser' <?> "symbol"
 
 setParser :: Parser NixExpr
 setParser = do
@@ -124,7 +161,7 @@ setParser = do
         pure (key, value)
   bindings <- fromList <$> many bindingParser
   void (lexeme (char '}'))
-  pure (NixSet bindings)
+  pure (Fix (NixSet bindings))
 
 exprParser :: Parser NixExpr
 exprParser =
@@ -137,3 +174,7 @@ exprParser =
     <|> try floatParser
     <|> try intParser
     <|> symbolParser
+
+parseFile :: FilePath -> IO (Either Text NixExpr)
+parseFile fn =
+  first (pack . errorBundlePretty) . parse exprParser fn <$> readFile fn

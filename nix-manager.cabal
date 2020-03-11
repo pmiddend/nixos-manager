@@ -12,11 +12,14 @@ executable nix-manager
                      , NixManager.ManagerEvent
                      , NixManager.View
                      , NixManager.NixParser
+                     , NixManager.Util
   build-depends:       base
                      , containers
                      , lens
                      , text
                      , bytestring
+                     , data-fix
+                     , bifunctors
                      , process
                      , aeson
                      , vector
