@@ -5,7 +5,6 @@
 module NixManager.ManagerMain where
 
 import           System.FilePath                ( (</>) )
-import           Control.Concurrent             ( threadDelay )
 import           NixManager.Css
 import           Data.Fix                       ( Fix(Fix)
                                                 , cata
@@ -46,9 +45,6 @@ import           Data.Text                      ( toLower
 import           Prelude                 hiding ( length
                                                 , putStrLn
                                                 )
-import           Pipes                          ( Producer
-                                                , yield
-                                                )
 
 packageMatches :: Text -> NixPackage -> Bool
 packageMatches t p = toLower t `isInfixOf` (p ^. npName . to toLower)
@@ -60,19 +56,21 @@ tryInstall :: NixPackage -> IO (Maybe ManagerEvent)
 tryInstall p = do
   bins <- getExecutables p
   case bins of
-    (bp, []            ) -> putStrLn "found no binaries"
-    (bp, [singleBinary]) -> startProgram (bp </> singleBinary)
-    multipleBinaries ->
+    (_, []) ->
+      pure (Just (ManagerEventShowError "No binaries found in this package!"))
+    (bp, [singleBinary]) -> do
+      startProgram (bp </> singleBinary)
+      pure Nothing
+    multipleBinaries -> do
       putStrLn $ "found more bins: " <> showText multipleBinaries
-  pure Nothing
---  pure (Just (ManagerEventTryInstallFinished []))
+      pure
+        (Just (ManagerEventShowError "Multiple binaries found in this package!")
+        )
 
 update' :: ManagerState -> ManagerEvent -> Transition ManagerState ManagerEvent
-update' _ ManagerEventClosed = Exit
-update' s (ManagerEventTryInstallFinished [bin]) =
-
-  Transition s (putStrLn "finished" >> pure Nothing)
-update' s ManagerEventTryInstall = case s ^. msSelectedPackage of
+update' _ ManagerEventClosed        = Exit
+update' s (ManagerEventShowError e) = pureTransition (s & msLatestError ?~ e)
+update' s ManagerEventTryInstall    = case s ^. msSelectedPackage of
   Nothing -> pureTransition s
   Just selected ->
     Transition (s & msInstallingPackage ?~ selected) (tryInstall selected)
@@ -126,5 +124,6 @@ nixMain = do
                                   , _msPackageSearchResult = mempty
                                   , _msSelectedPackage     = Nothing
                                   , _msInstallingPackage   = Nothing
+                                  , _msLatestError         = Nothing
                                   }
     }

@@ -11,6 +11,7 @@ data ManagerState = ManagerState {
    , _msPackageSearchResult :: [NixPackage]
    , _msSelectedPackage :: Maybe NixPackage
    , _msInstallingPackage :: Maybe NixPackage
+   , _msLatestError :: Maybe Text
    } deriving(Eq,Show)
 
 makeLenses ''ManagerState

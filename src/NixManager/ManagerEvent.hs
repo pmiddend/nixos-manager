@@ -9,7 +9,7 @@ data ManagerEvent = ManagerEventClosed
       | ManagerEventSearchChanged Text
       | ManagerEventPackageSelected (Maybe Int)
       | ManagerEventTryInstall
-      | ManagerEventTryInstallFinished [FilePath]
+      | ManagerEventShowError Text
       deriving(Eq,Show)
 
 makePrisms ''ManagerEvent

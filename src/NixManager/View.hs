@@ -124,22 +124,33 @@ view' s =
         [ #label := "Please enter a search term with at least two characters"
         , #expand := True
         ]
+    windowAttributes =
+      [ #title := "nix-manager 1.0"
+      , on #deleteEvent (const (True, ManagerEventClosed))
+      , #widthRequest := 1024
+      , #heightRequest := 768
+      ]
+    windowBox = container
+      Gtk.Box
+      [#orientation := Gtk.OrientationVertical, #spacing := 10]
+      (  [ BoxChild (defaultBoxChildProperties { padding = 5 }) searchBox
+         , widget Gtk.HSeparator []
+         ]
+      <> foldMap
+           (\e ->
+             [ BoxChild
+                 defaultBoxChildProperties
+                 (widget Gtk.Label [#label := e, classes ["error-message"]])
+             ]
+           )
+           (s ^. msLatestError)
+
+      <> [ packageButtonRow
+         , widget Gtk.HSeparator []
+         , BoxChild
+           (defaultBoxChildProperties { expand = True, fill = True })
+           resultBox
+         ]
+      )
   in
-    bin
-        Gtk.Window
-        [ #title := "nix-manager 1.0"
-        , on #deleteEvent (const (True, ManagerEventClosed))
-        , #widthRequest := 1024
-        , #heightRequest := 768
-        ]
-      $ container
-          Gtk.Box
-          [#orientation := Gtk.OrientationVertical, #spacing := 10]
-          [ BoxChild (defaultBoxChildProperties { padding = 5 }) searchBox
-          , widget Gtk.HSeparator []
-          , packageButtonRow
-          , widget Gtk.HSeparator []
-          , BoxChild
-            (defaultBoxChildProperties { expand = True, fill = True })
-            resultBox
-          ]
+    bin Gtk.Window windowAttributes windowBox
