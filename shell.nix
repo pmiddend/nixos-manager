@@ -8,7 +8,7 @@ let
       , cabal-install, containers, directory, filepath, gi-gtk
       , gi-gtk-declarative, gi-gtk-declarative-app-simple
       , haskell-gi-base, hlint, lens, lens-aeson, process, stdenv, text
-      , megaparsec, data-fix, gi-gdk
+      , megaparsec, data-fix, gi-gdk, pipes
       }:
       mkDerivation {
         pname = "nix-manager";
@@ -19,7 +19,7 @@ let
         executableHaskellDepends = [
           aeson base bytestring containers directory filepath gi-gtk
           gi-gtk-declarative gi-gtk-declarative-app-simple haskell-gi-base
-          lens lens-aeson process text megaparsec data-fix gi-gdk
+          lens lens-aeson process text megaparsec data-fix gi-gdk pipes
         ];
         executableToolDepends = [ brittany cabal-install hlint ];
         license = "unknown";

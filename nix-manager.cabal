@@ -17,6 +17,7 @@ executable nix-manager
   build-depends:       base
                      , containers
                      , gi-gdk
+                     , pipes
                      , lens
                      , text
                      , bytestring

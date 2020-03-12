@@ -82,6 +82,7 @@ view' s =
           [ #label := "Try without installing"
           , #sensitive := (packageSelected && not currentPackageInstalled)
           , classes ["try-install-button"]
+          , on #clicked ManagerEventTryInstall
           ]
         )
       , BoxChild

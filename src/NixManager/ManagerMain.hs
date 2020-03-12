@@ -4,6 +4,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.ManagerMain where
 
+import           System.FilePath                ( (</>) )
+import           Control.Concurrent             ( threadDelay )
 import           NixManager.Css
 import           Data.Fix                       ( Fix(Fix)
                                                 , cata
@@ -44,6 +46,9 @@ import           Data.Text                      ( toLower
 import           Prelude                 hiding ( length
                                                 , putStrLn
                                                 )
+import           Pipes                          ( Producer
+                                                , yield
+                                                )
 
 packageMatches :: Text -> NixPackage -> Bool
 packageMatches t p = toLower t `isInfixOf` (p ^. npName . to toLower)
@@ -51,8 +56,26 @@ packageMatches t p = toLower t `isInfixOf` (p ^. npName . to toLower)
 pureTransition :: ManagerState -> Transition ManagerState ManagerEvent
 pureTransition x = Transition x (pure Nothing)
 
+tryInstall :: NixPackage -> IO (Maybe ManagerEvent)
+tryInstall p = do
+  bins <- getExecutables p
+  case bins of
+    (bp, []            ) -> putStrLn "found no binaries"
+    (bp, [singleBinary]) -> startProgram (bp </> singleBinary)
+    multipleBinaries ->
+      putStrLn $ "found more bins: " <> showText multipleBinaries
+  pure Nothing
+--  pure (Just (ManagerEventTryInstallFinished []))
+
 update' :: ManagerState -> ManagerEvent -> Transition ManagerState ManagerEvent
 update' _ ManagerEventClosed = Exit
+update' s (ManagerEventTryInstallFinished [bin]) =
+
+  Transition s (putStrLn "finished" >> pure Nothing)
+update' s ManagerEventTryInstall = case s ^. msSelectedPackage of
+  Nothing -> pureTransition s
+  Just selected ->
+    Transition (s & msInstallingPackage ?~ selected) (tryInstall selected)
 update' s (ManagerEventPackageSelected (Just i)) =
   pureTransition (s & msSelectedPackage ?~ (s ^?! msPackageSearchResult . ix i))
 update' s (ManagerEventPackageSelected _) =
@@ -102,5 +125,6 @@ nixMain = do
                                   , _msSearchString        = mempty
                                   , _msPackageSearchResult = mempty
                                   , _msSelectedPackage     = Nothing
+                                  , _msInstallingPackage   = Nothing
                                   }
     }
