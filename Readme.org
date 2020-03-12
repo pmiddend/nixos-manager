@@ -1,5 +1,7 @@
 * nix-manager — manage your NixOS graphically
 
+[[./screenshots/v1.png]]
+
 ** What’s the goal of this?
 
 The idea is to build something to *configure NixOS graphically*. To me, this means: managing the installed software packages, and managing the enabled services, as well as updating and garbage-collecting. For the moment, I’m focusing on a solution for a declarative, global configuration.
