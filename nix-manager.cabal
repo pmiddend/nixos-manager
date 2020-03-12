@@ -13,8 +13,10 @@ executable nix-manager
                      , NixManager.View
                      , NixManager.NixParser
                      , NixManager.Util
+                     , NixManager.Css
   build-depends:       base
                      , containers
+                     , gi-gdk
                      , lens
                      , text
                      , bytestring

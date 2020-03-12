@@ -4,14 +4,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.View where
 
-import           Prelude                 hiding ( length )
-import           Data.Text                      ( pack
-                                                , toLower
-                                                , isInfixOf
-                                                , length
-                                                , Text
-                                                , unpack
+import           Data.Semigroup                 ( Any(Any)
+                                                , getAny
                                                 )
+import           Data.Maybe                     ( isJust )
+import           Prelude                 hiding ( length )
+import           Data.Text                      ( length )
 import           NixManager.Nix
 import           GI.Gtk.Declarative             ( bin
                                                 , padding
@@ -22,40 +20,29 @@ import           GI.Gtk.Declarative             ( bin
                                                 , Bin
                                                 , widget
                                                 , Attribute((:=))
+                                                , classes
                                                 , container
                                                 , BoxChild(BoxChild)
                                                 , on
                                                 , onM
                                                 )
-import           GI.Gtk.Declarative.App.Simple  ( AppView
-                                                , App(App)
-                                                , view
-                                                , update
-                                                , Transition(Transition, Exit)
-                                                , inputs
-                                                , initialState
-                                                , run
-                                                )
+import           GI.Gtk.Declarative.App.Simple  ( AppView )
 import           Data.Vector.Lens               ( toVectorOf )
 import qualified GI.Gtk                        as Gtk
 import           Control.Lens                   ( (^.)
                                                 , to
-                                                , (^..)
-                                                , (&)
-                                                , (.~)
                                                 , folded
-                                                , filtered
                                                 )
 import           NixManager.ManagerState
 import           NixManager.ManagerEvent
-
-packageMatches :: Text -> NixPackage -> Bool
-packageMatches t p = toLower t `isInfixOf` (p ^. npName . to toLower)
+import           NixManager.Util
 
 buildResultRow
   :: FromWidget (Bin Gtk.ListBoxRow) target => NixPackage -> target event
-buildResultRow pkg =
-  bin Gtk.ListBoxRow [] (widget Gtk.Label [#label := (pkg ^. npName)])
+buildResultRow pkg = bin
+  Gtk.ListBoxRow
+  [classes (mwhen (pkg ^. npInstalled) ["package-row-installed"])]
+  (widget Gtk.Label [#label := (pkg ^. npName)])
 
 view' :: ManagerState -> AppView Gtk.Window ManagerEvent
 view' s =
@@ -80,25 +67,57 @@ view' s =
                  searchField
       ]
     searchValid = (s ^. msSearchString . to length) >= 2
-    resultRows  = toVectorOf
-      ( msPackageCache
-      . folded
-      . filtered (packageMatches (s ^. msSearchString))
-      . to buildResultRow
-      )
-      s
+    resultRows =
+      toVectorOf (msPackageSearchResult . folded . to buildResultRow) s
+    packageSelected = isJust (s ^. msSelectedPackage)
+    currentPackageInstalled =
+      getAny (s ^. msSelectedPackage . folded . npInstalled . to Any)
     packageButtonRow = container
       Gtk.Box
       [#orientation := Gtk.OrientationHorizontal, #spacing := 10]
-      [ BoxChild (defaultBoxChildProperties { expand = True, fill = True })
-                 (widget Gtk.Button [#label := "Try without installing"])
-      , BoxChild (defaultBoxChildProperties { expand = True, fill = True })
-                 (widget Gtk.Button [#label := "Install"])
-      , BoxChild (defaultBoxChildProperties { expand = True, fill = True })
-                 (widget Gtk.Button [#label := "Remove"])
+      [ BoxChild
+        (defaultBoxChildProperties { expand = True, fill = True })
+        (widget
+          Gtk.Button
+          [ #label := "Try without installing"
+          , #sensitive := (packageSelected && not currentPackageInstalled)
+          , classes ["try-install-button"]
+          ]
+        )
+      , BoxChild
+        (defaultBoxChildProperties { expand = True, fill = True })
+        (widget
+          Gtk.Button
+          [ #label := "Install"
+          , #sensitive := (packageSelected && not currentPackageInstalled)
+          , classes ["install-button"]
+          ]
+        )
+      , BoxChild
+        (defaultBoxChildProperties { expand = True, fill = True })
+        (widget
+          Gtk.Button
+          [ #label := "Remove"
+          , #sensitive := (packageSelected && currentPackageInstalled)
+          , classes ["remove-button"]
+          ]
+        )
       ]
+    rowSelectionHandler
+      :: Maybe Gtk.ListBoxRow -> Gtk.ListBox -> IO ManagerEvent
+    rowSelectionHandler (Just row) _ = do
+      selectedIndex <- Gtk.listBoxRowGetIndex row
+      if selectedIndex == -1
+        then pure (ManagerEventPackageSelected Nothing)
+        else pure
+          (ManagerEventPackageSelected (Just (fromIntegral selectedIndex)))
+    rowSelectionHandler _ _ = pure (ManagerEventPackageSelected Nothing)
     resultBox = if searchValid
-      then bin Gtk.ScrolledWindow [] (container Gtk.ListBox [] resultRows)
+      then bin
+        Gtk.ScrolledWindow
+        []
+        (container Gtk.ListBox [onM #rowSelected rowSelectionHandler] resultRows
+        )
       else widget
         Gtk.Label
         [ #label := "Please enter a search term with at least two characters"

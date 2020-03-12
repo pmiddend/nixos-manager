@@ -4,15 +4,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.ManagerMain where
 
+import           NixManager.Css
 import           Data.Fix                       ( Fix(Fix)
                                                 , cata
                                                 )
 import           Data.Text.IO                   ( putStrLn )
+import qualified Data.Text                     as Text
 import           Control.Lens                   ( (^.)
                                                 , ix
                                                 , to
                                                 , (^..)
                                                 , (&)
+                                                , (?~)
                                                 , (^?!)
                                                 , (.~)
                                                 , folded
@@ -20,23 +23,11 @@ import           Control.Lens                   ( (^.)
                                                 )
 import           NixManager.ManagerState
 import           NixManager.Nix
+import           NixManager.Util
 import           NixManager.NixParser
 import           NixManager.ManagerEvent
 import           NixManager.View
-import           GI.Gtk.Declarative             ( bin
-                                                , padding
-                                                , defaultBoxChildProperties
-                                                , expand
-                                                , fill
-                                                , widget
-                                                , Attribute((:=))
-                                                , container
-                                                , BoxChild(BoxChild)
-                                                , on
-                                                , onM
-                                                )
-import           GI.Gtk.Declarative.App.Simple  ( AppView
-                                                , App(App)
+import           GI.Gtk.Declarative.App.Simple  ( App(App)
                                                 , view
                                                 , update
                                                 , Transition(Transition, Exit)
@@ -44,166 +35,72 @@ import           GI.Gtk.Declarative.App.Simple  ( AppView
                                                 , initialState
                                                 , run
                                                 )
-import           System.Process                 ( createProcess
-                                                , std_out
-                                                , proc
-                                                , StdStream(CreatePipe)
-                                                )
-import           Data.Map.Strict                ( Map
-                                                , elems
-                                                )
-import           Data.ByteString.Lazy           ( ByteString
-                                                , hGetContents
-                                                )
-import           Data.Aeson                     ( FromJSON(parseJSON)
-                                                , Value(Object)
-                                                , (.:)
-                                                , eitherDecode
-                                                )
-import           Data.IORef                     ( IORef
-                                                , newIORef
-                                                , readIORef
-                                                , modifyIORef
-                                                )
-import           Control.Monad                  ( forM_
-                                                , mzero
-                                                , void
-                                                )
+import           Control.Monad                  ( void )
 import qualified GI.Gtk                        as Gtk
-import           Data.GI.Base                   ( new )
-import           System.Environment             ( getArgs )
-import           Data.Text                      ( pack
-                                                , toLower
+import           Data.Text                      ( toLower
                                                 , isInfixOf
-                                                , length
                                                 , Text
-                                                , unpack
                                                 )
 import           Prelude                 hiding ( length
                                                 , putStrLn
                                                 )
 
--- createRow t = do
---   rowBox      <- Gtk.boxNew Gtk.OrientationHorizontal 0
---   rowBoxLabel <- Gtk.labelNew (Just t)
---   #add rowBox rowBoxLabel
---   resultingRow <- Gtk.listBoxRowNew
---   #add resultingRow rowBox
---   pure resultingRow
+packageMatches :: Text -> NixPackage -> Bool
+packageMatches t p = toLower t `isInfixOf` (p ^. npName . to toLower)
 
--- createSearchBox changeHandler = do
---   searchLabel <- Gtk.labelNew (Just "Search:")
---   searchBox   <- Gtk.boxNew Gtk.OrientationHorizontal 4
---   Gtk.boxPackStart searchBox searchLabel False False 6
---   searchInput <- Gtk.entryNew
---   void $ on searchInput #changed $ do
---     currentText <- Gtk.entryGetText searchInput
---     changeHandler currentText
---   Gtk.boxPackStart searchBox searchInput False False 6
---   pure searchBox
-
--- createPackageList packageGetter = do
---   packageList <- Gtk.listBoxNew
---   packages    <- packageGetter
---   forM_ packages $ \i -> do
---     r <- createRow i
---     #add packageList r
---   pure packageList
-
--- createPackages packageGetter searchChangeHandler = do
---   searchBox   <- createSearchBox searchChangeHandler
---   packageList <- createPackageList packageGetter
---   packagesBox <- Gtk.boxNew Gtk.OrientationVertical 6
---   #add packagesBox searchBox
---   #add packagesBox packageList
---   packagesScrolled <- new Gtk.ScrolledWindow []
---   #add packagesScrolled packagesBox
---   pure packagesScrolled
-
-type Endo a = a -> a
-
-data AppState = AppState {
-  _appStateSearchText :: Text
-  , _appStatePackages :: [NixPackage]
-  }
-
-type AppStateRef = IORef AppState
-
-createAppState :: AppState -> IO AppStateRef
-createAppState = newIORef
-
-readAppState :: AppStateRef -> IO AppState
-readAppState = readIORef
-
-modifyAppState :: AppStateRef -> Endo AppState -> IO ()
-modifyAppState = modifyIORef
-
-mwhen :: Monoid m => Bool -> m -> m
-mwhen True  v = v
-mwhen False _ = mempty
-
+pureTransition :: ManagerState -> Transition ManagerState ManagerEvent
+pureTransition x = Transition x (pure Nothing)
 
 update' :: ManagerState -> ManagerEvent -> Transition ManagerState ManagerEvent
 update' _ ManagerEventClosed = Exit
-update' s (ManagerEventSearchChanged t) =
-  Transition (s & msSearchString .~ t) (pure Nothing)
+update' s (ManagerEventPackageSelected (Just i)) =
+  pureTransition (s & msSelectedPackage ?~ (s ^?! msPackageSearchResult . ix i))
+update' s (ManagerEventPackageSelected _) =
+  pureTransition (s & msSelectedPackage .~ Nothing)
+update' s (ManagerEventSearchChanged t) = pureTransition
+  (  s
+  &  msSearchString
+  .~ t
+  &  msPackageSearchResult
+  .~ (s ^.. msPackageCache . folded . filtered (packageMatches t))
+  )
 
 readInstalledPackages :: IO [Text]
 readInstalledPackages = do
   expr <- parseFile "packages.nix"
   case expr of
     Right (Fix (NixFunctionDecl _ (Fix (NixSet m)))) ->
-      pure (cata evalSymbols (m ^?! ix "environment.systemPackages"))
+      pure
+        (   Text.drop 5
+        <$> cata evalSymbols (m ^?! ix "environment.systemPackages")
+        )
     Left e -> do
       putStrLn ("parse error " <> e)
       error "parse error"
     _ -> error "invalid packages.nix"
 
-nixMain :: IO ()
-nixMain = do
-  putStrLn "Reading cache..."
+readCache :: IO [NixPackage]
+readCache = do
   cache             <- nixSearchUnsafe ""
   installedPackages <- readInstalledPackages
+  pure
+    $   (\ip -> ip & npInstalled .~ ((ip ^. npName) `elem` installedPackages))
+    <$> cache
+
+nixMain :: IO ()
+nixMain = do
+  void (Gtk.init Nothing)
+  putStrLn "Reading cache..."
   putStrLn "Starting..."
+  initCss
+  cache <- readCache
   void $ run App
     { view         = view'
     , update       = update'
     , inputs       = []
-    , initialState = ManagerState { _msPackageCache      = cache
-                                  , _msSearchString      = ""
-                                  , _msInstalledPackages = installedPackages
+    , initialState = ManagerState { _msPackageCache        = cache
+                                  , _msSearchString        = mempty
+                                  , _msPackageSearchResult = mempty
+                                  , _msSelectedPackage     = Nothing
                                   }
     }
-  -- sr <- nixSearch "kde"
-  -- case sr of
-  --   Left  e -> error e
-  --   Right v -> mapM_ (putStrLn . unpack . _npName) v
-  -- argv             <- getArgs
-  -- (initSuccess, _) <- Gtk.initCheck (Just (pack <$> argv))
-  -- if initSuccess
-  --   then do
-  --     win          <- new Gtk.Window [#title := "nix-manager"]
-  --     _            <- on win #destroy Gtk.mainQuit
-  --     mainNotebook <- Gtk.notebookNew
-  --     #add win mainNotebook
-  --     packages <- nixSearchUnsafe ""
-  --     appState <- createAppState (AppState "" packages)
-  --     let packageGetter = do
-  --           as <- readAppState appState
-  --           if length (_appStateSearchText as) < 2
-  --             then pure []
-  --             else do
-  --               let matchingPackages = filter
-  --                     (((_appStateSearchText as `isInfixOf`)) . _npName)
-  --                     (_appStatePackages as)
-  --               pure ((_npName) <$> matchingPackages)
-  --         searchChangeHandler t =
-  --           modifyAppState appState (\as -> as { _appStateSearchText = t })
-  --     packagesScrolled <- createPackages packageGetter searchChangeHandler
-  --     packagesLabel    <- Gtk.labelNew (Just "Packages")
-  --     iRun             <- Gtk.notebookAppendPage mainNotebook
-  --                                                packagesScrolled
-  --                                                (Just packagesLabel)
-  --     #showAll win
-  --     Gtk.main
-  --   else putStrLn "Init failed"

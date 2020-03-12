@@ -31,13 +31,21 @@ data NixPackage = NixPackage {
     _npName :: Text
   , _npVersion :: Text
   , _npDescription :: Text
+  , _npInstalled :: Bool
   } deriving(Eq,Show)
 
 makeLenses ''NixPackage
 
 instance FromJSON NixPackage where
   parseJSON (Object v) =
-    NixPackage <$> v .: "pkgName" <*> v .: "version" <*> v .: "description"
+    NixPackage
+      <$> v
+      .:  "pkgName"
+      <*> v
+      .:  "version"
+      <*> v
+      .:  "description"
+      <*> pure False
   parseJSON _ = mzero
 
 decodeNixSearchResult :: ByteString -> Either String (Map Text NixPackage)
