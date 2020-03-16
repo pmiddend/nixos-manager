@@ -10,6 +10,8 @@ executable nix-manager
                      , NixManager.Nix
                      , NixManager.ManagerState
                      , NixManager.ManagerEvent
+                     , NixManager.PackageView
+                     , NixManager.ServiceView
                      , NixManager.View
                      , NixManager.Message
                      , NixManager.NixParser

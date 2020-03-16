@@ -2,13 +2,12 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
-module NixManager.View
-  ( view'
+module NixManager.ServiceView
+  ( servicesBox
   )
 where
 
 import           NixManager.PackageView         ( packagesBox )
-import           NixManager.ServiceView         ( servicesBox )
 import           Data.Text                      ( intercalate )
 import           NixManager.Nix
 import           GI.Gtk.Declarative             ( bin
@@ -34,16 +33,22 @@ import           Control.Lens                   ( (^.)
 import           NixManager.ManagerState
 import           NixManager.ManagerEvent
 
-windowAttributes =
-  [ #title := "nix-manager 1.0"
-  , on #deleteEvent (const (True, ManagerEventClosed))
-  , #widthRequest := 1024
-  , #heightRequest := 768
-  ]
 
-view' :: ManagerState -> AppView Gtk.Window ManagerEvent
-view' s =
-  let windowContents = notebook
-        []
-        [page "Packages" (packagesBox s), page "Services" (servicesBox s)]
-  in  bin Gtk.Window windowAttributes windowContents
+buildServiceRow
+  :: FromWidget (Bin Gtk.ListBoxRow) target => NixService -> target event
+buildServiceRow svc = bin
+  Gtk.ListBoxRow
+  []
+  (widget Gtk.Label [#label := (svc ^. serviceLoc . to (intercalate "."))])
+
+
+
+serviceRows s = toVectorOf (msServiceCache . folded . to buildServiceRow) s
+
+servicesLeftPane s =
+  bin Gtk.ScrolledWindow [] (container Gtk.ListBox [] (serviceRows s))
+
+servicesBox s = paned
+  []
+  (pane defaultPaneProperties (servicesLeftPane s))
+  (pane defaultPaneProperties $ widget Gtk.Label [#label := "right"])
