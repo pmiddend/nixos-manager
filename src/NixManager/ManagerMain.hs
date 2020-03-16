@@ -104,18 +104,23 @@ update' s (ManagerEventSearchChanged t) =
 nixMain :: IO ()
 nixMain = do
   void (Gtk.init Nothing)
-  putStrLn "Reading cache..."
-  putStrLn "Starting..."
-  initCss
-  cache <- readCache
-  void $ run App
-    { view         = view'
-    , update       = update'
-    , inputs       = []
-    , initialState = ManagerState { _msPackageCache       = cache
-                                  , _msSearchString       = mempty
-                                  , _msSelectedPackageIdx = Nothing
-                                  , _msInstallingPackage  = Nothing
-                                  , _msLatestMessage      = Nothing
-                                  }
-    }
+  putStrLn "Reading options..."
+  svcs <- readOptionsFile "options.json"
+  case svcs of
+    Left  e       -> printError e
+    Right options -> do
+      initCss
+      putStrLn "Reading cache..."
+      cache <- readCache
+      void $ run App
+        { view         = view'
+        , update       = update'
+        , inputs       = []
+        , initialState = ManagerState { _msPackageCache       = cache
+                                      , _msSearchString       = mempty
+                                      , _msSelectedPackageIdx = Nothing
+                                      , _msInstallingPackage  = Nothing
+                                      , _msLatestMessage      = Nothing
+                                      , _msServiceCache = makeServices options
+                                      }
+        }

@@ -3,13 +3,17 @@
 {-# LANGUAGE TemplateHaskell #-}
 module NixManager.Nix where
 
+import qualified Data.Set                      as Set
+import           Data.Bifunctor                 ( first )
 import           Data.Text.IO                   ( putStrLn )
-import           Prelude                 hiding ( putStrLn )
+import           Prelude                 hiding ( putStrLn
+                                                , readFile
+                                                )
 import           Data.Fix                       ( Fix(Fix)
                                                 , cata
                                                 )
-import           Data.List                      ( unfoldr
-                                                , intercalate
+import           Data.List                      ( intercalate
+                                                , isPrefixOf
                                                 , find
                                                 , inits
                                                 )
@@ -19,10 +23,13 @@ import           Control.Exception              ( catch
                                                 , IOException
                                                 )
 import           Data.Map.Strict                ( Map
+                                                , toList
+                                                , insertWith
                                                 , elems
                                                 )
 import           Data.ByteString.Lazy           ( ByteString
                                                 , hGetContents
+                                                , readFile
                                                 )
 import           Data.ByteString.Lazy.Lens      ( unpackedChars )
 import           System.Process                 ( createProcess
@@ -39,6 +46,7 @@ import           Data.Aeson                     ( FromJSON
                                                 , Value(Object)
                                                 , parseJSON
                                                 , (.:)
+                                                , (.:?)
                                                 , eitherDecode
                                                 )
 import           Control.Lens                   ( (^.)
@@ -63,6 +71,7 @@ import           Control.Monad                  ( mzero
                                                 , void
                                                 )
 import           NixManager.NixParser
+import           NixManager.Util
 
 
 data NixPackage = NixPackage {
@@ -103,14 +112,65 @@ nixSearchUnsafe t = do
     Left  e -> error e
     Right v -> pure v
 
-splitRepeat :: Char -> String -> [String]
-splitRepeat c = unfoldr f
- where
-  f :: String -> Maybe (String, String)
-  f "" = Nothing
-  f x  = case span (/= c) x of
-    (before, []       ) -> Just (before, "")
-    (before, _ : after) -> Just (before, after)
+type OptionLocation = [Text]
+
+data NixServiceOption = NixServiceOption {
+    _optionDefault :: Maybe Value
+  , _optionDescription :: Text
+  , _optionLoc :: OptionLocation
+  , _optionType :: Text
+  } deriving(Show, Eq)
+
+makeLenses ''NixServiceOption
+
+instance FromJSON NixServiceOption where
+  parseJSON (Object v) =
+    NixServiceOption
+      <$> v
+      .:? "default"
+      <*> v
+      .:  "description"
+      <*> v
+      .:  "loc"
+      <*> v
+      .:  "type"
+  parseJSON _ = mzero
+
+
+decodeOptions :: ByteString -> Either ErrorMessage (Map Text NixServiceOption)
+decodeOptions = first errorMessageFromString . eitherDecode
+
+readOptionsFile
+  :: FilePath -> IO (Either ErrorMessage (Map Text NixServiceOption))
+readOptionsFile fp = decodeOptions <$> readFile fp
+
+data NixService = NixService {
+    _serviceLoc :: OptionLocation
+  , _serviceOptions :: [NixServiceOption]
+  } deriving(Show, Eq)
+
+makeLenses ''NixService
+
+makeServices :: Map Text NixServiceOption -> [NixService]
+makeServices options' =
+  let
+    options = elems options'
+    servicePaths :: Set.Set OptionLocation
+    servicePaths = Set.fromList
+      (init <$> filter ((== "enable") . last) (view optionLoc <$> options))
+    serviceForOption :: NixServiceOption -> Maybe OptionLocation
+    serviceForOption opt = case Set.lookupLT (opt ^. optionLoc) servicePaths of
+      Nothing -> Nothing
+      Just result ->
+        if result `isPrefixOf` (opt ^. optionLoc) then Just result else Nothing
+    transducer
+      :: NixServiceOption -> Endo (Map OptionLocation [NixServiceOption])
+    transducer opt m = case serviceForOption opt of
+      Nothing          -> m
+      Just serviceLoc' -> insertWith (<>) serviceLoc' [opt] m
+    serviceMap = foldr transducer mempty options
+  in
+    uncurry NixService <$> toList serviceMap
 
 matchName :: String -> [FilePath] -> Maybe FilePath
 matchName pkgName bins =

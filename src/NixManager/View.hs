@@ -11,6 +11,7 @@ import           Data.Maybe                     ( isJust )
 import           Prelude                 hiding ( length )
 import           Data.Text                      ( length
                                                 , Text
+                                                , intercalate
                                                 , toLower
                                                 , isInfixOf
                                                 )
@@ -18,9 +19,14 @@ import           NixManager.Nix
 import           GI.Gtk.Declarative             ( bin
                                                 , Widget
                                                 , padding
+                                                , pane
+                                                , paned
+                                                , notebook
+                                                , page
                                                 , defaultBoxChildProperties
                                                 , expand
                                                 , fill
+                                                , defaultPaneProperties
                                                 , FromWidget
                                                 , Bin
                                                 , widget
@@ -50,6 +56,13 @@ buildResultRow pkg = bin
   Gtk.ListBoxRow
   [classes (mwhen (pkg ^. npInstalled) ["package-row-installed"])]
   (widget Gtk.Label [#label := (pkg ^. npName)])
+
+buildServiceRow
+  :: FromWidget (Bin Gtk.ListBoxRow) target => NixService -> target event
+buildServiceRow svc = bin
+  Gtk.ListBoxRow
+  []
+  (widget Gtk.Label [#label := (svc ^. serviceLoc . to (intercalate "."))])
 
 processSearchChange w = ManagerEventSearchChanged <$> Gtk.getEntryText w
 
@@ -148,7 +161,7 @@ view' s =
         [ #label := "Please enter a search term with at least two characters"
         , #expand := True
         ]
-    windowBox = container
+    packagesBox = container
       Gtk.Box
       [#orientation := Gtk.OrientationVertical, #spacing := 10]
       (  [ BoxChild (defaultBoxChildProperties { padding = 5 }) searchBox
@@ -179,5 +192,14 @@ view' s =
            resultBox
          ]
       )
+    serviceRows = toVectorOf (msServiceCache . folded . to buildServiceRow) s
+    servicesLeftPane =
+      bin Gtk.ScrolledWindow [] (container Gtk.ListBox [] serviceRows)
+    servicesBox = paned
+      []
+      (pane defaultPaneProperties servicesLeftPane)
+      (pane defaultPaneProperties $ widget Gtk.Label [#label := "right"])
+    windowContents =
+      notebook [] [page "Packages" packagesBox, page "Services" servicesBox]
   in
-    bin Gtk.Window windowAttributes windowBox
+    bin Gtk.Window windowAttributes windowContents

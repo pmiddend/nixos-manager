@@ -4,6 +4,7 @@ module NixManager.ManagerState where
 
 import           NixManager.Nix                 ( NixPackage
                                                 , npName
+                                                , NixService
                                                 )
 import           NixManager.Message
 import           Control.Lens                   ( makeLenses
@@ -27,6 +28,7 @@ data ManagerState = ManagerState {
    , _msSelectedPackageIdx :: Maybe Int
    , _msInstallingPackage :: Maybe NixPackage
    , _msLatestMessage :: Maybe Message
+   , _msServiceCache :: [NixService]
    } deriving(Eq,Show)
 
 makeLenses ''ManagerState
