@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveTraversable #-}
 module NixManager.NixParser where
 
@@ -20,9 +21,12 @@ import           Text.Megaparsec                ( Parsec
                                                 )
 import           Prelude                 hiding ( readFile
                                                 , unwords
+                                                , writeFile
                                                 )
 import           Data.Void                      ( Void )
-import           Data.Text.IO                   ( readFile )
+import           Data.Text.IO                   ( readFile
+                                                , writeFile
+                                                )
 import           Data.Text                      ( Text
                                                 , intercalate
                                                 , unwords
@@ -40,11 +44,26 @@ import           Text.Megaparsec.Char           ( space1
                                                 , string
                                                 )
 import           Control.Applicative            ( empty )
-import           Data.Fix                       ( Fix(Fix) )
+import           Data.Fix                       ( Fix(Fix)
+                                                , cata
+                                                )
+import           Control.Lens                   ( makePrisms
+                                                , makeLenses
+                                                , prism'
+                                                , Prism'
+                                                , (^.)
+                                                )
+
+data NixFunction a = NixFunction {
+    _nfArgs :: [Text]
+  , _nfExpr :: a
+  } deriving(Show, Functor, Traversable, Foldable)
+
+makeLenses ''NixFunction
 
 data NixExprF r = NixList [r]
              | NixSet (Map Text r)
-             | NixFunctionDecl [Text] r
+             | NixFunctionDecl (NixFunction r)
              | NixSymbol Text
              | NixString Text
              | NixBoolean Bool
@@ -54,6 +73,63 @@ data NixExprF r = NixList [r]
              deriving(Show, Functor, Traversable, Foldable)
 
 type NixExpr = Fix NixExprF
+
+makePrisms ''NixExprF
+
+-- FIXME: We need a Prism or something for Fix, but I don't know how to write one.
+_NixNull' :: Prism' NixExpr ()
+_NixNull' = prism' (\_ -> Fix NixNull) f
+ where
+  f (Fix NixNull) = Just ()
+  f _             = Nothing
+
+_NixFloat' :: Prism' NixExpr Double
+_NixFloat' = prism' (Fix . NixFloat) f
+ where
+  f (Fix (NixFloat x)) = Just x
+  f _                  = Nothing
+
+_NixInt' :: Prism' NixExpr Integer
+_NixInt' = prism' (Fix . NixInt) f
+ where
+  f (Fix (NixInt x)) = Just x
+  f _                = Nothing
+
+_NixBoolean' :: Prism' NixExpr Bool
+_NixBoolean' = prism' (Fix . NixBoolean) f
+ where
+  f (Fix (NixBoolean x)) = Just x
+  f _                    = Nothing
+
+_NixString' :: Prism' NixExpr Text
+_NixString' = prism' (Fix . NixString) f
+ where
+  f (Fix (NixString x)) = Just x
+  f _                   = Nothing
+
+_NixSymbol' :: Prism' NixExpr Text
+_NixSymbol' = prism' (Fix . NixSymbol) f
+ where
+  f (Fix (NixSymbol x)) = Just x
+  f _                   = Nothing
+
+_NixFunctionDecl' :: Prism' NixExpr (NixFunction NixExpr)
+_NixFunctionDecl' = prism' (Fix . NixFunctionDecl) f
+ where
+  f (Fix (NixFunctionDecl t)) = Just t
+  f _                         = Nothing
+
+_NixSet' :: Prism' NixExpr (Map Text NixExpr)
+_NixSet' = prism' (Fix . NixSet) f
+ where
+  f (Fix (NixSet m)) = Just m
+  f _                = Nothing
+
+_NixList' :: Prism' NixExpr [NixExpr]
+_NixList' = prism' (Fix . NixList) f
+ where
+  f (Fix (NixList m)) = Just m
+  f _                 = Nothing
 
 evalSymbols :: NixExprF [Text] -> [Text]
 evalSymbols (NixSymbol r) = [r]
@@ -67,8 +143,8 @@ prettyPrint (NixBoolean True ) = "true"
 prettyPrint (NixBoolean False) = "false"
 prettyPrint (NixString  s    ) = "\"" <> s <> "\""
 prettyPrint (NixSymbol  s    ) = s
-prettyPrint (NixFunctionDecl args body) =
-  "{ " <> intercalate "," args <> " }: " <> body
+prettyPrint (NixFunctionDecl fn) =
+  "{ " <> intercalate "," (fn ^. nfArgs) <> " }: " <> (fn ^. nfExpr)
 prettyPrint (NixList xs) = "[ " <> unwords xs <> " ]"
 prettyPrint (NixSet m) =
   "{ " <> foldMap (\(k, v) -> k <> " = " <> v <> "; ") (toList m) <> " }"
@@ -129,8 +205,7 @@ functionDeclParser = do
   symbols <- lexeme symbolParser' `sepBy` lexeme (char ',')
   void (lexeme (char '}'))
   void (lexeme (char ':'))
-  expr <- exprParser
-  pure (Fix (NixFunctionDecl symbols expr))
+  Fix . NixFunctionDecl . NixFunction symbols <$> exprParser
 
 
 floatParser :: Parser NixExpr
@@ -178,3 +253,6 @@ exprParser =
 parseFile :: FilePath -> IO (Either Text NixExpr)
 parseFile fn =
   first (pack . errorBundlePretty) . parse exprParser fn <$> readFile fn
+
+writeExprFile :: FilePath -> NixExpr -> IO ()
+writeExprFile fp = writeFile fp . cata prettyPrint

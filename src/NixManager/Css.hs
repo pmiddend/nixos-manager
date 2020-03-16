@@ -13,6 +13,7 @@ styles = mconcat
   , ".try-install-button { background-image: image(#cdffcd); }"
   , ".remove-button { background-image: image(#ffaeae); }"
   , ".error-message { background-image: image(#e1d08e); }"
+  , ".info-message { background-image: image(#bef7ff); }"
   ]
 
 initCss :: IO ()

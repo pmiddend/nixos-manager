@@ -3,6 +3,11 @@
 {-# LANGUAGE TemplateHaskell #-}
 module NixManager.Nix where
 
+import           Data.Text.IO                   ( putStrLn )
+import           Prelude                 hiding ( putStrLn )
+import           Data.Fix                       ( Fix(Fix)
+                                                , cata
+                                                )
 import           Data.List                      ( unfoldr
                                                 , intercalate
                                                 , find
@@ -25,6 +30,7 @@ import           System.Process                 ( createProcess
                                                 , std_out
                                                 , StdStream(CreatePipe)
                                                 )
+import qualified Data.Text                     as Text
 import           Data.Text                      ( Text
                                                 , toLower
                                                 , strip
@@ -36,9 +42,19 @@ import           Data.Aeson                     ( FromJSON
                                                 , eitherDecode
                                                 )
 import           Control.Lens                   ( (^.)
+                                                , _Right
+                                                , (.~)
                                                 , makeLenses
+                                                , (^?)
+                                                , ix
+                                                , Traversal'
                                                 , view
+                                                , hasn't
+                                                , only
+                                                , (<>~)
+                                                , (&)
                                                 , to
+                                                , (%~)
                                                 )
 import           Data.Text.Lens                 ( unpacked
                                                 , packed
@@ -46,6 +62,7 @@ import           Data.Text.Lens                 ( unpacked
 import           Control.Monad                  ( mzero
                                                 , void
                                                 )
+import           NixManager.NixParser
 
 
 data NixPackage = NixPackage {
@@ -122,3 +139,61 @@ getExecutables pkg = do
 
 startProgram :: FilePath -> IO ()
 startProgram fn = void $ createProcess (proc fn [])
+
+packageLens :: Traversal' NixExpr NixExpr
+packageLens =
+  _NixFunctionDecl' . nfExpr . _NixSet' . ix "environment.systemPackages"
+
+parsePackages :: IO (Either Text NixExpr)
+parsePackages = parseFile "packages.nix"
+
+writePackages :: NixExpr -> IO ()
+writePackages = writeExprFile "packages.nix"
+
+readInstalledPackages :: IO [Text]
+readInstalledPackages = do
+  expr <- parsePackages
+  case expr ^? _Right . packageLens of
+    Just packages -> pure (Text.drop 5 <$> cata evalSymbols packages)
+    Nothing       -> do
+      putStrLn "parse error: couldn't find packages node"
+      -- FIXME: Better error handling
+      error "parse error"
+
+packagePrefix :: Text
+packagePrefix = "pkgs."
+
+installPackage :: Text -> IO (Maybe Text)
+installPackage p = do
+  expr' <- parsePackages
+  case expr' of
+    Left  e    -> pure (Just e)
+    Right expr -> do
+      writePackages
+        (   expr
+        &   packageLens
+        .   _NixList'
+        <>~ [Fix (NixSymbol (packagePrefix <> p))]
+        )
+      pure Nothing
+
+uninstallPackage :: Text -> IO (Maybe Text)
+uninstallPackage p = do
+  expr' <- parsePackages
+  case expr' of
+    Left  e    -> pure (Just e)
+    Right expr -> do
+      writePackages
+        (expr & packageLens . _NixList' %~ filter
+          (hasn't (_NixSymbol' . only (packagePrefix <> p)))
+        )
+      pure Nothing
+
+readCache :: IO [NixPackage]
+readCache = do
+  cache             <- nixSearchUnsafe ""
+  installedPackages <- readInstalledPackages
+  pure
+    $   (\ip -> ip & npInstalled .~ ((ip ^. npName) `elem` installedPackages))
+    <$> cache
+

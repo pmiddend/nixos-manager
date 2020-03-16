@@ -3,13 +3,18 @@ module NixManager.ManagerEvent where
 
 import           Data.Text                      ( Text )
 import           Control.Lens                   ( makePrisms )
-
+import           NixManager.Message
+import           NixManager.Nix                 ( NixPackage )
 
 data ManagerEvent = ManagerEventClosed
       | ManagerEventSearchChanged Text
       | ManagerEventPackageSelected (Maybe Int)
+      | ManagerEventInstall
+      | ManagerEventInstallCompleted [NixPackage]
+      | ManagerEventUninstallCompleted [NixPackage]
+      | ManagerEventUninstall
       | ManagerEventTryInstall
-      | ManagerEventShowError Text
+      | ManagerEventShowMessage Message
       deriving(Eq,Show)
 
 makePrisms ''ManagerEvent

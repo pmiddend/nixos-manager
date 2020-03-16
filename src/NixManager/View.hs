@@ -9,9 +9,14 @@ import           Data.Semigroup                 ( Any(Any)
                                                 )
 import           Data.Maybe                     ( isJust )
 import           Prelude                 hiding ( length )
-import           Data.Text                      ( length )
+import           Data.Text                      ( length
+                                                , Text
+                                                , toLower
+                                                , isInfixOf
+                                                )
 import           NixManager.Nix
 import           GI.Gtk.Declarative             ( bin
+                                                , Widget
                                                 , padding
                                                 , defaultBoxChildProperties
                                                 , expand
@@ -31,11 +36,13 @@ import           Data.Vector.Lens               ( toVectorOf )
 import qualified GI.Gtk                        as Gtk
 import           Control.Lens                   ( (^.)
                                                 , to
+                                                , has
                                                 , folded
                                                 )
 import           NixManager.ManagerState
 import           NixManager.ManagerEvent
 import           NixManager.Util
+import           NixManager.Message
 
 buildResultRow
   :: FromWidget (Bin Gtk.ListBoxRow) target => NixPackage -> target event
@@ -44,31 +51,55 @@ buildResultRow pkg = bin
   [classes (mwhen (pkg ^. npInstalled) ["package-row-installed"])]
   (widget Gtk.Label [#label := (pkg ^. npName)])
 
+processSearchChange w = ManagerEventSearchChanged <$> Gtk.getEntryText w
+
+searchLabel :: Widget event
+searchLabel =
+  widget Gtk.Label [#label := "Search in packages:", #halign := Gtk.AlignEnd]
+
+searchField :: Widget ManagerEvent
+searchField = widget
+  Gtk.SearchEntry
+  [ #placeholderText := "Enter a package name or part of a name..."
+  , #maxWidthChars := 50
+  , onM #searchChanged processSearchChange
+  , #halign := Gtk.AlignFill
+  ]
+
+searchBox :: Widget ManagerEvent
+searchBox = container
+  Gtk.Box
+  [#orientation := Gtk.OrientationHorizontal, #spacing := 10]
+  [ BoxChild (defaultBoxChildProperties { expand = True, fill = True })
+             searchLabel
+  , BoxChild (defaultBoxChildProperties { expand = True, fill = True })
+             searchField
+  ]
+
+rowSelectionHandler :: Maybe Gtk.ListBoxRow -> Gtk.ListBox -> IO ManagerEvent
+rowSelectionHandler (Just row) _ = do
+  selectedIndex <- Gtk.listBoxRowGetIndex row
+  if selectedIndex == -1
+    then pure (ManagerEventPackageSelected Nothing)
+    else pure (ManagerEventPackageSelected (Just (fromIntegral selectedIndex)))
+rowSelectionHandler _ _ = pure (ManagerEventPackageSelected Nothing)
+
+windowAttributes =
+  [ #title := "nix-manager 1.0"
+  , on #deleteEvent (const (True, ManagerEventClosed))
+  , #widthRequest := 1024
+  , #heightRequest := 768
+  ]
+
+packageMatches :: Text -> NixPackage -> Bool
+packageMatches t p = toLower t `isInfixOf` (p ^. npName . to toLower)
+
+
 view' :: ManagerState -> AppView Gtk.Window ManagerEvent
 view' s =
   let
-    searchLabel = widget
-      Gtk.Label
-      [#label := "Search in packages:", #halign := Gtk.AlignEnd]
-    processSearchChange w = ManagerEventSearchChanged <$> Gtk.getEntryText w
-    searchField = widget
-      Gtk.SearchEntry
-      [ #placeholderText := "Enter a package name or part of a name..."
-      , #maxWidthChars := 50
-      , onM #searchChanged processSearchChange
-      , #halign := Gtk.AlignFill
-      ]
-    searchBox = container
-      Gtk.Box
-      [#orientation := Gtk.OrientationHorizontal, #spacing := 10]
-      [ BoxChild (defaultBoxChildProperties { expand = True, fill = True })
-                 searchLabel
-      , BoxChild (defaultBoxChildProperties { expand = True, fill = True })
-                 searchField
-      ]
-    searchValid = (s ^. msSearchString . to length) >= 2
-    resultRows =
-      toVectorOf (msPackageSearchResult . folded . to buildResultRow) s
+    searchValid     = (s ^. msSearchString . to length) >= 2
+    resultRows      = toVectorOf (msSearchResult . folded . to buildResultRow) s
     packageSelected = isJust (s ^. msSelectedPackage)
     currentPackageInstalled =
       getAny (s ^. msSelectedPackage . folded . npInstalled . to Any)
@@ -92,6 +123,7 @@ view' s =
           [ #label := "Install"
           , #sensitive := (packageSelected && not currentPackageInstalled)
           , classes ["install-button"]
+          , on #clicked ManagerEventInstall
           ]
         )
       , BoxChild
@@ -101,18 +133,10 @@ view' s =
           [ #label := "Remove"
           , #sensitive := (packageSelected && currentPackageInstalled)
           , classes ["remove-button"]
+          , on #clicked ManagerEventUninstall
           ]
         )
       ]
-    rowSelectionHandler
-      :: Maybe Gtk.ListBoxRow -> Gtk.ListBox -> IO ManagerEvent
-    rowSelectionHandler (Just row) _ = do
-      selectedIndex <- Gtk.listBoxRowGetIndex row
-      if selectedIndex == -1
-        then pure (ManagerEventPackageSelected Nothing)
-        else pure
-          (ManagerEventPackageSelected (Just (fromIntegral selectedIndex)))
-    rowSelectionHandler _ _ = pure (ManagerEventPackageSelected Nothing)
     resultBox = if searchValid
       then bin
         Gtk.ScrolledWindow
@@ -124,12 +148,6 @@ view' s =
         [ #label := "Please enter a search term with at least two characters"
         , #expand := True
         ]
-    windowAttributes =
-      [ #title := "nix-manager 1.0"
-      , on #deleteEvent (const (True, ManagerEventClosed))
-      , #widthRequest := 1024
-      , #heightRequest := 768
-      ]
     windowBox = container
       Gtk.Box
       [#orientation := Gtk.OrientationVertical, #spacing := 10]
@@ -140,10 +158,19 @@ view' s =
            (\e ->
              [ BoxChild
                  defaultBoxChildProperties
-                 (widget Gtk.Label [#label := e, classes ["error-message"]])
+                 (widget
+                   Gtk.Label
+                   [ #label := (e ^. messageText)
+                   , classes
+                     [ if has (messageType . _ErrorMessage) e
+                         then "error-message"
+                         else "info-message"
+                     ]
+                   ]
+                 )
              ]
            )
-           (s ^. msLatestError)
+           (s ^. msLatestMessage)
 
       <> [ packageButtonRow
          , widget Gtk.HSeparator []

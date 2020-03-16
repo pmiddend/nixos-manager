@@ -11,6 +11,7 @@ executable nix-manager
                      , NixManager.ManagerState
                      , NixManager.ManagerEvent
                      , NixManager.View
+                     , NixManager.Message
                      , NixManager.NixParser
                      , NixManager.Util
                      , NixManager.Css
