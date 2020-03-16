@@ -29,6 +29,7 @@ data ManagerState = ManagerState {
    , _msInstallingPackage :: Maybe NixPackage
    , _msLatestMessage :: Maybe Message
    , _msServiceCache :: [NixService]
+   , _msSelectedServiceIdx :: Maybe Int
    } deriving(Eq,Show)
 
 makeLenses ''ManagerState

@@ -9,6 +9,7 @@ import           NixManager.Nix                 ( NixPackage )
 data ManagerEvent = ManagerEventClosed
       | ManagerEventSearchChanged Text
       | ManagerEventPackageSelected (Maybe Int)
+      | ManagerEventServiceSelected (Maybe Int)
       | ManagerEventInstall
       | ManagerEventInstallCompleted [NixPackage]
       | ManagerEventUninstallCompleted [NixPackage]

@@ -97,6 +97,8 @@ update' s ManagerEventTryInstall = case s ^. msSelectedPackage of
     Transition (s & msInstallingPackage ?~ selected) (tryInstall selected)
 update' s (ManagerEventPackageSelected i) =
   pureTransition (s & msSelectedPackageIdx .~ i)
+update' s (ManagerEventServiceSelected i) =
+  pureTransition (s & msSelectedServiceIdx .~ i)
 update' s (ManagerEventSearchChanged t) =
   pureTransition (s & msSearchString .~ t)
 
@@ -122,5 +124,6 @@ nixMain = do
                                       , _msInstallingPackage  = Nothing
                                       , _msLatestMessage      = Nothing
                                       , _msServiceCache = makeServices options
+                                      , _msSelectedServiceIdx = Nothing
                                       }
         }
