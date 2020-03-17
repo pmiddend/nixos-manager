@@ -71,10 +71,10 @@ update' s ManagerEventInstall = case s ^. msSelectedPackage of
   Nothing       -> pureTransition s
   Just selected -> Transition s $ do
     installResult <- installPackage (selected ^. npName)
-    newCache      <- readCache
-    case installResult of
-      Nothing -> pure (Just (ManagerEventInstallCompleted newCache))
-      Just e ->
+    cacheResult   <- readCache
+    case installResult >>= const cacheResult of
+      Success newCache -> pure (Just (ManagerEventInstallCompleted newCache))
+      Error e ->
         pure
           (Just
             (ManagerEventShowMessage (errorMessage ("Install failed: " <> e)))
@@ -83,10 +83,10 @@ update' s ManagerEventUninstall = case s ^. msSelectedPackage of
   Nothing       -> pureTransition s
   Just selected -> Transition s $ do
     uninstallResult <- uninstallPackage (selected ^. npName)
-    newCache        <- readCache
-    case uninstallResult of
-      Nothing -> pure (Just (ManagerEventUninstallCompleted newCache))
-      Just e ->
+    cacheResult     <- readCache
+    case uninstallResult >>= const cacheResult of
+      Success newCache -> pure (Just (ManagerEventUninstallCompleted newCache))
+      Error e ->
         pure
           (Just
             (ManagerEventShowMessage (errorMessage ("Uninstall failed: " <> e)))
@@ -102,28 +102,28 @@ update' s (ManagerEventServiceSelected i) =
 update' s (ManagerEventSearchChanged t) =
   pureTransition (s & msSearchString .~ t)
 
+initState :: IO (MaybeError ManagerState)
+initState = ifSuccessIO (readOptionsFile "options.json") $ \options ->
+  ifSuccessIO readCache $ \cache -> pure $ Success $ ManagerState
+    { _msPackageCache       = cache
+    , _msSearchString       = mempty
+    , _msSelectedPackageIdx = Nothing
+    , _msInstallingPackage  = Nothing
+    , _msLatestMessage      = Nothing
+    , _msServiceCache       = makeServices options
+    , _msSelectedServiceIdx = Nothing
+    }
 
 nixMain :: IO ()
 nixMain = do
   void (Gtk.init Nothing)
-  putStrLn "Reading options..."
-  svcs <- readOptionsFile "options.json"
-  case svcs of
-    Left  e       -> printError e
-    Right options -> do
-      initCss
-      putStrLn "Reading cache..."
-      cache <- readCache
-      void $ run App
-        { view         = view'
-        , update       = update'
-        , inputs       = []
-        , initialState = ManagerState { _msPackageCache       = cache
-                                      , _msSearchString       = mempty
-                                      , _msSelectedPackageIdx = Nothing
-                                      , _msInstallingPackage  = Nothing
-                                      , _msLatestMessage      = Nothing
-                                      , _msServiceCache = makeServices options
-                                      , _msSelectedServiceIdx = Nothing
-                                      }
-        }
+  initCss
+  initialState' <- initState
+  case initialState' of
+    Error e -> putStrLn e
+    Success s ->
+      void $ run App { view         = view'
+                     , update       = update'
+                     , inputs       = []
+                     , initialState = s
+                     }

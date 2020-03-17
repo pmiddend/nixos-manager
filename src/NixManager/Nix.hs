@@ -4,11 +4,7 @@
 module NixManager.Nix where
 
 import qualified Data.Set                      as Set
-import           Data.Bifunctor                 ( first )
-import           Data.Text.IO                   ( putStrLn )
-import           Prelude                 hiding ( putStrLn
-                                                , readFile
-                                                )
+import           Prelude                 hiding ( readFile )
 import           Data.Fix                       ( Fix(Fix)
                                                 , cata
                                                 )
@@ -50,7 +46,6 @@ import           Data.Aeson                     ( FromJSON
                                                 , eitherDecode
                                                 )
 import           Control.Lens                   ( (^.)
-                                                , _Right
                                                 , (.~)
                                                 , makeLenses
                                                 , (^?)
@@ -95,22 +90,19 @@ instance FromJSON NixPackage where
       <*> pure False
   parseJSON _ = mzero
 
-decodeNixSearchResult :: ByteString -> Either String (Map Text NixPackage)
-decodeNixSearchResult = eitherDecode
+decodeNixSearchResult :: ByteString -> MaybeError (Map Text NixPackage)
+decodeNixSearchResult = fromEither . eitherDecode
 
-nixSearch :: Text -> IO (Either String [NixPackage])
+nixSearch :: Text -> IO (MaybeError [NixPackage])
 nixSearch t = do
   (_, Just hout, _, _) <- createProcess
     (proc "nix" ["search", t ^. unpacked, "--json"]) { std_out = CreatePipe }
   out <- hGetContents hout
-  pure (elems <$> decodeNixSearchResult out)
-
-nixSearchUnsafe :: Text -> IO [NixPackage]
-nixSearchUnsafe t = do
-  result <- nixSearch t
-  case result of
-    Left  e -> error e
-    Right v -> pure v
+  pure
+    (addToError
+      "Error parsing output of \"nix search\" command. This could be due to changes in this command in a later version (and doesn't fix itself). Please open an issue in the nixos-manager repository. The error was: "
+      (elems <$> decodeNixSearchResult out)
+    )
 
 type OptionLocation = [Text]
 
@@ -137,11 +129,14 @@ instance FromJSON NixServiceOption where
   parseJSON _ = mzero
 
 
-decodeOptions :: ByteString -> Either ErrorMessage (Map Text NixServiceOption)
-decodeOptions = first errorMessageFromString . eitherDecode
+decodeOptions :: ByteString -> MaybeError (Map Text NixServiceOption)
+decodeOptions =
+  ( addToError "Couldn't read the options JSON file. The error was: "
+    . fromEither
+    )
+    . eitherDecode
 
-readOptionsFile
-  :: FilePath -> IO (Either ErrorMessage (Map Text NixServiceOption))
+readOptionsFile :: FilePath -> IO (MaybeError (Map Text NixServiceOption))
 readOptionsFile fp = decodeOptions <$> readFile fp
 
 data NixService = NixService {
@@ -151,13 +146,24 @@ data NixService = NixService {
 
 makeLenses ''NixService
 
+canBeEnabled :: OptionLocation -> Bool
+canBeEnabled = (== "enable") . last
+
+isService :: OptionLocation -> Bool
+isService = (== "services") . head
+
+predAnd :: (t -> Bool) -> (t -> Bool) -> t -> Bool
+predAnd a b x = a x && b x
+
 makeServices :: Map Text NixServiceOption -> [NixService]
 makeServices options' =
   let
     options = elems options'
     servicePaths :: Set.Set OptionLocation
     servicePaths = Set.fromList
-      (init <$> filter ((== "enable") . last) (view optionLoc <$> options))
+      (init <$> filter (canBeEnabled `predAnd` isService)
+                       (view optionLoc <$> options)
+      )
     serviceForOption :: NixServiceOption -> Maybe OptionLocation
     serviceForOption opt = case Set.lookupLT (opt ^. optionLoc) servicePaths of
       Nothing -> Nothing
@@ -204,56 +210,45 @@ packageLens :: Traversal' NixExpr NixExpr
 packageLens =
   _NixFunctionDecl' . nfExpr . _NixSet' . ix "environment.systemPackages"
 
-parsePackages :: IO (Either Text NixExpr)
-parsePackages = parseFile "packages.nix"
+parsePackages :: IO (MaybeError NixExpr)
+parsePackages =
+  addToError
+      "Error parsing the packages.nix file. This is most likely a syntax error, please investigate the file itself and fix the error. Then restart nixos-manager. The error was: "
+    .   fromEither
+
+    <$> parseFile "packages.nix"
 
 writePackages :: NixExpr -> IO ()
 writePackages = writeExprFile "packages.nix"
 
-readInstalledPackages :: IO [Text]
-readInstalledPackages = do
-  expr <- parsePackages
-  case expr ^? _Right . packageLens of
-    Just packages -> pure (Text.drop 5 <$> cata evalSymbols packages)
-    Nothing       -> do
-      putStrLn "parse error: couldn't find packages node"
-      -- FIXME: Better error handling
-      error "parse error"
+readInstalledPackages :: IO (MaybeError [Text])
+readInstalledPackages = ifSuccessIO parsePackages $ \expr ->
+  case expr ^? packageLens of
+    Just packages -> pure (Success (Text.drop 5 <$> cata evalSymbols packages))
+    Nothing -> pure (Error "Couldn't find packages node in packages.nix file.")
 
 packagePrefix :: Text
 packagePrefix = "pkgs."
 
-installPackage :: Text -> IO (Maybe Text)
-installPackage p = do
-  expr' <- parsePackages
-  case expr' of
-    Left  e    -> pure (Just e)
-    Right expr -> do
-      writePackages
-        (   expr
-        &   packageLens
-        .   _NixList'
-        <>~ [Fix (NixSymbol (packagePrefix <> p))]
-        )
-      pure Nothing
+installPackage :: Text -> IO (MaybeError ())
+installPackage p = ifSuccessIO parsePackages $ \expr -> do
+  writePackages
+    (expr & packageLens . _NixList' <>~ [Fix (NixSymbol (packagePrefix <> p))])
+  pure (Success ())
 
-uninstallPackage :: Text -> IO (Maybe Text)
-uninstallPackage p = do
-  expr' <- parsePackages
-  case expr' of
-    Left  e    -> pure (Just e)
-    Right expr -> do
-      writePackages
-        (expr & packageLens . _NixList' %~ filter
-          (hasn't (_NixSymbol' . only (packagePrefix <> p)))
-        )
-      pure Nothing
+uninstallPackage :: Text -> IO (MaybeError ())
+uninstallPackage p = ifSuccessIO parsePackages $ \expr -> do
+  writePackages
+    (expr & packageLens . _NixList' %~ filter
+      (hasn't (_NixSymbol' . only (packagePrefix <> p)))
+    )
+  pure (Success ())
 
-readCache :: IO [NixPackage]
-readCache = do
-  cache             <- nixSearchUnsafe ""
-  installedPackages <- readInstalledPackages
-  pure
-    $   (\ip -> ip & npInstalled .~ ((ip ^. npName) `elem` installedPackages))
-    <$> cache
+readCache :: IO (MaybeError [NixPackage])
+readCache = ifSuccessIO (nixSearch "") $ \cache ->
+  ifSuccessIO readInstalledPackages $ \installedPackages ->
+    pure
+      $   Success
+      $   (\ip -> ip & npInstalled .~ ((ip ^. npName) `elem` installedPackages))
+      <$> cache
 

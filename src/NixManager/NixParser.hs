@@ -250,9 +250,8 @@ exprParser =
     <|> try intParser
     <|> symbolParser
 
-parseFile :: FilePath -> IO (Either Text NixExpr)
-parseFile fn =
-  first (pack . errorBundlePretty) . parse exprParser fn <$> readFile fn
+parseFile :: FilePath -> IO (Either String NixExpr)
+parseFile fn = first errorBundlePretty . parse exprParser fn <$> readFile fn
 
 writeExprFile :: FilePath -> NixExpr -> IO ()
 writeExprFile fp = writeFile fp . cata prettyPrint

@@ -1,21 +1,55 @@
+{-# LANGUAGE DeriveFunctor #-}
 module NixManager.Util where
 
 import           Data.Text                      ( Text
                                                 , pack
                                                 )
-import           Data.Text.IO                   ( putStrLn )
 import           Data.List                      ( unfoldr )
 import           Prelude                 hiding ( putStrLn )
 
-newtype ErrorMessage = ErrorMessage {
-  _getErrorMessage :: Text
-  }
+data MaybeError e = Error Text
+                  | Success e
+                  deriving(Functor)
 
-errorMessageFromString :: String -> ErrorMessage
-errorMessageFromString = ErrorMessage . pack
+fromEither :: Either String e -> MaybeError e
+fromEither (Left  e) = Error (pack e)
+fromEither (Right v) = Success v
 
-printError :: ErrorMessage -> IO ()
-printError (ErrorMessage e) = putStrLn e
+instance Applicative MaybeError where
+  pure = Success
+  (Error   v) <*> _           = Error v
+  (Success _) <*> (Error   v) = Error v
+  (Success f) <*> (Success v) = Success (f v)
+
+instance Monad MaybeError where
+  (Error   e) >>= _ = Error e
+  (Success v) >>= f = f v
+
+ifNothing v f = case v of
+  Nothing -> f
+  _       -> mempty
+
+ifSuccessIO v f = do
+  v' <- v
+  ifSuccess v' f
+
+addToError :: Text -> Endo (MaybeError a)
+addToError prefix (Error t) = Error (prefix <> t)
+addToError _      v         = v
+
+ifSuccess
+  :: Applicative f
+  => MaybeError t
+  -> (t -> f (MaybeError a))
+  -> f (MaybeError a)
+ifSuccess v f = case v of
+  Error   e  -> pure (Error e)
+  Success v' -> f v'
+-- errorMessageFromString :: String -> ErrorMessage
+-- errorMessageFromString = ErrorMessage . pack
+
+-- printError :: ErrorMessage -> IO ()
+-- printError (ErrorMessage e) = putStrLn e
 
 showText :: Show a => a -> Text
 showText = pack . show
