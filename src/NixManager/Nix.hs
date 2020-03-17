@@ -152,9 +152,6 @@ canBeEnabled = (== "enable") . last
 isService :: OptionLocation -> Bool
 isService = (== "services") . head
 
-predAnd :: (t -> Bool) -> (t -> Bool) -> t -> Bool
-predAnd a b x = a x && b x
-
 makeServices :: Map Text NixServiceOption -> [NixService]
 makeServices options' =
   let

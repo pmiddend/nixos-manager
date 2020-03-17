@@ -23,6 +23,8 @@ executable nix-manager
                      , pipes
                      , lens
                      , text
+                     , regex-pcre
+                     , regex-compat
                      , bytestring
                      , data-fix
                      , bifunctors

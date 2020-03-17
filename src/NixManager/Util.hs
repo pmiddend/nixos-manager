@@ -1,8 +1,14 @@
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE OverloadedStrings #-}
 module NixManager.Util where
 
+import           Text.Regex                     ( mkRegex
+                                                , subRegex
+                                                )
 import           Data.Text                      ( Text
                                                 , pack
+                                                , unpack
+                                                , replace
                                                 )
 import           Data.List                      ( unfoldr )
 import           Prelude                 hiding ( putStrLn )
@@ -69,4 +75,20 @@ splitRepeat c = unfoldr f
     (before, []       ) -> Just (before, "")
     (before, _ : after) -> Just (before, after)
 
+
+predAnd :: (t -> Bool) -> (t -> Bool) -> t -> Bool
+predAnd a b x = a x && b x
+
+openTag t = "<" <> t <> ">"
+closeTag t = "</" <> t <> ">"
+
+replaceTag :: Text -> Text -> Endo Text
+replaceTag from toTag = replace (openTag from) (openTag toTag)
+  . replace (closeTag from) (closeTag toTag)
+
+removeStartTag needle haystack = pack
+  (subRegex (mkRegex ("<" <> unpack needle <> "[^>]*>")) (unpack haystack) "")
+
+removeTag :: Text -> Endo Text
+removeTag t = removeStartTag t . replace (closeTag t) ""
 
