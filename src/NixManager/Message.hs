@@ -1,5 +1,15 @@
 {-# LANGUAGE TemplateHaskell #-}
-module NixManager.Message where
+module NixManager.Message
+  ( MessageType
+  , Message
+  , messageType
+  , messageText
+  , errorMessage
+  , infoMessage
+  , _ErrorMessage
+  , _InfoMessage
+  )
+where
 
 import           Data.Text                      ( Text )
 import           Control.Lens                   ( makeLenses

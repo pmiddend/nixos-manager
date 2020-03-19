@@ -2,7 +2,26 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveTraversable #-}
-module NixManager.NixParser where
+module NixManager.NixExpr
+  ( parseNixFile
+  , NixExprF(..)
+  , NixExpr
+  , evalSymbols
+  , NixFunction
+  , nfArgs
+  , nfExpr
+  , _NixNull'
+  , _NixFunctionDecl'
+  , _NixSymbol'
+  , _NixList'
+  , _NixString'
+  , _NixBoolean'
+  , _NixSet'
+  , writeNixFile
+  , _NixInt'
+  , _NixFloat'
+  )
+where
 
 import           NixManager.Util
 import           Data.Foldable                  ( fold )
@@ -250,8 +269,8 @@ exprParser =
     <|> try intParser
     <|> symbolParser
 
-parseFile :: FilePath -> IO (Either String NixExpr)
-parseFile fn = first errorBundlePretty . parse exprParser fn <$> readFile fn
+parseNixFile :: FilePath -> IO (Either String NixExpr)
+parseNixFile fn = first errorBundlePretty . parse exprParser fn <$> readFile fn
 
-writeExprFile :: FilePath -> NixExpr -> IO ()
-writeExprFile fp = writeFile fp . cata prettyPrint
+writeNixFile :: FilePath -> NixExpr -> IO ()
+writeNixFile fp = writeFile fp . cata prettyPrint

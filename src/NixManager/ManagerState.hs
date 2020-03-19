@@ -1,10 +1,24 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RankNTypes #-}
-module NixManager.ManagerState where
+module NixManager.ManagerState
+  ( msSearchString
+  , msSearchResult
+  , msSelectedPackage
+  , msLatestMessage
+  , msServiceCache
+  , msPackageCache
+  , msSelectedServiceIdx
+  , msServiceExpression
+  , msInstallingPackage
+  , msSelectedPackageIdx
+  , ManagerState(..)
+  )
+where
 
-import           NixManager.Nix                 ( NixPackage
+import           NixManager.NixExpr             ( NixExpr )
+import           NixManager.NixService          ( NixService )
+import           NixManager.NixPackage          ( NixPackage
                                                 , npName
-                                                , NixService
                                                 )
 import           NixManager.Message
 import           Control.Lens                   ( makeLenses
@@ -30,6 +44,7 @@ data ManagerState = ManagerState {
    , _msLatestMessage :: Maybe Message
    , _msServiceCache :: [NixService]
    , _msSelectedServiceIdx :: Maybe Int
+   , _msServiceExpression :: NixExpr
    } deriving(Show)
 
 makeLenses ''ManagerState

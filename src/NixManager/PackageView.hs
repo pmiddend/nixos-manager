@@ -2,8 +2,23 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
-module NixManager.PackageView where
+module NixManager.PackageView
+  ( packagesBox
+  )
+where
 
+import           NixManager.ManagerEvent        ( ManagerEvent
+                                                  ( ManagerEventSearchChanged
+                                                  , ManagerEventPackageSelected
+                                                  , ManagerEventTryInstall
+                                                  , ManagerEventInstall
+                                                  , ManagerEventUninstall
+                                                  )
+                                                )
+import           NixManager.NixPackage          ( NixPackage
+                                                , npInstalled
+                                                , npName
+                                                )
 import           Data.Semigroup                 ( Any(Any)
                                                 , getAny
                                                 )
@@ -45,10 +60,16 @@ import           Control.Lens                   ( (^.)
                                                 , has
                                                 , folded
                                                 )
-import           NixManager.ManagerState
-import           NixManager.ManagerEvent
-import           NixManager.Util
-import           NixManager.Message
+import           NixManager.ManagerState        ( msSearchString
+                                                , msSearchResult
+                                                , msSelectedPackage
+                                                , msLatestMessage
+                                                )
+import           NixManager.Util                ( mwhen )
+import           NixManager.Message             ( messageText
+                                                , messageType
+                                                , _ErrorMessage
+                                                )
 
 processSearchChange w = ManagerEventSearchChanged <$> Gtk.getEntryText w
 

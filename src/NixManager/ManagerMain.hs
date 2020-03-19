@@ -12,12 +12,37 @@ import           Control.Lens                   ( (^.)
                                                 , (?~)
                                                 , (.~)
                                                 )
-import           NixManager.ManagerState
-import           NixManager.Nix
-import           NixManager.Util
-import           NixManager.Message
-import           NixManager.ManagerEvent
-import           NixManager.View
+import           NixManager.ManagerState        ( ManagerState(..)
+                                                , msInstallingPackage
+                                                , msSelectedPackage
+                                                , msLatestMessage
+                                                , msPackageCache
+                                                , msSelectedServiceIdx
+                                                , msSelectedPackageIdx
+                                                , msSearchString
+                                                )
+import           NixManager.NixServiceOption    ( readOptionsFile )
+import           NixManager.NixService          ( makeServices
+                                                , readServiceFile
+                                                )
+import           NixManager.Util                ( MaybeError(Success, Error)
+                                                , ifSuccessIO
+                                                , showText
+                                                )
+import           NixManager.Message             ( errorMessage
+                                                , infoMessage
+                                                )
+import           NixManager.ManagerEvent        ( ManagerEvent(..) )
+import           NixManager.Nix                 ( installPackage
+                                                , readCache
+                                                , startProgram
+                                                , uninstallPackage
+                                                , getExecutables
+                                                )
+import           NixManager.NixPackage          ( NixPackage
+                                                , npName
+                                                )
+import           NixManager.View                ( view' )
 import           GI.Gtk.Declarative.App.Simple  ( App(App)
                                                 , view
                                                 , update
@@ -101,18 +126,21 @@ update' s (ManagerEventServiceSelected i) =
   pureTransition (s & msSelectedServiceIdx .~ i)
 update' s (ManagerEventSearchChanged t) =
   pureTransition (s & msSearchString .~ t)
+update' s ManagerEventDiscard = pureTransition s
 
 initState :: IO (MaybeError ManagerState)
-initState = ifSuccessIO (readOptionsFile "options.json") $ \options ->
-  ifSuccessIO readCache $ \cache -> pure $ Success $ ManagerState
-    { _msPackageCache       = cache
-    , _msSearchString       = mempty
-    , _msSelectedPackageIdx = Nothing
-    , _msInstallingPackage  = Nothing
-    , _msLatestMessage      = Nothing
-    , _msServiceCache       = makeServices options
-    , _msSelectedServiceIdx = Nothing
-    }
+initState = ifSuccessIO readServiceFile $ \serviceExpr ->
+  ifSuccessIO (readOptionsFile "options.json") $ \options ->
+    ifSuccessIO readCache $ \cache -> pure $ Success $ ManagerState
+      { _msPackageCache       = cache
+      , _msSearchString       = mempty
+      , _msSelectedPackageIdx = Nothing
+      , _msInstallingPackage  = Nothing
+      , _msLatestMessage      = Nothing
+      , _msServiceCache       = makeServices options
+      , _msSelectedServiceIdx = Nothing
+      , _msServiceExpression  = serviceExpr
+      }
 
 nixMain :: IO ()
 nixMain = do

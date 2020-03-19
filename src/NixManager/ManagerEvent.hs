@@ -1,10 +1,13 @@
 {-# LANGUAGE TemplateHaskell #-}
-module NixManager.ManagerEvent where
+module NixManager.ManagerEvent
+  ( ManagerEvent(..)
+  )
+where
 
 import           Data.Text                      ( Text )
 import           Control.Lens                   ( makePrisms )
 import           NixManager.Message
-import           NixManager.Nix                 ( NixPackage )
+import           NixManager.NixPackage          ( NixPackage )
 
 data ManagerEvent = ManagerEventClosed
       | ManagerEventSearchChanged Text

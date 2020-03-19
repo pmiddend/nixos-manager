@@ -1,19 +1,19 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
-module NixManager.Nix where
+module NixManager.Nix
+  ( getExecutables
+  , startProgram
+  , installPackage
+  , readCache
+  , uninstallPackage
+  )
+where
 
-import           Data.Scientific                ( isFloating
-                                                , isInteger
-                                                , floatingOrInteger
-                                                )
-import qualified Data.Set                      as Set
 import           Prelude                 hiding ( readFile )
 import           Data.Fix                       ( Fix(Fix)
                                                 , cata
                                                 )
 import           Data.List                      ( intercalate
-                                                , isPrefixOf
                                                 , find
                                                 , inits
                                                 )
@@ -22,15 +22,7 @@ import           System.Directory               ( listDirectory )
 import           Control.Exception              ( catch
                                                 , IOException
                                                 )
-import           Data.Map.Strict                ( Map
-                                                , toList
-                                                , insertWith
-                                                , elems
-                                                )
-import           Data.ByteString.Lazy           ( ByteString
-                                                , hGetContents
-                                                , readFile
-                                                )
+import           Data.ByteString.Lazy           ( hGetContents )
 import           Data.ByteString.Lazy.Lens      ( unpackedChars )
 import           System.Process                 ( createProcess
                                                 , proc
@@ -42,22 +34,8 @@ import           Data.Text                      ( Text
                                                 , toLower
                                                 , strip
                                                 )
-import           Data.Aeson                     ( FromJSON
-                                                , Value
-                                                  ( Object
-                                                  , Null
-                                                  , Bool
-                                                  , Number
-                                                  , String
-                                                  , Array
-                                                  )
-                                                , parseJSON
-                                                , (.:)
-                                                , eitherDecode
-                                                )
 import           Control.Lens                   ( (^.)
                                                 , (.~)
-                                                , makeLenses
                                                 , (^?)
                                                 , ix
                                                 , Traversal'
@@ -72,131 +50,31 @@ import           Control.Lens                   ( (^.)
 import           Data.Text.Lens                 ( unpacked
                                                 , packed
                                                 )
-import           Control.Monad                  ( mzero
-                                                , void
+import           Control.Monad                  ( void )
+import           NixManager.NixExpr             ( NixExpr
+                                                , NixExprF(NixSymbol)
+                                                , _NixFunctionDecl'
+                                                , nfExpr
+                                                , _NixSymbol'
+                                                , evalSymbols
+                                                , _NixSet'
+                                                , parseNixFile
+                                                , writeNixFile
+                                                , _NixList'
                                                 )
-import           NixManager.NixParser
-import           NixManager.Util
-import           NixManager.NixServiceOption
+import           NixManager.Util                ( MaybeError(Success, Error)
+                                                , splitRepeat
+                                                , addToError
+                                                , fromEither
+                                                , ifSuccessIO
+                                                )
+import           NixManager.NixServiceOption    ( )
+import           NixManager.NixPackage          ( NixPackage
+                                                , npName
+                                                , npInstalled
+                                                )
+import           NixManager.PackageSearch       ( searchPackages )
 
-
-data NixPackage = NixPackage {
-    _npName :: Text
-  , _npVersion :: Text
-  , _npDescription :: Text
-  , _npInstalled :: Bool
-  } deriving(Eq,Show)
-
-makeLenses ''NixPackage
-
-instance FromJSON NixPackage where
-  parseJSON (Object v) =
-    NixPackage
-      <$> v
-      .:  "pkgName"
-      <*> v
-      .:  "version"
-      <*> v
-      .:  "description"
-      <*> pure False
-  parseJSON _ = mzero
-
-decodeNixSearchResult :: ByteString -> MaybeError (Map Text NixPackage)
-decodeNixSearchResult = fromEither . eitherDecode
-
-nixSearch :: Text -> IO (MaybeError [NixPackage])
-nixSearch t = do
-  (_, Just hout, _, _) <- createProcess
-    (proc "nix" ["search", t ^. unpacked, "--json"]) { std_out = CreatePipe }
-  out <- hGetContents hout
-  pure
-    (addToError
-      "Error parsing output of \"nix search\" command. This could be due to changes in this command in a later version (and doesn't fix itself). Please open an issue in the nixos-manager repository. The error was: "
-      (elems <$> decodeNixSearchResult out)
-    )
-
-type OptionLocation = [Text]
-
-data NixServiceOption = NixServiceOption {
-   _optionDescription :: Text
-  , _optionLoc :: OptionLocation
-  , _optionType :: Either Text NixServiceOptionType
-  , _optionValue :: Maybe NixExpr
-  } deriving(Show)
-
-makeLenses ''NixServiceOption
-
-instance FromJSON NixServiceOption where
-  parseJSON (Object v) = do
-    objectType <- v .: "type"
-    let realOptionType = toEither (parseNixServiceOptionType objectType)
-    description <- v .: "description"
-    loc         <- v .: "loc"
-    -- pure $ NixServiceOption (convertJson objectType <$> defaultValue)
-    pure $ NixServiceOption description loc realOptionType Nothing
-  parseJSON _ = mzero
-
-
-decodeOptions :: ByteString -> MaybeError (Map Text NixServiceOption)
-decodeOptions =
-  ( addToError "Couldn't read the options JSON file. The error was: "
-    . fromEither
-    )
-    . eitherDecode
-
-readOptionsFile :: FilePath -> IO (MaybeError (Map Text NixServiceOption))
-readOptionsFile fp = decodeOptions <$> readFile fp
-
-data NixService = NixService {
-    _serviceLoc :: OptionLocation
-  , _serviceOptions :: [NixServiceOption]
-  } deriving(Show)
-
-makeLenses ''NixService
-
-canBeEnabled :: OptionLocation -> Bool
-canBeEnabled = (== "enable") . last
-
-isService :: OptionLocation -> Bool
-isService = (== "services") . head
-
-makeServices :: Map Text NixServiceOption -> [NixService]
-makeServices options' =
-  let
-    options = elems options'
-    servicePaths :: Set.Set OptionLocation
-    servicePaths = Set.fromList
-      (init <$> filter (canBeEnabled `predAnd` isService)
-                       (view optionLoc <$> options)
-      )
-    serviceForOption :: NixServiceOption -> Maybe OptionLocation
-    serviceForOption opt = case Set.lookupLT (opt ^. optionLoc) servicePaths of
-      Nothing -> Nothing
-      Just result ->
-        if result `isPrefixOf` (opt ^. optionLoc) then Just result else Nothing
-    transducer
-      :: NixServiceOption -> Endo (Map OptionLocation [NixServiceOption])
-    transducer opt m = case serviceForOption opt of
-      Nothing          -> m
-      Just serviceLoc' -> insertWith (<>) serviceLoc' [opt] m
-    serviceMap = foldr transducer mempty options
-  in
-    uncurry NixService <$> toList serviceMap
-
-readServiceFile :: IO (MaybeError NixExpr)
-readServiceFile =
-  addToError
-      "Error parsing the services.nix file. This is most likely a syntax error, please investigate the file itself and fix the error. Then restart nixos-manager. The error was: "
-    .   fromEither
-
-    <$> parseFile "services.nix"
-
-makeServiceValues :: [NixService] -> IO (MaybeError [NixService])
-makeServiceValues svcs = do
-  ifSuccessIO readServiceFile $ \serviceExpr ->
-    case serviceExpr ^? _NixFunctionDecl' . nfExpr . _NixSet' of
-      Nothing -> pure (Error "Couldn't find a set inside services file.")
-      Just s  -> undefined
 
 matchName :: String -> [FilePath] -> Maybe FilePath
 matchName pkgName bins =
@@ -236,10 +114,10 @@ parsePackages =
       "Error parsing the packages.nix file. This is most likely a syntax error, please investigate the file itself and fix the error. Then restart nixos-manager. The error was: "
     .   fromEither
 
-    <$> parseFile "packages.nix"
+    <$> parseNixFile "packages.nix"
 
 writePackages :: NixExpr -> IO ()
-writePackages = writeExprFile "packages.nix"
+writePackages = writeNixFile "packages.nix"
 
 readInstalledPackages :: IO (MaybeError [Text])
 readInstalledPackages = ifSuccessIO parsePackages $ \expr ->
@@ -265,7 +143,7 @@ uninstallPackage p = ifSuccessIO parsePackages $ \expr -> do
   pure (Success ())
 
 readCache :: IO (MaybeError [NixPackage])
-readCache = ifSuccessIO (nixSearch "") $ \cache ->
+readCache = ifSuccessIO (searchPackages "") $ \cache ->
   ifSuccessIO readInstalledPackages $ \installedPackages ->
     pure
       $   Success

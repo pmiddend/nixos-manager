@@ -31,8 +31,11 @@ import           Control.Lens                   ( (^.)
                                                 , to
                                                 , folded
                                                 )
-import           NixManager.ManagerState
-import           NixManager.ManagerEvent
+import           NixManager.ManagerState        ( ManagerState )
+import           NixManager.ManagerEvent        ( ManagerEvent
+                                                  ( ManagerEventClosed
+                                                  )
+                                                )
 
 windowAttributes =
   [ #title := "nix-manager 1.0"

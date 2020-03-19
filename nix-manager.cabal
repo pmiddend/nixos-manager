@@ -15,8 +15,12 @@ executable nix-manager
                      , NixManager.ComboBox
                      , NixManager.View
                      , NixManager.NixServiceOption
+                     , NixManager.NixPackage
+                     , NixManager.NixService
+                     , NixManager.NixServiceOptionType
+                     , NixManager.PackageSearch
                      , NixManager.Message
-                     , NixManager.NixParser
+                     , NixManager.NixExpr
                      , NixManager.Util
                      , NixManager.Css
   build-depends:       base

@@ -49,8 +49,31 @@ import           Control.Lens                   ( (^.)
                                                 , (^..)
                                                 , (^?!)
                                                 )
-import           NixManager.ManagerState
-import           NixManager.ManagerEvent
+import           NixManager.ManagerState        ( msServiceCache
+                                                , msSelectedServiceIdx
+                                                )
+import           NixManager.ManagerEvent        ( ManagerEvent
+                                                  ( ManagerEventDiscard
+                                                  , ManagerEventServiceSelected
+                                                  )
+                                                )
+import           NixManager.NixService          ( NixService
+                                                , serviceLoc
+                                                , serviceOptions
+                                                )
+import           NixManager.NixServiceOptionType
+                                                ( NixServiceOptionType
+                                                  ( NixServiceOptionString
+                                                  , NixServiceOptionPath
+                                                  , NixServiceOptionSubmodule
+                                                  , NixServiceOptionBoolean
+                                                  , NixServiceOptionUnspecified
+                                                  , NixServiceOptionOneOf
+                                                  , NixServiceOptionPackage
+                                                  , NixServiceOptionInteger
+                                                  , NixServiceOptionOr
+                                                  )
+                                                )
 
 
 buildServiceRow
