@@ -7,6 +7,10 @@ module NixManager.ServiceView
   )
 where
 
+import           NixManager.ComboBox
+import           Data.Fix                       ( cata
+                                                , Fix(Fix)
+                                                )
 import qualified Data.Vector                   as Vector
 import           NixManager.PackageView         ( packagesBox )
 import           Data.Text                      ( intercalate
@@ -15,6 +19,7 @@ import           Data.Text                      ( intercalate
                                                 )
 import           NixManager.Nix
 import           NixManager.Util
+import           NixManager.NixServiceOption
 import           GI.Gtk.Declarative             ( bin
                                                 , onM
                                                 , pane
@@ -73,12 +78,33 @@ servicesLeftPane s = bin
   []
   (container Gtk.ListBox [onM #rowSelected rowSelectionHandler] (serviceRows s))
 
-buildOptionValueCell serviceOption | (serviceOption ^. optionType) == "string" =
-  widget Gtk.Entry []
-buildOptionValueCell serviceOption
-  | (serviceOption ^. optionType) == "boolean" = widget Gtk.Switch []
-buildOptionValueCell serviceOption | otherwise =
-  widget Gtk.Label [#label := "Option value not implemented yet"]
+isStringy :: NixServiceOptionType -> Bool
+isStringy NixServiceOptionString    = True
+isStringy NixServiceOptionPath      = True
+isStringy NixServiceOptionSubmodule = True
+isStringy NixServiceOptionPackage   = True
+isStringy NixServiceOptionInteger   = True
+isStringy (NixServiceOptionOr l r)  = isStringy l && isStringy r
+isStringy _                         = False
+
+buildOptionValueCell serviceOption = case serviceOption ^. optionType of
+  Left e -> widget
+    Gtk.Label
+    [#label := ("Option value \"" <> e <> "\" not implemented yet")]
+  Right NixServiceOptionBoolean     -> widget Gtk.Switch []
+  Right NixServiceOptionUnspecified -> widget
+    Gtk.Label
+    [ classes ["unspecified-label"]
+    , #label := "Type not specified, cannot edit."
+    ]
+  Right (NixServiceOptionOneOf values) ->
+    const ManagerEventDiscard
+      <$> comboBox [] (ComboBoxProperties values Nothing)
+  Right v -> if isStringy v
+    then widget Gtk.Entry []
+    else widget
+      Gtk.Label
+      [#label := ("Option value \"" <> showText v <> "\" not implemented yet")]
 
 convertMarkup :: Text -> Text
 convertMarkup =
@@ -88,6 +114,7 @@ convertMarkup =
     . replaceTag "option"  "tt"
     . replaceTag "varname" "tt"
     . removeTag "refentrytitle"
+    . removeTag "manvolnum"
     . removeTag "link"
     . replaceTag "citerefentry" "tt"
 

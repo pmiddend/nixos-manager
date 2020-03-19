@@ -12,7 +12,9 @@ executable nix-manager
                      , NixManager.ManagerEvent
                      , NixManager.PackageView
                      , NixManager.ServiceView
+                     , NixManager.ComboBox
                      , NixManager.View
+                     , NixManager.NixServiceOption
                      , NixManager.Message
                      , NixManager.NixParser
                      , NixManager.Util
@@ -21,6 +23,8 @@ executable nix-manager
                      , containers
                      , gi-gdk
                      , pipes
+                     , scientific
+                     , gi-gobject
                      , lens
                      , text
                      , regex-pcre

@@ -17,6 +17,7 @@ styles = mconcat
   , ".service-headline { font-size: 40px; }"
   , ".service-option-title { font-family: monospace; font-weight: bold; }"
   , ".service-option-description { font-style: italic; }"
+  , ".unspecified-label { color: #101010; }"
   ]
 
 initCss :: IO ()

@@ -3,6 +3,10 @@
 {-# LANGUAGE TemplateHaskell #-}
 module NixManager.Nix where
 
+import           Data.Scientific                ( isFloating
+                                                , isInteger
+                                                , floatingOrInteger
+                                                )
 import qualified Data.Set                      as Set
 import           Prelude                 hiding ( readFile )
 import           Data.Fix                       ( Fix(Fix)
@@ -39,10 +43,16 @@ import           Data.Text                      ( Text
                                                 , strip
                                                 )
 import           Data.Aeson                     ( FromJSON
-                                                , Value(Object)
+                                                , Value
+                                                  ( Object
+                                                  , Null
+                                                  , Bool
+                                                  , Number
+                                                  , String
+                                                  , Array
+                                                  )
                                                 , parseJSON
                                                 , (.:)
-                                                , (.:?)
                                                 , eitherDecode
                                                 )
 import           Control.Lens                   ( (^.)
@@ -67,6 +77,7 @@ import           Control.Monad                  ( mzero
                                                 )
 import           NixManager.NixParser
 import           NixManager.Util
+import           NixManager.NixServiceOption
 
 
 data NixPackage = NixPackage {
@@ -107,25 +118,22 @@ nixSearch t = do
 type OptionLocation = [Text]
 
 data NixServiceOption = NixServiceOption {
-    _optionDefault :: Maybe Value
-  , _optionDescription :: Text
+   _optionDescription :: Text
   , _optionLoc :: OptionLocation
-  , _optionType :: Text
-  } deriving(Show, Eq)
+  , _optionType :: Either Text NixServiceOptionType
+  , _optionValue :: Maybe NixExpr
+  } deriving(Show)
 
 makeLenses ''NixServiceOption
 
 instance FromJSON NixServiceOption where
-  parseJSON (Object v) =
-    NixServiceOption
-      <$> v
-      .:? "default"
-      <*> v
-      .:  "description"
-      <*> v
-      .:  "loc"
-      <*> v
-      .:  "type"
+  parseJSON (Object v) = do
+    objectType <- v .: "type"
+    let realOptionType = toEither (parseNixServiceOptionType objectType)
+    description <- v .: "description"
+    loc         <- v .: "loc"
+    -- pure $ NixServiceOption (convertJson objectType <$> defaultValue)
+    pure $ NixServiceOption description loc realOptionType Nothing
   parseJSON _ = mzero
 
 
@@ -142,7 +150,7 @@ readOptionsFile fp = decodeOptions <$> readFile fp
 data NixService = NixService {
     _serviceLoc :: OptionLocation
   , _serviceOptions :: [NixServiceOption]
-  } deriving(Show, Eq)
+  } deriving(Show)
 
 makeLenses ''NixService
 
@@ -174,6 +182,21 @@ makeServices options' =
     serviceMap = foldr transducer mempty options
   in
     uncurry NixService <$> toList serviceMap
+
+readServiceFile :: IO (MaybeError NixExpr)
+readServiceFile =
+  addToError
+      "Error parsing the services.nix file. This is most likely a syntax error, please investigate the file itself and fix the error. Then restart nixos-manager. The error was: "
+    .   fromEither
+
+    <$> parseFile "services.nix"
+
+makeServiceValues :: [NixService] -> IO (MaybeError [NixService])
+makeServiceValues svcs = do
+  ifSuccessIO readServiceFile $ \serviceExpr ->
+    case serviceExpr ^? _NixFunctionDecl' . nfExpr . _NixSet' of
+      Nothing -> pure (Error "Couldn't find a set inside services file.")
+      Just s  -> undefined
 
 matchName :: String -> [FilePath] -> Maybe FilePath
 matchName pkgName bins =

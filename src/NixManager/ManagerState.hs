@@ -30,7 +30,7 @@ data ManagerState = ManagerState {
    , _msLatestMessage :: Maybe Message
    , _msServiceCache :: [NixService]
    , _msSelectedServiceIdx :: Maybe Int
-   } deriving(Eq,Show)
+   } deriving(Show)
 
 makeLenses ''ManagerState
 

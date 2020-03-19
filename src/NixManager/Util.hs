@@ -17,9 +17,21 @@ data MaybeError e = Error Text
                   | Success e
                   deriving(Functor)
 
+instance Show e => Show (MaybeError e) where
+  show (Error   e) = "error: " <> unpack e
+  show (Success e) = "success: " <> show e
+
 fromEither :: Either String e -> MaybeError e
 fromEither (Left  e) = Error (pack e)
 fromEither (Right v) = Success v
+
+toEither :: MaybeError e -> Either Text e
+toEither (Error   e) = Left e
+toEither (Success e) = Right e
+
+errorFallback :: e -> MaybeError e -> e
+errorFallback v (Error   _) = v
+errorFallback _ (Success v) = v
 
 instance Applicative MaybeError where
   pure = Success
@@ -31,10 +43,13 @@ instance Monad MaybeError where
   (Error   e) >>= _ = Error e
   (Success v) >>= f = f v
 
+ifNothing :: Monoid p => Maybe a -> p -> p
 ifNothing v f = case v of
   Nothing -> f
   _       -> mempty
 
+ifSuccessIO
+  :: Monad m => m (MaybeError t) -> (t -> m (MaybeError a)) -> m (MaybeError a)
 ifSuccessIO v f = do
   v' <- v
   ifSuccess v' f

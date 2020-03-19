@@ -16,6 +16,7 @@ data ManagerEvent = ManagerEventClosed
       | ManagerEventUninstall
       | ManagerEventTryInstall
       | ManagerEventShowMessage Message
+      | ManagerEventDiscard
       deriving(Eq,Show)
 
 makePrisms ''ManagerEvent
