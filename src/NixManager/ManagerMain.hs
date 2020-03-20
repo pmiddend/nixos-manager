@@ -8,6 +8,7 @@ import           System.FilePath                ( (</>) )
 import           NixManager.Css
 import           Data.Text.IO                   ( putStrLn )
 import           Control.Lens                   ( (^.)
+                                                , over
                                                 , (&)
                                                 , (?~)
                                                 , (.~)
@@ -15,6 +16,7 @@ import           Control.Lens                   ( (^.)
 import           NixManager.ManagerState        ( ManagerState(..)
                                                 , msInstallingPackage
                                                 , msSelectedPackage
+                                                , msServiceExpression
                                                 , msLatestMessage
                                                 , msPackageCache
                                                 , msSelectedServiceIdx
@@ -24,6 +26,7 @@ import           NixManager.ManagerState        ( ManagerState(..)
 import           NixManager.NixServiceOption    ( readOptionsFile )
 import           NixManager.NixService          ( makeServices
                                                 , readServiceFile
+                                                , writeServiceFile
                                                 )
 import           NixManager.Util                ( MaybeError(Success, Error)
                                                 , ifSuccessIO
@@ -83,6 +86,13 @@ tryInstall p = do
         )
 
 update' :: ManagerState -> ManagerEvent -> Transition ManagerState ManagerEvent
+update' s (ManagerEventSettingChanged setter) =
+  let newState = over msServiceExpression setter s
+  in  Transition newState $ do
+        putStrLn "changing the state"
+        writeServiceFile (newState ^. msServiceExpression)
+        pure Nothing
+
 update' _ ManagerEventClosed = Exit
 update' s (ManagerEventShowMessage e) =
   pureTransition (s & msLatestMessage ?~ e)

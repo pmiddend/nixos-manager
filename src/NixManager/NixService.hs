@@ -5,6 +5,7 @@ module NixManager.NixService
   ( NixService
   , serviceLoc
   , readServiceFile
+  , writeServiceFile
   , serviceOptions
   , makeServices
   )
@@ -14,25 +15,21 @@ import qualified Data.Set                      as Set
 import           Prelude                 hiding ( readFile )
 import           Data.List                      ( isPrefixOf )
 import           Data.Map.Strict                ( Map
-                                                , toList
                                                 , insertWith
+                                                , toList
                                                 , elems
                                                 )
 import           Data.Text                      ( Text )
 import           Control.Lens                   ( (^.)
                                                 , makeLenses
-                                                , (^?)
                                                 , view
                                                 )
 import           NixManager.NixExpr             ( NixExpr
                                                 , parseNixFile
-                                                , _NixFunctionDecl
-                                                , _NixSet
-                                                , nfExpr
+                                                , writeNixFile
                                                 )
 import           NixManager.Util                ( Endo
-                                                , ifSuccessIO
-                                                , MaybeError(Error)
+                                                , MaybeError
                                                 , addToError
                                                 , predAnd
                                                 , fromEither
@@ -88,10 +85,5 @@ readServiceFile =
 
     <$> parseNixFile "services.nix"
 
-makeServiceValues :: [NixService] -> IO (MaybeError [NixService])
-makeServiceValues svcs = do
-  ifSuccessIO readServiceFile $ \serviceExpr ->
-    case serviceExpr ^? _NixFunctionDecl . nfExpr . _NixSet of
-      Nothing -> pure (Error "Couldn't find a set inside services file.")
-      Just s  -> undefined
-
+writeServiceFile :: NixExpr -> IO ()
+writeServiceFile = writeNixFile "services.nix"

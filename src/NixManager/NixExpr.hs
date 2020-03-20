@@ -69,16 +69,15 @@ import           Control.Lens                   ( makePrisms
                                                 , (^.)
                                                 )
 
-data NixFunction a = NixFunction {
+data NixFunction = NixFunction {
     _nfArgs :: [Text]
-  , _nfExpr :: a
-  } deriving(Show, Functor, Traversable, Foldable)
+  , _nfExpr :: NixExpr
+  } deriving(Show)
 
-makeLenses ''NixFunction
 
 data NixExpr = NixList [NixExpr]
              | NixSet (Map Text NixExpr)
-             | NixFunctionDecl (NixFunction NixExpr)
+             | NixFunctionDecl NixFunction
              | NixSymbol Text
              | NixString Text
              | NixBoolean Bool
@@ -88,6 +87,7 @@ data NixExpr = NixList [NixExpr]
              deriving(Show)
 
 makePrisms ''NixExpr
+makeLenses ''NixFunction
 
 evalSymbols :: NixExpr -> [Text]
 evalSymbols (NixSymbol r) = [r]
@@ -109,9 +109,10 @@ prettyPrint (NixFunctionDecl fn) =
 prettyPrint (NixList xs) =
   "[ " <> unwords (xs ^.. traversed . to prettyPrint) <> " ]"
 prettyPrint (NixSet m) =
-  "{ "
-    <> foldMap (\(k, v) -> k <> " = " <> prettyPrint v <> "; ") (toList m)
-    <> " }"
+  "{\n"
+    <> foldMap (\(k, v) -> "  " <> k <> " = " <> prettyPrint v <> ";\n")
+               (toList m)
+    <> "}"
 
 type Parser = Parsec Void Text
 
