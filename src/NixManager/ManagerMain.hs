@@ -89,7 +89,6 @@ update' :: ManagerState -> ManagerEvent -> Transition ManagerState ManagerEvent
 update' s (ManagerEventSettingChanged setter) =
   let newState = over msServiceExpression setter s
   in  Transition newState $ do
-        putStrLn "changing the state"
         writeServiceFile (newState ^. msServiceExpression)
         pure Nothing
 

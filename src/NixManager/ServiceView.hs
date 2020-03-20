@@ -8,11 +8,12 @@ module NixManager.ServiceView
   )
 where
 
-import           NixManager.NixExpr             ( NixExpr(NixBoolean)
+import           NixManager.NixExpr             ( NixExpr(NixBoolean, NixString)
                                                 , _NixFunctionDecl
                                                 , nfExpr
                                                 , _NixSet
                                                 , _NixBoolean
+                                                , _NixString
                                                 )
 import           NixManager.ComboBox            ( comboBox
                                                 , ComboBoxProperties
@@ -174,6 +175,15 @@ buildOptionValueCell serviceExpression serviceOption =
         ]
       Right (NixServiceOptionOneOf values) ->
         ManagerEventDiscard <$ comboBox [] (ComboBoxProperties values Nothing)
+      Right NixServiceOptionString ->
+        let changeCallback :: Text -> ManagerEvent
+            changeCallback t = ManagerEventSettingChanged
+              (set (optionLens' optionPath) (Just (NixString t)))
+        in  widget
+              Gtk.Entry
+              [ #text := (optionValue ^. pre (traversed . _NixString) . non "")
+              , onM #changed ((changeCallback <$>) . Gtk.entryGetText)
+              ]
       Right v -> if isStringy v
         then widget Gtk.Entry []
         else widget
