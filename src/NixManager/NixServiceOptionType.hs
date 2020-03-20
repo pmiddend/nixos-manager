@@ -31,7 +31,8 @@ data NixServiceOptionType = NixServiceOptionInteger
                          | NixServiceOptionAttributeSet
                          | NixServiceOptionBoolean
                          | NixServiceOptionOr NixServiceOptionType NixServiceOptionType
-                         | NixServiceOptionOneOf [Text]
+                         | NixServiceOptionOneOfNumeric [Integer]
+                         | NixServiceOptionOneOfString [Text]
                          | NixServiceOptionString
                          | NixServiceOptionList NixServiceOptionType
                          | NixServiceOptionPackage
@@ -87,8 +88,14 @@ serviceOptionTypeParser =
     oneOfParser :: Parser NixServiceOptionType
     oneOfParser = do
       void (string "one of ")
-      values <- (stringLiteral <|> (show <$> decimalParser)) `sepBy` string ", "
-      pure (NixServiceOptionOneOf (pack <$> values))
+      stringSuffix  <- optional (stringLiteral `sepBy` string ", ")
+      numericSuffix <- optional (decimalParser `sepBy` string ", ")
+      case stringSuffix of
+        Nothing -> case numericSuffix of
+          Just numbers -> pure (NixServiceOptionOneOfNumeric numbers)
+          Nothing ->
+            fail "\"one of\" with neither strings nor integers, not supported"
+        Just strings -> pure (NixServiceOptionOneOfString (pack <$> strings))
     integerParser =
       optional (decimalParser *> string " bit ")
         *> optional (string "unsigned " <|> string "signed ")

@@ -8,6 +8,7 @@
 module NixManager.ComboBox
   ( comboBox
   , ComboBoxProperties(ComboBoxProperties)
+  , ComboBoxIndexType
   )
 where
 
@@ -40,22 +41,24 @@ import           Control.Lens                   ( makeLenses
                                                 )
 import           Data.Int                       ( Int32 )
 
+type ComboBoxIndexType = Int32
+
 data ComboBoxProperties = ComboBoxProperties {
     _cbpValues :: [Text]
-  , _cbpActive :: Maybe Int32
+  , _cbpActive :: Maybe ComboBoxIndexType
   } deriving(Eq)
 
 makeLenses ''ComboBoxProperties
 
-fromActive :: Int32 -> Maybe Int32
+fromActive :: ComboBoxIndexType -> Maybe ComboBoxIndexType
 fromActive x | x < 0     = Nothing
              | otherwise = Just x
 
-toActive :: Maybe Int32 -> Int32
+toActive :: Maybe ComboBoxIndexType -> ComboBoxIndexType
 toActive Nothing  = -1
 toActive (Just x) = x
 
-newtype ComboBoxChangeEvent = ComboBoxChangeEvent (Maybe Int32)
+newtype ComboBoxChangeEvent = ComboBoxChangeEvent (Maybe ComboBoxIndexType)
 
 comboBox
   :: Vector (Attribute Gtk.ComboBoxText ComboBoxChangeEvent)
@@ -76,6 +79,7 @@ comboBox customAttributes customParams = Widget
   customCreate props = do
     box <- Gtk.new Gtk.ComboBoxText []
     forM_ (props ^. cbpValues) $ Gtk.comboBoxTextInsert box (-1) Nothing
+    Gtk.comboBoxSetActive box (props ^. cbpActive . to toActive)
     pure (box, ())
   customSubscribe _params _ widget cb = do
     h <-
