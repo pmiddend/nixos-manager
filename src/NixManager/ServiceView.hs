@@ -7,6 +7,12 @@ module NixManager.ServiceView
   )
 where
 
+import           NixManager.NixExpr             ( NixExpr
+                                                , _NixFunctionDecl'
+                                                , nfExpr
+                                                , _NixSet'
+                                                , _NixBoolean'
+                                                )
 import           NixManager.ComboBox            ( comboBox
                                                 , ComboBoxProperties
                                                   ( ComboBoxProperties
@@ -47,7 +53,11 @@ import           GI.Gtk.Declarative             ( bin
 import           Data.Vector.Lens               ( toVectorOf )
 import qualified GI.Gtk                        as Gtk
 import           Control.Lens                   ( (^.)
+                                                , pre
+                                                , traversed
                                                 , ix
+                                                , non
+                                                , (^?)
                                                 , to
                                                 , folded
                                                 , (^..)
@@ -55,6 +65,7 @@ import           Control.Lens                   ( (^.)
                                                 )
 import           NixManager.ManagerState        ( msServiceCache
                                                 , ManagerState
+                                                , msServiceExpression
                                                 , msSelectedServiceIdx
                                                 )
 import           NixManager.ManagerEvent        ( ManagerEvent
@@ -120,24 +131,31 @@ isStringy (NixServiceOptionOr l r)  = isStringy l && isStringy r
 isStringy _                         = False
 
 buildOptionValueCell
-  :: NixServiceOption -> GI.Gtk.Declarative.Widget.Widget ManagerEvent
-buildOptionValueCell serviceOption = case serviceOption ^. optionType of
-  Left e -> widget
-    Gtk.Label
-    [#label := ("Option value \"" <> e <> "\" not implemented yet")]
-  Right NixServiceOptionBoolean     -> widget Gtk.Switch []
-  Right NixServiceOptionUnspecified -> widget
-    Gtk.Label
-    [ classes ["unspecified-label"]
-    , #label := "Type not specified, cannot edit."
-    ]
-  Right (NixServiceOptionOneOf values) ->
-    ManagerEventDiscard <$ comboBox [] (ComboBoxProperties values Nothing)
-  Right v -> if isStringy v
-    then widget Gtk.Entry []
-    else widget
+  :: Maybe NixExpr
+  -> NixServiceOption
+  -> GI.Gtk.Declarative.Widget.Widget ManagerEvent
+buildOptionValueCell optionValue serviceOption =
+  case serviceOption ^. optionType of
+    Left e -> widget
       Gtk.Label
-      [#label := ("Option value \"" <> showText v <> "\" not implemented yet")]
+      [#label := ("Option value \"" <> e <> "\" not implemented yet")]
+    Right NixServiceOptionBoolean -> widget
+      Gtk.Switch
+      [#active := (optionValue ^. pre (traversed . _NixBoolean') . non False)]
+    Right NixServiceOptionUnspecified -> widget
+      Gtk.Label
+      [ classes ["unspecified-label"]
+      , #label := "Type not specified, cannot edit."
+      ]
+    Right (NixServiceOptionOneOf values) ->
+      ManagerEventDiscard <$ comboBox [] (ComboBoxProperties values Nothing)
+    Right v -> if isStringy v
+      then widget Gtk.Entry []
+      else widget
+        Gtk.Label
+        [ #label
+            := ("Option value \"" <> showText v <> "\" not implemented yet")
+        ]
 
 convertMarkup :: Text -> Text
 convertMarkup =
@@ -151,38 +169,47 @@ convertMarkup =
     . removeTag "link"
     . replaceTag "citerefentry" "tt"
 
-buildOptionRows :: NixServiceOption -> BoxChild ManagerEvent
-buildOptionRows serviceOption =
-  let optionBox = container
-        Gtk.Box
-        [ #orientation := Gtk.OrientationHorizontal
-        , #spacing := 10
-        , #margin := 15
+buildOptionRows :: NixExpr -> NixServiceOption -> BoxChild ManagerEvent
+buildOptionRows serviceExpression serviceOption =
+  let
+    optionPath :: Text
+    optionPath = serviceOption ^. optionLoc . to (intercalate ".")
+    optionValue :: Maybe NixExpr
+    optionValue =
+      (  serviceExpression
+      ^? _NixFunctionDecl'
+      .  nfExpr
+      .  _NixSet'
+      .  ix optionPath
+      )
+    optionBox = container
+      Gtk.Box
+      [#orientation := Gtk.OrientationHorizontal, #spacing := 10, #margin := 15]
+      [ BoxChild (defaultBoxChildProperties { expand = True, fill = True })
+        $ widget
+            Gtk.Label
+            [ classes ["service-option-title"]
+            , #label
+              := (serviceOption ^. optionLoc . to (intercalate "." . drop 2))
+            , #halign := Gtk.AlignStart
+            ]
+      , BoxChild defaultBoxChildProperties
+        $ buildOptionValueCell optionValue serviceOption
+      ]
+    rootBox = container
+      Gtk.Box
+      [#orientation := Gtk.OrientationVertical, #spacing := 5]
+      [ optionBox
+      , widget
+        Gtk.Label
+        [ classes ["service-option-description"]
+        , #label := (serviceOption ^. optionDescription . to convertMarkup)
+        , #wrap := True
+        , #useMarkup := True
         ]
-        [ BoxChild (defaultBoxChildProperties { expand = True, fill = True })
-          $ widget
-              Gtk.Label
-              [ classes ["service-option-title"]
-              , #label
-                := (serviceOption ^. optionLoc . to (intercalate "." . drop 2))
-              , #halign := Gtk.AlignStart
-              ]
-        , BoxChild defaultBoxChildProperties
-          $ buildOptionValueCell serviceOption
-        ]
-      rootBox = container
-        Gtk.Box
-        [#orientation := Gtk.OrientationVertical, #spacing := 5]
-        [ optionBox
-        , widget
-          Gtk.Label
-          [ classes ["service-option-description"]
-          , #label := (serviceOption ^. optionDescription . to convertMarkup)
-          , #wrap := True
-          , #useMarkup := True
-          ]
-        ]
-  in  BoxChild defaultBoxChildProperties rootBox
+      ]
+  in
+    BoxChild defaultBoxChildProperties rootBox
 
 servicesRightPane
   :: ( FromWidget (SingleWidget Gtk.Label) target
@@ -207,7 +234,9 @@ servicesRightPane s = case s ^. msSelectedServiceIdx of
                   (widget Gtk.Label
                           [classes ["service-headline"], #label := svcLabel]
                   )
-              : (svc ^.. serviceOptions . folded . to buildOptionRows)
+              : (svc ^.. serviceOptions . folded . to
+                  (buildOptionRows (s ^. msServiceExpression))
+                )
               )
     in
       bin Gtk.ScrolledWindow [] optBox
