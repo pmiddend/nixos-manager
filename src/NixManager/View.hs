@@ -9,34 +9,23 @@ where
 
 import           NixManager.PackageView         ( packagesBox )
 import           NixManager.ServiceView         ( servicesBox )
-import           Data.Text                      ( intercalate )
-import           NixManager.Nix
-import           GI.Gtk.Declarative             ( bin
-                                                , pane
-                                                , paned
+import           NixManager.Nix                 ( )
+import           GI.Gtk.Declarative             ( Attribute((:=))
+                                                , on
+                                                , bin
                                                 , notebook
                                                 , page
-                                                , defaultPaneProperties
-                                                , FromWidget
-                                                , Bin
-                                                , widget
-                                                , Attribute((:=))
-                                                , container
-                                                , on
                                                 )
 import           GI.Gtk.Declarative.App.Simple  ( AppView )
-import           Data.Vector.Lens               ( toVectorOf )
 import qualified GI.Gtk                        as Gtk
-import           Control.Lens                   ( (^.)
-                                                , to
-                                                , folded
-                                                )
 import           NixManager.ManagerState        ( ManagerState )
 import           NixManager.ManagerEvent        ( ManagerEvent
                                                   ( ManagerEventClosed
                                                   )
                                                 )
+import           Data.Vector                    ( Vector )
 
+windowAttributes :: Vector (Attribute Gtk.Window ManagerEvent)
 windowAttributes =
   [ #title := "nix-manager 1.0"
   , on #deleteEvent (const (True, ManagerEventClosed))

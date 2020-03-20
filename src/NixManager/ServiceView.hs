@@ -7,28 +7,34 @@ module NixManager.ServiceView
   )
 where
 
-import           NixManager.ComboBox
-import           Data.Fix                       ( cata
-                                                , Fix(Fix)
+import           NixManager.ComboBox            ( comboBox
+                                                , ComboBoxProperties
+                                                  ( ComboBoxProperties
+                                                  )
                                                 )
 import qualified Data.Vector                   as Vector
-import           NixManager.PackageView         ( packagesBox )
 import           Data.Text                      ( intercalate
                                                 , Text
-                                                , replace
                                                 )
-import           NixManager.Nix
-import           NixManager.Util
-import           NixManager.NixServiceOption
+import           NixManager.Util                ( showText
+                                                , replaceTag
+                                                , removeTag
+                                                )
+import           NixManager.NixServiceOption    ( optionType
+                                                , NixServiceOption
+                                                , optionLoc
+                                                , optionDescription
+                                                )
+import           GI.Gtk.Declarative.Widget      ( Widget )
+import           GI.Gtk.Declarative.SingleWidget
+                                                ( SingleWidget )
 import           GI.Gtk.Declarative             ( bin
                                                 , onM
                                                 , pane
                                                 , paned
                                                 , classes
-                                                , notebook
                                                 , fill
                                                 , expand
-                                                , page
                                                 , defaultPaneProperties
                                                 , BoxChild(BoxChild)
                                                 , defaultBoxChildProperties
@@ -37,9 +43,7 @@ import           GI.Gtk.Declarative             ( bin
                                                 , widget
                                                 , Attribute((:=))
                                                 , container
-                                                , on
                                                 )
-import           GI.Gtk.Declarative.App.Simple  ( AppView )
 import           Data.Vector.Lens               ( toVectorOf )
 import qualified GI.Gtk                        as Gtk
 import           Control.Lens                   ( (^.)
@@ -50,6 +54,7 @@ import           Control.Lens                   ( (^.)
                                                 , (^?!)
                                                 )
 import           NixManager.ManagerState        ( msServiceCache
+                                                , ManagerState
                                                 , msSelectedServiceIdx
                                                 )
 import           NixManager.ManagerEvent        ( ManagerEvent
@@ -93,9 +98,13 @@ rowSelectionHandler (Just row) _ = do
     else pure (ManagerEventServiceSelected (Just (fromIntegral selectedIndex)))
 rowSelectionHandler _ _ = pure (ManagerEventServiceSelected Nothing)
 
+serviceRows :: ManagerState -> Vector.Vector (Bin Gtk.ListBoxRow event)
+serviceRows = toVectorOf (msServiceCache . folded . to buildServiceRow)
 
-serviceRows s = toVectorOf (msServiceCache . folded . to buildServiceRow) s
-
+servicesLeftPane
+  :: FromWidget (Bin Gtk.ScrolledWindow) target
+  => ManagerState
+  -> target ManagerEvent
 servicesLeftPane s = bin
   Gtk.ScrolledWindow
   []
@@ -110,6 +119,8 @@ isStringy NixServiceOptionInteger   = True
 isStringy (NixServiceOptionOr l r)  = isStringy l && isStringy r
 isStringy _                         = False
 
+buildOptionValueCell
+  :: NixServiceOption -> GI.Gtk.Declarative.Widget.Widget ManagerEvent
 buildOptionValueCell serviceOption = case serviceOption ^. optionType of
   Left e -> widget
     Gtk.Label
@@ -121,8 +132,7 @@ buildOptionValueCell serviceOption = case serviceOption ^. optionType of
     , #label := "Type not specified, cannot edit."
     ]
   Right (NixServiceOptionOneOf values) ->
-    const ManagerEventDiscard
-      <$> comboBox [] (ComboBoxProperties values Nothing)
+    ManagerEventDiscard <$ comboBox [] (ComboBoxProperties values Nothing)
   Right v -> if isStringy v
     then widget Gtk.Entry []
     else widget
@@ -141,6 +151,7 @@ convertMarkup =
     . removeTag "link"
     . replaceTag "citerefentry" "tt"
 
+buildOptionRows :: NixServiceOption -> BoxChild ManagerEvent
 buildOptionRows serviceOption =
   let optionBox = container
         Gtk.Box
@@ -173,6 +184,13 @@ buildOptionRows serviceOption =
         ]
   in  BoxChild defaultBoxChildProperties rootBox
 
+servicesRightPane
+  :: ( FromWidget (SingleWidget Gtk.Label) target
+     , FromWidget (Bin Gtk.ScrolledWindow) target
+     )
+  => NixManager.ManagerState.ManagerState
+  -> target ManagerEvent
+
 servicesRightPane s = case s ^. msSelectedServiceIdx of
   Nothing ->
     widget Gtk.Label [#label := "Please select a service from the left pane"]
@@ -194,6 +212,7 @@ servicesRightPane s = case s ^. msSelectedServiceIdx of
     in
       bin Gtk.ScrolledWindow [] optBox
 
+servicesBox :: ManagerState -> Widget ManagerEvent
 servicesBox s = paned []
                       (pane defaultPaneProperties (servicesLeftPane s))
                       (pane defaultPaneProperties (servicesRightPane s))

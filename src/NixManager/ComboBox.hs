@@ -5,7 +5,11 @@
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
-module NixManager.ComboBox where
+module NixManager.ComboBox
+  ( comboBox
+  , ComboBoxProperties(ComboBoxProperties)
+  )
+where
 
 import           Data.Vector                    ( Vector )
 import           GI.Gtk.Declarative.EventSource ( fromCancellation )

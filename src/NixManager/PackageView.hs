@@ -24,24 +24,16 @@ import           Data.Semigroup                 ( Any(Any)
                                                 )
 import           Data.Maybe                     ( isJust )
 import           Prelude                 hiding ( length )
-import           Data.Text                      ( length
-                                                , Text
-                                                , intercalate
-                                                , toLower
-                                                , isInfixOf
-                                                )
-import           NixManager.Nix
+import           Data.Text                      ( length )
+import           GI.Gtk.Declarative.Container.Class
+                                                ( Children )
 import           GI.Gtk.Declarative             ( bin
                                                 , Widget
                                                 , padding
-                                                , pane
-                                                , paned
-                                                , notebook
-                                                , page
                                                 , defaultBoxChildProperties
                                                 , expand
+                                                , Container
                                                 , fill
-                                                , defaultPaneProperties
                                                 , FromWidget
                                                 , Bin
                                                 , widget
@@ -52,15 +44,16 @@ import           GI.Gtk.Declarative             ( bin
                                                 , on
                                                 , onM
                                                 )
-import           GI.Gtk.Declarative.App.Simple  ( AppView )
 import           Data.Vector.Lens               ( toVectorOf )
 import qualified GI.Gtk                        as Gtk
+import           Data.GI.Base.Overloading       ( IsDescendantOf )
 import           Control.Lens                   ( (^.)
                                                 , to
                                                 , has
                                                 , folded
                                                 )
 import           NixManager.ManagerState        ( msSearchString
+                                                , ManagerState
                                                 , msSearchResult
                                                 , msSelectedPackage
                                                 , msLatestMessage
@@ -70,7 +63,13 @@ import           NixManager.Message             ( messageText
                                                 , messageType
                                                 , _ErrorMessage
                                                 )
+import           Control.Monad.IO.Class         ( MonadIO )
 
+
+processSearchChange
+  :: (IsDescendantOf Gtk.Entry o, MonadIO f, Gtk.GObject o)
+  => o
+  -> f ManagerEvent
 processSearchChange w = ManagerEventSearchChanged <$> Gtk.getEntryText w
 
 searchLabel :: Widget event
@@ -112,6 +111,10 @@ rowSelectionHandler (Just row) _ = do
     else pure (ManagerEventPackageSelected (Just (fromIntegral selectedIndex)))
 rowSelectionHandler _ _ = pure (ManagerEventPackageSelected Nothing)
 
+packagesBox
+  :: FromWidget (Container Gtk.Box (Children BoxChild)) target
+  => ManagerState
+  -> target ManagerEvent
 packagesBox s =
   let
     searchValid     = (s ^. msSearchString . to length) >= 2
