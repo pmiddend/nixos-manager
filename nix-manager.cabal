@@ -23,9 +23,11 @@ executable nix-manager
                      , NixManager.NixExpr
                      , NixManager.Util
                      , NixManager.Css
+                     , NixManager.ErrorDialog
   build-depends:       base
                      , containers
                      , gi-gdk
+                     , word-wrap
                      , pipes
                      , scientific
                      , gi-gobject

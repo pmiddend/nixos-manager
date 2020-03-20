@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.ManagerMain where
 
+import           NixManager.ErrorDialog         ( runErrorDialog )
 import           System.FilePath                ( (</>) )
 import           NixManager.Css
 import           Data.Text.IO                   ( putStrLn )
@@ -157,7 +158,7 @@ nixMain = do
   initCss
   initialState' <- initState
   case initialState' of
-    Error e -> putStrLn e
+    Error e -> runErrorDialog e
     Success s ->
       void $ run App { view         = view'
                      , update       = update'
