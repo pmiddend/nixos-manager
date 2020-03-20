@@ -10,9 +10,6 @@ module NixManager.Nix
 where
 
 import           Prelude                 hiding ( readFile )
-import           Data.Fix                       ( Fix(Fix)
-                                                , cata
-                                                )
 import           Data.List                      ( intercalate
                                                 , find
                                                 , inits
@@ -51,16 +48,15 @@ import           Data.Text.Lens                 ( unpacked
                                                 , packed
                                                 )
 import           Control.Monad                  ( void )
-import           NixManager.NixExpr             ( NixExpr
-                                                , NixExprF(NixSymbol)
-                                                , _NixFunctionDecl'
+import           NixManager.NixExpr             ( NixExpr(NixSymbol)
+                                                , _NixFunctionDecl
                                                 , nfExpr
-                                                , _NixSymbol'
+                                                , _NixSymbol
                                                 , evalSymbols
-                                                , _NixSet'
+                                                , _NixSet
                                                 , parseNixFile
                                                 , writeNixFile
-                                                , _NixList'
+                                                , _NixList
                                                 )
 import           NixManager.Util                ( MaybeError(Success, Error)
                                                 , splitRepeat
@@ -106,7 +102,7 @@ startProgram fn = void $ createProcess (proc fn [])
 
 packageLens :: Traversal' NixExpr NixExpr
 packageLens =
-  _NixFunctionDecl' . nfExpr . _NixSet' . ix "environment.systemPackages"
+  _NixFunctionDecl . nfExpr . _NixSet . ix "environment.systemPackages"
 
 parsePackages :: IO (MaybeError NixExpr)
 parsePackages =
@@ -122,7 +118,7 @@ writePackages = writeNixFile "packages.nix"
 readInstalledPackages :: IO (MaybeError [Text])
 readInstalledPackages = ifSuccessIO parsePackages $ \expr ->
   case expr ^? packageLens of
-    Just packages -> pure (Success (Text.drop 5 <$> cata evalSymbols packages))
+    Just packages -> pure (Success (Text.drop 5 <$> evalSymbols packages))
     Nothing -> pure (Error "Couldn't find packages node in packages.nix file.")
 
 packagePrefix :: Text
@@ -131,14 +127,14 @@ packagePrefix = "pkgs."
 installPackage :: Text -> IO (MaybeError ())
 installPackage p = ifSuccessIO parsePackages $ \expr -> do
   writePackages
-    (expr & packageLens . _NixList' <>~ [Fix (NixSymbol (packagePrefix <> p))])
+    (expr & packageLens . _NixList <>~ [NixSymbol (packagePrefix <> p)])
   pure (Success ())
 
 uninstallPackage :: Text -> IO (MaybeError ())
 uninstallPackage p = ifSuccessIO parsePackages $ \expr -> do
   writePackages
-    (expr & packageLens . _NixList' %~ filter
-      (hasn't (_NixSymbol' . only (packagePrefix <> p)))
+    (expr & packageLens . _NixList %~ filter
+      (hasn't (_NixSymbol . only (packagePrefix <> p)))
     )
   pure (Success ())
 

@@ -6,8 +6,9 @@ where
 
 import           Data.Text                      ( Text )
 import           Control.Lens                   ( makePrisms )
-import           NixManager.Message
+import           NixManager.Message             ( Message )
 import           NixManager.NixPackage          ( NixPackage )
+import           NixManager.NixExpr             ( NixExpr )
 
 data ManagerEvent = ManagerEventClosed
       | ManagerEventSearchChanged Text
@@ -17,9 +18,10 @@ data ManagerEvent = ManagerEventClosed
       | ManagerEventInstallCompleted [NixPackage]
       | ManagerEventUninstallCompleted [NixPackage]
       | ManagerEventUninstall
+      | ManagerEventSettingChanged Text NixExpr
       | ManagerEventTryInstall
       | ManagerEventShowMessage Message
       | ManagerEventDiscard
-      deriving(Eq,Show)
+      deriving(Show)
 
 makePrisms ''ManagerEvent

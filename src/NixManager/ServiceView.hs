@@ -7,11 +7,11 @@ module NixManager.ServiceView
   )
 where
 
-import           NixManager.NixExpr             ( NixExpr
-                                                , _NixFunctionDecl'
+import           NixManager.NixExpr             ( NixExpr(NixBoolean)
+                                                , _NixFunctionDecl
                                                 , nfExpr
-                                                , _NixSet'
-                                                , _NixBoolean'
+                                                , _NixSet
+                                                , _NixBoolean
                                                 )
 import           NixManager.ComboBox            ( comboBox
                                                 , ComboBoxProperties
@@ -71,6 +71,7 @@ import           NixManager.ManagerState        ( msServiceCache
 import           NixManager.ManagerEvent        ( ManagerEvent
                                                   ( ManagerEventDiscard
                                                   , ManagerEventServiceSelected
+                                                  , ManagerEventSettingChanged
                                                   )
                                                 )
 import           NixManager.NixService          ( NixService
@@ -131,17 +132,24 @@ isStringy (NixServiceOptionOr l r)  = isStringy l && isStringy r
 isStringy _                         = False
 
 buildOptionValueCell
-  :: Maybe NixExpr
+  :: Text
+  -> Maybe NixExpr
   -> NixServiceOption
   -> GI.Gtk.Declarative.Widget.Widget ManagerEvent
-buildOptionValueCell optionValue serviceOption =
+buildOptionValueCell optionPath optionValue serviceOption =
   case serviceOption ^. optionType of
     Left e -> widget
       Gtk.Label
       [#label := ("Option value \"" <> e <> "\" not implemented yet")]
     Right NixServiceOptionBoolean -> widget
       Gtk.Switch
-      [#active := (optionValue ^. pre (traversed . _NixBoolean') . non False)]
+      [ #active := (optionValue ^. pre (traversed . _NixBoolean) . non False)
+      , onM
+        #activate
+        ( (ManagerEventSettingChanged optionPath . NixBoolean <$>)
+        . Gtk.switchGetActive
+        )
+      ]
     Right NixServiceOptionUnspecified -> widget
       Gtk.Label
       [ classes ["unspecified-label"]
@@ -176,12 +184,7 @@ buildOptionRows serviceExpression serviceOption =
     optionPath = serviceOption ^. optionLoc . to (intercalate ".")
     optionValue :: Maybe NixExpr
     optionValue =
-      (  serviceExpression
-      ^? _NixFunctionDecl'
-      .  nfExpr
-      .  _NixSet'
-      .  ix optionPath
-      )
+      (serviceExpression ^? _NixFunctionDecl . nfExpr . _NixSet . ix optionPath)
     optionBox = container
       Gtk.Box
       [#orientation := Gtk.OrientationHorizontal, #spacing := 10, #margin := 15]
@@ -194,7 +197,7 @@ buildOptionRows serviceExpression serviceOption =
             , #halign := Gtk.AlignStart
             ]
       , BoxChild defaultBoxChildProperties
-        $ buildOptionValueCell optionValue serviceOption
+        $ buildOptionValueCell optionPath optionValue serviceOption
       ]
     rootBox = container
       Gtk.Box

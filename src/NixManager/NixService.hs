@@ -26,9 +26,9 @@ import           Control.Lens                   ( (^.)
                                                 )
 import           NixManager.NixExpr             ( NixExpr
                                                 , parseNixFile
-                                                , _NixFunctionDecl'
+                                                , _NixFunctionDecl
+                                                , _NixSet
                                                 , nfExpr
-                                                , _NixSet'
                                                 )
 import           NixManager.Util                ( Endo
                                                 , ifSuccessIO
@@ -91,7 +91,7 @@ readServiceFile =
 makeServiceValues :: [NixService] -> IO (MaybeError [NixService])
 makeServiceValues svcs = do
   ifSuccessIO readServiceFile $ \serviceExpr ->
-    case serviceExpr ^? _NixFunctionDecl' . nfExpr . _NixSet' of
+    case serviceExpr ^? _NixFunctionDecl . nfExpr . _NixSet of
       Nothing -> pure (Error "Couldn't find a set inside services file.")
       Just s  -> undefined
 

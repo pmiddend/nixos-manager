@@ -34,7 +34,6 @@ executable nix-manager
                      , regex-pcre
                      , regex-compat
                      , bytestring
-                     , data-fix
                      , bifunctors
                      , process
                      , aeson
