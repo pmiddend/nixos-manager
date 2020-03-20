@@ -7,6 +7,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module NixManager.ComboBox
   ( comboBox
+  , ComboBoxChangeEvent(ComboBoxChangeEvent)
   , ComboBoxProperties(ComboBoxProperties)
   , ComboBoxIndexType
   )

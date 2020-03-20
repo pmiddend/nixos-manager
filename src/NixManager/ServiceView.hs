@@ -24,6 +24,9 @@ import           NixManager.NixExpr             ( NixExpr
                                                 )
 import           NixManager.ComboBox            ( comboBox
                                                 , ComboBoxIndexType
+                                                , ComboBoxChangeEvent
+                                                  ( ComboBoxChangeEvent
+                                                  )
                                                 , ComboBoxProperties
                                                   ( ComboBoxProperties
                                                   )
@@ -64,6 +67,7 @@ import           GI.Gtk.Declarative             ( bin
 import           Data.Vector.Lens               ( toVectorOf )
 import qualified GI.Gtk                        as Gtk
 import           Control.Lens                   ( (^.)
+                                                , re
                                                 , Traversal'
                                                 , pre
                                                 , traversed
@@ -176,16 +180,25 @@ buildOptionValueCell serviceExpression serviceOption =
           , #label := "Type not specified, cannot edit."
           ]
         Right (NixServiceOptionOneOfString values) ->
-          let activeIndex :: Maybe ComboBoxIndexType
-              activeIndex =
-                  optionValue
-                    ^? folded
-                    .  _NixString
-                    .  to (`elemIndex` values)
-                    .  folded
-                    .  to fromIntegral
-          in  ManagerEventDiscard
-                <$ comboBox [] (ComboBoxProperties values activeIndex)
+          let
+            activeIndex :: Maybe ComboBoxIndexType
+            activeIndex =
+              optionValue
+                ^? folded
+                .  _NixString
+                .  to (`elemIndex` values)
+                .  folded
+                .  to fromIntegral
+            changeCallback :: ComboBoxChangeEvent -> ManagerEvent
+            changeCallback (ComboBoxChangeEvent Nothing) =
+              ManagerEventSettingChanged $ set (optionLens' optionPath) Nothing
+            changeCallback (ComboBoxChangeEvent (Just idx)) =
+              ManagerEventSettingChanged $ set
+                (optionLens' optionPath)
+                (Just (values ^?! ix (fromIntegral idx) . re _NixString))
+          in
+            changeCallback
+              <$> comboBox [] (ComboBoxProperties values activeIndex)
         Right NixServiceOptionPackage   -> textLikeEntry NixSymbol _NixSymbol
         Right NixServiceOptionSubmodule -> textLikeEntry NixSymbol _NixSymbol
         Right NixServiceOptionPath      -> textLikeEntry NixSymbol _NixSymbol
