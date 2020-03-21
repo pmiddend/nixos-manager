@@ -30,7 +30,7 @@ import           Text.Megaparsec                ( Parsec
 import           NixManager.Util
 
 data NixServiceOptionType = NixServiceOptionInteger
-                         | NixServiceOptionAttributeSet
+                         | NixServiceOptionAttributeSet (Maybe NixServiceOptionType)
                          | NixServiceOptionBoolean
                          | NixServiceOptionOr NixServiceOptionType NixServiceOptionType
                          | NixServiceOptionOneOfNumeric [Integer]
@@ -45,16 +45,18 @@ data NixServiceOptionType = NixServiceOptionInteger
   deriving(Eq)
 
 instance Show NixServiceOptionType where
-  show NixServiceOptionInteger      = "integer"
-  show NixServiceOptionString       = "string"
-  show (NixServiceOptionList t)     = "list of " <> show t <> "s"
-  show NixServiceOptionBoolean      = "boolean"
-  show NixServiceOptionPackage      = "package"
-  show NixServiceOptionAttributeSet = "attribute set"
-  show NixServiceOptionPath         = "path"
-  show NixServiceOptionSubmodule    = "submodule"
-  show NixServiceOptionUnspecified  = "unspecified"
-  show NixServiceOptionNull         = "null"
+  show NixServiceOptionInteger  = "integer"
+  show NixServiceOptionString   = "string"
+  show (NixServiceOptionList t) = "list of " <> show t <> "s"
+  show NixServiceOptionBoolean  = "boolean"
+  show NixServiceOptionPackage  = "package"
+  show (NixServiceOptionAttributeSet (Just t)) =
+    "attribute set of " <> show t <> "s"
+  show (NixServiceOptionAttributeSet Nothing) = "attribute set"
+  show NixServiceOptionPath                   = "path"
+  show NixServiceOptionSubmodule              = "submodule"
+  show NixServiceOptionUnspecified            = "unspecified"
+  show NixServiceOptionNull                   = "null"
   show (NixServiceOptionOneOfNumeric xs) =
     "one of " <> intercalate ", " (show <$> xs)
   show (NixServiceOptionOneOfString xs) =
@@ -96,12 +98,12 @@ serviceOptionTypeParser =
       void (string "s")
       pure (NixServiceOptionList expr)
     attributeSetUntyped =
-      string "attribute set" $> NixServiceOptionAttributeSet
+      string "attribute set" $> NixServiceOptionAttributeSet Nothing
     attributeSetTyped = do
       void (string "attribute set of ")
-      void expressionParser
+      t <- expressionParser
       void (string "s")
-      pure NixServiceOptionAttributeSet
+      pure (NixServiceOptionAttributeSet (Just t))
     attributeSetParser :: Parser NixServiceOptionType
     attributeSetParser = attributeSetTyped <|> attributeSetUntyped
     oneOfParser :: Parser NixServiceOptionType

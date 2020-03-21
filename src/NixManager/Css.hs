@@ -16,10 +16,9 @@ styles = mconcat
   , ".info-message { background-image: image(#bef7ff); }"
   , ".service-headline { font-size: 40px; }"
   , ".service-option-title { font-family: monospace; font-weight: bold; }"
-  , ".service-option-description { font-style: italic; }"
   , ".unspecified-label { color: #101010; }"
   , ".startup-error-message { font-family: monospace; }"
-  , ".option-type-description { font-style: italic; }"
+  , ".option-type-description { font-style: italic; font-size: 13px; }"
   ]
 
 initCss :: IO ()
