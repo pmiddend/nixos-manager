@@ -4,9 +4,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.ManagerMain where
 
-import           NixManager.ErrorDialog         ( runErrorDialog )
+import           NixManager.View.ErrorDialog    ( runErrorDialog )
 import           System.FilePath                ( (</>) )
-import           NixManager.Css
+import           NixManager.View.Css            ( initCss )
 import           Data.Text.IO                   ( putStrLn )
 import           Control.Lens                   ( (^.)
                                                 , over
@@ -46,7 +46,7 @@ import           NixManager.Nix                 ( installPackage
 import           NixManager.NixPackage          ( NixPackage
                                                 , npName
                                                 )
-import           NixManager.View                ( view' )
+import           NixManager.View.Root           ( view' )
 import           GI.Gtk.Declarative.App.Simple  ( App(App)
                                                 , view
                                                 , update

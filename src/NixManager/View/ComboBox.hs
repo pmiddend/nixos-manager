@@ -5,7 +5,7 @@
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
-module NixManager.ComboBox
+module NixManager.View.ComboBox
   ( comboBox
   , ComboBoxChangeEvent(ComboBoxChangeEvent)
   , ComboBoxProperties(ComboBoxProperties)

@@ -3,12 +3,11 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
-module NixManager.ServiceView
+module NixManager.View.Services
   ( servicesBox
   )
 where
 
-import           Debug.Trace                    ( traceShowId )
 import           Data.List                      ( elemIndex )
 import           NixManager.NixExpr             ( NixExpr
                                                   ( NixBoolean
@@ -24,7 +23,7 @@ import           NixManager.NixExpr             ( NixExpr
                                                 , _NixString
                                                 , _NixSymbol
                                                 )
-import           NixManager.ComboBox            ( comboBox
+import           NixManager.View.ComboBox       ( comboBox
                                                 , ComboBoxIndexType
                                                 , ComboBoxChangeEvent
                                                   ( ComboBoxChangeEvent
@@ -223,7 +222,8 @@ buildOptionValueCell serviceExpression serviceOption =
           ]
         , widget
           Gtk.Label
-          [ #label := ("type: " <> showText v)
+          [ #label := ("type: " <> (showText v))
+          , #wrap := True
           , classes ["option-type-description"]
           ]
         ]
@@ -231,13 +231,16 @@ buildOptionValueCell serviceExpression serviceOption =
 convertMarkup :: Text -> Text
 convertMarkup =
   replaceTag "filename" "tt"
-    . replaceTag "literal" "tt"
-    . replaceTag "command" "tt"
-    . replaceTag "option"  "tt"
-    . replaceTag "varname" "tt"
+    . replaceTag "literal"        "tt"
+    . replaceTag "command"        "tt"
+    . replaceTag "option"         "tt"
+    . replaceTag "code"           "tt"
+    . replaceTag "programlisting" "tt"
+    . replaceTag "varname"        "tt"
     . removeTag "refentrytitle"
     . removeTag "note"
     . removeTag "para"
+    . removeTag "replaceable"
     . removeTag "manvolnum"
     . removeTag "link"
     . replaceTag "citerefentry" "tt"

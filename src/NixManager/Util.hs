@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.Util where
 
-import           Text.Regex                     ( mkRegex
+import           Text.Regex                     ( mkRegexWithOpts
                                                 , subRegex
                                                 )
 import           Data.Text                      ( Text
@@ -102,7 +102,10 @@ replaceTag from toTag = replace (openTag from) (openTag toTag)
   . replace (closeTag from) (closeTag toTag)
 
 removeStartTag needle haystack = pack
-  (subRegex (mkRegex ("<" <> unpack needle <> "[^>]*>")) (unpack haystack) "")
+  (subRegex (mkRegexWithOpts ("<" <> unpack needle <> "[^>]*>") False True)
+            (unpack haystack)
+            ""
+  )
 
 removeTag :: Text -> Endo Text
 removeTag t = removeStartTag t . replace (closeTag t) ""

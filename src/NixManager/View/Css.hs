@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module NixManager.Css where
+module NixManager.View.Css where
 
 import           Data.ByteString                ( ByteString )
 import qualified GI.Gdk                        as Gdk

@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
-module NixManager.ErrorDialog
+module NixManager.View.ErrorDialog
   ( runErrorDialog
   )
 where

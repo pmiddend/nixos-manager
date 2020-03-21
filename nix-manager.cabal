@@ -10,11 +10,15 @@ executable nix-manager
                      , NixManager.Nix
                      , NixManager.ManagerState
                      , NixManager.ManagerEvent
-                     , NixManager.PackageView
-                     , NixManager.ServiceView
-                     , NixManager.ComboBox
-                     , NixManager.View
+                     , NixManager.View.Packages
+                     , NixManager.View.Services
+                     , NixManager.View.Admin
+                     , NixManager.View.Root
+                     , NixManager.View.ComboBox
+                     , NixManager.View.Css
+                     , NixManager.View.ErrorDialog
                      , NixManager.NixServiceOption
+                     , NixManager.Docbook
                      , NixManager.NixPackage
                      , NixManager.NixService
                      , NixManager.NixServiceOptionType
@@ -22,8 +26,6 @@ executable nix-manager
                      , NixManager.Message
                      , NixManager.NixExpr
                      , NixManager.Util
-                     , NixManager.Css
-                     , NixManager.ErrorDialog
   build-depends:       base
                      , containers
                      , gi-gdk

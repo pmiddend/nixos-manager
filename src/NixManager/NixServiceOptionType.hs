@@ -30,6 +30,7 @@ import           Text.Megaparsec                ( Parsec
 import           NixManager.Util
 
 data NixServiceOptionType = NixServiceOptionInteger
+                         | NixServiceOptionFloat
                          | NixServiceOptionAttributeSet (Maybe NixServiceOptionType)
                          | NixServiceOptionBoolean
                          | NixServiceOptionOr NixServiceOptionType NixServiceOptionType
@@ -37,6 +38,7 @@ data NixServiceOptionType = NixServiceOptionInteger
                          | NixServiceOptionOneOfString [Text]
                          | NixServiceOptionString
                          | NixServiceOptionList NixServiceOptionType
+                         | NixServiceOptionLoa NixServiceOptionType
                          | NixServiceOptionPackage
                          | NixServiceOptionPath
                          | NixServiceOptionSubmodule
@@ -47,7 +49,9 @@ data NixServiceOptionType = NixServiceOptionInteger
 instance Show NixServiceOptionType where
   show NixServiceOptionInteger  = "integer"
   show NixServiceOptionString   = "string"
+  show NixServiceOptionFloat    = "float"
   show (NixServiceOptionList t) = "list of " <> show t <> "s"
+  show (NixServiceOptionLoa  t) = "list or attribute set of " <> show t <> "s"
   show NixServiceOptionBoolean  = "boolean"
   show NixServiceOptionPackage  = "package"
   show (NixServiceOptionAttributeSet (Just t)) =
@@ -77,6 +81,9 @@ serviceOptionTypeParser =
   let
     booleanParser :: Parser NixServiceOptionType
     booleanParser = string "boolean" $> NixServiceOptionBoolean <?> "boolean"
+    floatParser :: Parser NixServiceOptionType
+    floatParser =
+      string "floating point number" $> NixServiceOptionFloat <?> "float"
     stringParser :: Parser NixServiceOptionType
     stringParser = string "string" $> NixServiceOptionString <?> "string"
     nullParser :: Parser NixServiceOptionType
@@ -91,6 +98,12 @@ serviceOptionTypeParser =
     unspecifiedParser :: Parser NixServiceOptionType
     unspecifiedParser =
       string "unspecified" $> NixServiceOptionUnspecified <?> "unspecified"
+    loaParser :: Parser NixServiceOptionType
+    loaParser = do
+      void (string "list or attribute set of ")
+      expr <- expressionParser
+      void (string "s")
+      pure (NixServiceOptionLoa expr)
     listParser :: Parser NixServiceOptionType
     listParser = do
       void (string "list of ")
@@ -133,6 +146,7 @@ serviceOptionTypeParser =
     atomicsParser =
       nullParser
         <|> booleanParser
+        <|> floatParser
         <|> stringParser
         <|> packageParser
         <|> pathParser
@@ -140,6 +154,7 @@ serviceOptionTypeParser =
         <|> unspecifiedParser
         <|> (integerParser <?> "integer")
         <|> (oneOfParser <?> "\"one of\" expression")
+        <|> (loaParser <?> "\"list or attribute set of\" expression")
         <|> (listParser <?> "\"list of\" expression")
         <|> (attributeSetParser <?> "\"attribute set\" expression")
     expressionParser = do

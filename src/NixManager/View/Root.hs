@@ -2,13 +2,14 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
-module NixManager.View
+module NixManager.View.Root
   ( view'
   )
 where
 
-import           NixManager.PackageView         ( packagesBox )
-import           NixManager.ServiceView         ( servicesBox )
+import           NixManager.View.Packages       ( packagesBox )
+import           NixManager.View.Services       ( servicesBox )
+import           NixManager.View.Admin          ( adminBox )
 import           NixManager.Nix                 ( )
 import           GI.Gtk.Declarative             ( Attribute((:=))
                                                 , on
@@ -37,5 +38,8 @@ view' :: ManagerState -> AppView Gtk.Window ManagerEvent
 view' s =
   let windowContents = notebook
         []
-        [page "Packages" (packagesBox s), page "Services" (servicesBox s)]
+        [ page "Packages" (packagesBox s)
+        , page "Services" (servicesBox s)
+        , page "Admin"    (adminBox s)
+        ]
   in  bin Gtk.Window windowAttributes windowContents
