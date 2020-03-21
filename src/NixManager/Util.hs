@@ -1,7 +1,10 @@
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.Util where
 
+import           Data.String                    ( IsString )
+import           Data.Bifunctor                 ( first )
 import           Text.Regex                     ( mkRegexWithOpts
                                                 , subRegex
                                                 )
@@ -15,11 +18,15 @@ import           Prelude                 hiding ( putStrLn )
 
 data MaybeError e = Error Text
                   | Success e
-                  deriving(Functor)
+                  deriving(Functor, Foldable)
 
 instance Show e => Show (MaybeError e) where
   show (Error   e) = "error: " <> unpack e
   show (Success e) = "success: " <> show e
+
+fromShowableError :: Show ex => Either ex e -> MaybeError e
+fromShowableError = fromEither . first show
+
 
 fromEither :: Either String e -> MaybeError e
 fromEither (Left  e) = Error (pack e)
@@ -94,8 +101,13 @@ splitRepeat c = unfoldr f
 predAnd :: (t -> Bool) -> (t -> Bool) -> t -> Bool
 predAnd a b x = a x && b x
 
+openTag :: (IsString s, Semigroup s) => s -> s
 openTag t = "<" <> t <> ">"
+closeTag :: (IsString s, Semigroup s) => s -> s
 closeTag t = "</" <> t <> ">"
+
+surroundSimple :: (IsString s, Semigroup s) => s -> s -> s
+surroundSimple tag content = openTag tag <> content <> closeTag tag
 
 replaceTag :: Text -> Text -> Endo Text
 replaceTag from toTag = replace (openTag from) (openTag toTag)

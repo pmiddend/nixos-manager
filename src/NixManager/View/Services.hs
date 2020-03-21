@@ -8,6 +8,9 @@ module NixManager.View.Services
   )
 where
 
+import           NixManager.Docbook             ( parseDocbook
+                                                , docbookToPango
+                                                )
 import           Data.List                      ( elemIndex )
 import           NixManager.NixExpr             ( NixExpr
                                                   ( NixBoolean
@@ -229,21 +232,9 @@ buildOptionValueCell serviceExpression serviceOption =
         ]
 
 convertMarkup :: Text -> Text
-convertMarkup =
-  replaceTag "filename" "tt"
-    . replaceTag "literal"        "tt"
-    . replaceTag "command"        "tt"
-    . replaceTag "option"         "tt"
-    . replaceTag "code"           "tt"
-    . replaceTag "programlisting" "tt"
-    . replaceTag "varname"        "tt"
-    . removeTag "refentrytitle"
-    . removeTag "note"
-    . removeTag "para"
-    . removeTag "replaceable"
-    . removeTag "manvolnum"
-    . removeTag "link"
-    . replaceTag "citerefentry" "tt"
+convertMarkup t = case parseDocbook t of
+  Error   e -> "error parsing description: " <> e
+  Success v -> docbookToPango v
 
 buildOptionRows :: NixExpr -> NixServiceOption -> BoxChild ManagerEvent
 buildOptionRows serviceExpression serviceOption =

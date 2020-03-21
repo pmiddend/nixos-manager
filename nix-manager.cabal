@@ -36,6 +36,9 @@ executable nix-manager
                      , lens
                      , text
                      , regex-pcre
+                     , xml-lens
+                     , xml-conduit
+                     , data-default
                      , regex-compat
                      , bytestring
                      , bifunctors
