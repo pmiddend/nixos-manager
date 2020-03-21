@@ -4,8 +4,10 @@
 {-# LANGUAGE DeriveTraversable #-}
 module NixManager.NixExpr
   ( parseNixFile
+  , parseNixString
   , NixExpr(..)
   , evalSymbols
+  , prettyPrintSingleLine
   , NixFunction
   , nfArgs
   , nfExpr
@@ -22,7 +24,10 @@ module NixManager.NixExpr
   )
 where
 
-import           NixManager.Util
+import           NixManager.Util                ( showText
+                                                , fromEither
+                                                , MaybeError
+                                                )
 import           Data.Bifunctor                 ( first )
 import           Control.Monad                  ( void )
 import           Data.Functor                   ( ($>) )
@@ -47,6 +52,7 @@ import           Data.Text.IO                   ( readFile
 import           Data.Text                      ( Text
                                                 , intercalate
                                                 , unwords
+                                                , replace
                                                 , pack
                                                 )
 import           Data.Map.Strict                ( Map
@@ -92,6 +98,9 @@ makeLenses ''NixFunction
 evalSymbols :: NixExpr -> [Text]
 evalSymbols (NixSymbol r) = [r]
 evalSymbols _             = []
+
+prettyPrintSingleLine :: NixExpr -> Text
+prettyPrintSingleLine = replace "\n" "" . prettyPrint
 
 prettyPrint :: NixExpr -> Text
 prettyPrint NixNull            = "null"
@@ -209,6 +218,10 @@ exprParser =
     <|> try floatParser
     <|> try intParser
     <|> symbolParser
+
+parseNixString :: Text -> MaybeError NixExpr
+parseNixString =
+  fromEither . first errorBundlePretty . parse exprParser "string expression"
 
 parseNixFile :: FilePath -> IO (Either String NixExpr)
 parseNixFile fn = first errorBundlePretty . parse exprParser fn <$> readFile fn

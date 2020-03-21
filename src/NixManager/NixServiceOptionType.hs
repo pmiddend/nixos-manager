@@ -5,12 +5,14 @@ module NixManager.NixServiceOptionType
   )
 where
 
+import           Data.List                      ( intercalate )
 import           Data.Bifunctor                 ( first )
 import           Control.Monad                  ( void )
 import           Data.Functor                   ( ($>) )
 import           Data.Void                      ( Void )
 import           Data.Text                      ( Text
                                                 , pack
+                                                , unpack
                                                 )
 import qualified Text.Megaparsec.Char.Lexer    as L
 import           Text.Megaparsec.Char           ( char
@@ -40,7 +42,24 @@ data NixServiceOptionType = NixServiceOptionInteger
                          | NixServiceOptionSubmodule
                          | NixServiceOptionUnspecified
                          | NixServiceOptionNull
-  deriving(Show, Eq)
+  deriving(Eq)
+
+instance Show NixServiceOptionType where
+  show NixServiceOptionInteger      = "integer"
+  show NixServiceOptionString       = "string"
+  show (NixServiceOptionList t)     = "list of " <> show t <> "s"
+  show NixServiceOptionBoolean      = "boolean"
+  show NixServiceOptionPackage      = "package"
+  show NixServiceOptionAttributeSet = "attribute set"
+  show NixServiceOptionPath         = "path"
+  show NixServiceOptionSubmodule    = "submodule"
+  show NixServiceOptionUnspecified  = "unspecified"
+  show NixServiceOptionNull         = "null"
+  show (NixServiceOptionOneOfNumeric xs) =
+    "one of " <> intercalate ", " (show <$> xs)
+  show (NixServiceOptionOneOfString xs) =
+    "one of " <> intercalate ", " (unpack <$> xs)
+  show (NixServiceOptionOr a b) = show a <> " or " <> show b
 
 type Parser = Parsec Void Text
 

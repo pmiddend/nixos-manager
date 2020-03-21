@@ -17,7 +17,9 @@ import           NixManager.NixExpr             ( NixExpr
                                                   )
                                                 , _NixFunctionDecl
                                                 , nfExpr
+                                                , prettyPrintSingleLine
                                                 , _NixSet
+                                                , parseNixString
                                                 , _NixBoolean
                                                 , _NixString
                                                 , _NixSymbol
@@ -38,6 +40,7 @@ import           Data.Text                      ( intercalate
 import           NixManager.Util                ( showText
                                                 , replaceTag
                                                 , removeTag
+                                                , MaybeError(Error, Success)
                                                 )
 import           NixManager.NixServiceOption    ( optionType
                                                 , NixServiceOption
@@ -144,70 +147,86 @@ servicesLeftPane s = bin
 optionLens' :: Text -> Traversal' NixExpr (Maybe NixExpr)
 optionLens' optionPath = _NixFunctionDecl . nfExpr . _NixSet . at optionPath
 
-buildOptionValueCell
-  :: NixExpr
-  -> NixServiceOption
-  -> GI.Gtk.Declarative.Widget.Widget ManagerEvent
+buildOptionValueCell :: NixExpr -> NixServiceOption -> Widget ManagerEvent
 buildOptionValueCell serviceExpression serviceOption =
-  let optionPath :: Text
-      optionPath = serviceOption ^. optionLoc . to (intercalate ".")
-      optionValue :: Maybe NixExpr
-      optionValue = serviceExpression ^? optionLens' optionPath . folded
-      changeEvent v =
-          ManagerEventSettingChanged (set (optionLens' optionPath) (Just v))
-      textLikeEntry inL outL = widget
-        Gtk.Entry
-        [ #text := (optionValue ^. pre (traversed . outL) . non "")
-        , onM #changed ((changeEvent . inL <$>) . Gtk.entryGetText)
-        ]
-  in  case serviceOption ^. optionType of
-        Left e -> widget
-          Gtk.Label
-          [#label := ("Option value \"" <> e <> "\" not implemented yet")]
-        Right NixServiceOptionBoolean ->
-          let changeCallback :: Bool -> (Bool, ManagerEvent)
-              changeCallback newValue =
-                  (False, changeEvent (NixBoolean newValue))
-          in  widget
-                Gtk.Switch
-                [ #active
-                  := (optionValue ^. pre (traversed . _NixBoolean) . non False)
-                , on #stateSet changeCallback
-                ]
-        Right NixServiceOptionUnspecified -> widget
-          Gtk.Label
-          [ classes ["unspecified-label"]
-          , #label := "Type not specified, cannot edit."
-          ]
-        Right (NixServiceOptionOneOfString values) ->
-          let
-            activeIndex :: Maybe ComboBoxIndexType
+  let
+    optionPath :: Text
+    optionPath = serviceOption ^. optionLoc . to (intercalate ".")
+    optionValue :: Maybe NixExpr
+    optionValue = serviceExpression ^? optionLens' optionPath . folded
+    rawChangeEvent :: Text -> ManagerEvent
+    rawChangeEvent "" =
+      ManagerEventSettingChanged (set (optionLens' optionPath) Nothing)
+    rawChangeEvent v = case parseNixString v of
+      Error _ -> ManagerEventDiscard
+      Success e ->
+        ManagerEventSettingChanged (set (optionLens' optionPath) (Just e))
+    changeEvent v =
+      ManagerEventSettingChanged (set (optionLens' optionPath) (Just v))
+    textLikeEntry inL outL = widget
+      Gtk.Entry
+      [ #text := (optionValue ^. pre (traversed . outL) . non "")
+      , onM #changed ((changeEvent . inL <$>) . Gtk.entryGetText)
+      ]
+  in
+    case serviceOption ^. optionType of
+      Left e -> widget
+        Gtk.Label
+        [#label := ("Option value \"" <> e <> "\" not implemented yet")]
+      Right NixServiceOptionBoolean ->
+        let changeCallback :: Bool -> (Bool, ManagerEvent)
+            changeCallback newValue =
+                (False, changeEvent (NixBoolean newValue))
+        in  widget
+              Gtk.Switch
+              [ #active
+                := (optionValue ^. pre (traversed . _NixBoolean) . non False)
+              , on #stateSet changeCallback
+              ]
+      -- Right NixServiceOptionUnspecified -> widget
+      --   Gtk.Label
+      --   [ classes ["unspecified-label"]
+      --   , #label := "Type not specified, cannot edit."
+      --   ]
+      Right (NixServiceOptionOneOfString values) ->
+        let activeIndex :: Maybe ComboBoxIndexType
             activeIndex =
-              optionValue
-                ^? folded
-                .  _NixString
-                .  to (`elemIndex` values)
-                .  folded
-                .  to fromIntegral
+                optionValue
+                  ^? folded
+                  .  _NixString
+                  .  to (`elemIndex` values)
+                  .  folded
+                  .  to fromIntegral
             changeCallback :: ComboBoxChangeEvent -> ManagerEvent
             changeCallback (ComboBoxChangeEvent Nothing) =
-              ManagerEventSettingChanged $ set (optionLens' optionPath) Nothing
+                ManagerEventSettingChanged $ set (optionLens' optionPath) Nothing
             changeCallback (ComboBoxChangeEvent (Just idx)) =
-              ManagerEventSettingChanged $ set
-                (optionLens' optionPath)
-                (Just (values ^?! ix (fromIntegral idx) . re _NixString))
-          in
-            changeCallback
+                ManagerEventSettingChanged $ set
+                  (optionLens' optionPath)
+                  (Just (values ^?! ix (fromIntegral idx) . re _NixString))
+        in  changeCallback
               <$> comboBox [] (ComboBoxProperties values activeIndex)
-        Right NixServiceOptionPackage   -> textLikeEntry NixSymbol _NixSymbol
-        Right NixServiceOptionSubmodule -> textLikeEntry NixSymbol _NixSymbol
-        Right NixServiceOptionPath      -> textLikeEntry NixSymbol _NixSymbol
-        Right NixServiceOptionString    -> textLikeEntry NixString _NixString
-        Right v                         -> widget
-          Gtk.Label
-          [ #label
-              := ("Option value \"" <> showText v <> "\" not implemented yet")
+      Right NixServiceOptionPackage   -> textLikeEntry NixSymbol _NixSymbol
+      Right NixServiceOptionSubmodule -> textLikeEntry NixSymbol _NixSymbol
+      Right NixServiceOptionPath      -> textLikeEntry NixSymbol _NixSymbol
+      Right NixServiceOptionString    -> textLikeEntry NixString _NixString
+      Right v                         -> container
+        Gtk.Box
+        [#orientation := Gtk.OrientationVertical]
+        [ widget
+          Gtk.Entry
+          [ #text
+            := (optionValue ^. pre (traversed . to prettyPrintSingleLine) . non
+                 ""
+               )
+          , onM #changed ((rawChangeEvent <$>) . Gtk.entryGetText)
           ]
+        , widget
+          Gtk.Label
+          [ #label := ("type: " <> showText v)
+          , classes ["option-type-description"]
+          ]
+        ]
 
 convertMarkup :: Text -> Text
 convertMarkup =
@@ -217,6 +236,8 @@ convertMarkup =
     . replaceTag "option"  "tt"
     . replaceTag "varname" "tt"
     . removeTag "refentrytitle"
+    . removeTag "note"
+    . removeTag "para"
     . removeTag "manvolnum"
     . removeTag "link"
     . replaceTag "citerefentry" "tt"
