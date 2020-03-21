@@ -8,7 +8,7 @@ module NixManager.NixExpr
   , NixExpr(..)
   , evalSymbols
   , prettyPrintSingleLine
-  , NixFunction
+  , NixFunction(NixFunction)
   , nfArgs
   , nfExpr
   , _NixNull

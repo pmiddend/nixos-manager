@@ -12,6 +12,7 @@ import           Text.Wrap                      ( wrapText
                                                 )
 import           Data.Text                      ( Text )
 import           Control.Monad                  ( void )
+import           NixManager.View.GtkUtil        ( paddedAround )
 import           GI.Gtk.Declarative.App.Simple  ( App(App)
                                                 , view
                                                 , update
@@ -22,7 +23,6 @@ import           GI.Gtk.Declarative.App.Simple  ( App(App)
                                                 , run
                                                 )
 import           GI.Gtk.Declarative             ( bin
-                                                , padding
                                                 , defaultBoxChildProperties
                                                 , on
                                                 , expand
@@ -46,19 +46,6 @@ errorDialog e _ =
         [ #label := wrapText (WrapSettings True False) 80 e
         , classes ["startup-error-message"]
         ]
-      paddedAround spacing =
-          container Gtk.Box [#orientation := Gtk.OrientationVertical]
-            . pure
-            . BoxChild defaultBoxChildProperties { padding = spacing
-                                                 , expand  = True
-                                                 , fill    = True
-                                                 }
-            . container Gtk.Box []
-            . pure
-            . BoxChild defaultBoxChildProperties { padding = spacing
-                                                 , expand  = True
-                                                 , fill    = True
-                                                 }
   in  bin
           Gtk.Dialog
           [ #title := "An error occurred"

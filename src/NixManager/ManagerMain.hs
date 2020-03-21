@@ -4,34 +4,61 @@
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.ManagerMain where
 
+import           NixManager.ServiceStateData    ( ServiceStateData
+                                                  ( ServiceStateData
+                                                  )
+                                                , ssdServiceExpression
+                                                , ssdSelectedServiceIdx
+                                                )
+import           NixManager.ServiceState        ( ServiceState
+                                                  ( ServiceStateDownloading
+                                                  , ServiceStateInvalidOptions
+                                                  , ServiceStateInvalidExpr
+                                                  , ServiceStateDone
+                                                  )
+                                                , _ServiceStateDone
+                                                , _ServiceStateDownloading
+                                                , ssddCounter
+                                                , ssddVar
+                                                , ServiceStateDownloadingData
+                                                  ( ServiceStateDownloadingData
+                                                  )
+                                                )
+import qualified NixManager.ServiceDownload    as ServiceDownload
 import           NixManager.View.ErrorDialog    ( runErrorDialog )
 import           System.FilePath                ( (</>) )
 import           NixManager.View.Css            ( initCss )
 import           Data.Text.IO                   ( putStrLn )
+import           Data.Foldable                  ( for_ )
 import           Control.Lens                   ( (^.)
                                                 , over
                                                 , (&)
+                                                , (^?)
                                                 , (?~)
                                                 , (.~)
+                                                , (+~)
+                                                , (^?!)
                                                 )
 import           NixManager.ManagerState        ( ManagerState(..)
                                                 , msInstallingPackage
                                                 , msSelectedPackage
-                                                , msServiceExpression
+                                                , msServiceState
                                                 , msLatestMessage
                                                 , msPackageCache
-                                                , msSelectedServiceIdx
                                                 , msSelectedPackageIdx
                                                 , msSearchString
                                                 )
-import           NixManager.NixServiceOption    ( readOptionsFile )
+import           NixManager.NixServiceOption    ( readOptionsFile
+                                                , locateOptionsFile
+                                                )
 import           NixManager.NixService          ( makeServices
-                                                , readServiceFile
                                                 , writeServiceFile
+                                                , readServices
                                                 )
 import           NixManager.Util                ( MaybeError(Success, Error)
                                                 , ifSuccessIO
                                                 , showText
+                                                , threadDelayMillis
                                                 )
 import           NixManager.Message             ( errorMessage
                                                 , infoMessage
@@ -88,12 +115,54 @@ tryInstall p = do
 
 update' :: ManagerState -> ManagerEvent -> Transition ManagerState ManagerEvent
 update' s (ManagerEventSettingChanged setter) =
-  let newState = over msServiceExpression setter s
+  let newState = over
+        (msServiceState . _ServiceStateDone . ssdServiceExpression)
+        setter
+        s
   in  Transition newState $ do
-        writeServiceFile (newState ^. msServiceExpression)
+        writeServiceFile
+          (   newState
+          ^?! msServiceState
+          .   _ServiceStateDone
+          .   ssdServiceExpression
+          )
         pure Nothing
 
-update' _ ManagerEventClosed = Exit
+update' _ ManagerEventClosed                = Exit
+update' s ManagerEventServiceDownloadCancel = Transition s $ do
+  for_ (s ^? msServiceState . _ServiceStateDownloading . ssddVar)
+       ServiceDownload.cancel
+  pure (Just ManagerEventServiceStateReload)
+update' s (ManagerEventServiceStateResult newServiceState) =
+  pureTransition (s & msServiceState .~ newServiceState)
+update' s ManagerEventServiceStateReload =
+  Transition s (Just . ManagerEventServiceStateResult <$> initServiceState)
+update' s (ManagerEventServiceDownloadCheck var) =
+  Transition (s & msServiceState . _ServiceStateDownloading . ssddCounter +~ 1)
+    $ do
+        downloadResult <- ServiceDownload.result var
+        case downloadResult of
+          Just (Error e) -> pure
+            (Just
+              (ManagerEventServiceStateResult
+                (ServiceStateInvalidOptions (Just e))
+              )
+            )
+          Just (Success _) -> pure (Just ManagerEventServiceStateReload)
+          Nothing          -> threadDelayMillis 500
+            >> pure (Just (ManagerEventServiceDownloadCheck var))
+update' s (ManagerEventServiceDownloadStarted var) =
+  Transition
+      (s & msServiceState .~ ServiceStateDownloading
+        (ServiceStateDownloadingData 0 var)
+      )
+    $ do
+        threadDelayMillis 500
+        pure (Just (ManagerEventServiceDownloadCheck var))
+update' s ManagerEventServiceDownloadStart = Transition
+  s
+  (Just . ManagerEventServiceDownloadStarted <$> ServiceDownload.start)
+
 update' s (ManagerEventShowMessage e) =
   pureTransition (s & msLatestMessage ?~ e)
 update' s (ManagerEventInstallCompleted cache) = Transition
@@ -132,25 +201,40 @@ update' s ManagerEventTryInstall = case s ^. msSelectedPackage of
     Transition (s & msInstallingPackage ?~ selected) (tryInstall selected)
 update' s (ManagerEventPackageSelected i) =
   pureTransition (s & msSelectedPackageIdx .~ i)
-update' s (ManagerEventServiceSelected i) =
-  pureTransition (s & msSelectedServiceIdx .~ i)
+update' s (ManagerEventServiceSelected i) = pureTransition
+  (s & msServiceState . _ServiceStateDone . ssdSelectedServiceIdx .~ i)
 update' s (ManagerEventSearchChanged t) =
   pureTransition (s & msSearchString .~ t)
 update' s ManagerEventDiscard = pureTransition s
 
+-- FIXME: Better happy path
+initServiceState :: IO ServiceState
+initServiceState = do
+  optionsFile' <- locateOptionsFile
+  case optionsFile' of
+    Nothing          -> pure (ServiceStateInvalidOptions Nothing)
+    Just optionsFile -> do
+      options' <- readOptionsFile optionsFile
+      case options' of
+        Error   e       -> pure (ServiceStateInvalidOptions (Just e))
+        Success options -> do
+          services' <- readServices
+          case services' of
+            Error   e        -> pure (ServiceStateInvalidExpr e)
+            Success services -> pure $ ServiceStateDone
+              (ServiceStateData (makeServices options) Nothing services)
+
+
 initState :: IO (MaybeError ManagerState)
-initState = ifSuccessIO readServiceFile $ \serviceExpr ->
-  ifSuccessIO (readOptionsFile "options.json") $ \options ->
-    ifSuccessIO readCache $ \cache -> pure $ Success $ ManagerState
-      { _msPackageCache       = cache
-      , _msSearchString       = mempty
-      , _msSelectedPackageIdx = Nothing
-      , _msInstallingPackage  = Nothing
-      , _msLatestMessage      = Nothing
-      , _msServiceCache       = makeServices options
-      , _msSelectedServiceIdx = Nothing
-      , _msServiceExpression  = serviceExpr
-      }
+initState = ifSuccessIO readCache $ \cache -> do
+  serviceState <- initServiceState
+  pure $ Success $ ManagerState { _msPackageCache       = cache
+                                , _msSearchString       = mempty
+                                , _msSelectedPackageIdx = Nothing
+                                , _msInstallingPackage  = Nothing
+                                , _msLatestMessage      = Nothing
+                                , _msServiceState       = serviceState
+                                }
 
 nixMain :: IO ()
 nixMain = do

@@ -10,13 +10,18 @@ executable nix-manager
                      , NixManager.Nix
                      , NixManager.ManagerState
                      , NixManager.ManagerEvent
+                     , NixManager.ServiceDownload
+                     , NixManager.ServiceState
+                     , NixManager.ServiceStateData
                      , NixManager.View.Packages
+                     , NixManager.View.GtkUtil
                      , NixManager.View.Services
                      , NixManager.View.Admin
                      , NixManager.View.Root
                      , NixManager.View.ComboBox
                      , NixManager.View.Css
                      , NixManager.View.ErrorDialog
+                     , NixManager.View.ProgressBar
                      , NixManager.NixServiceOption
                      , NixManager.Docbook
                      , NixManager.NixPackage
@@ -30,6 +35,8 @@ executable nix-manager
                      , containers
                      , gi-gdk
                      , word-wrap
+                     , http-client
+                     , wreq
                      , pipes
                      , scientific
                      , gi-gobject

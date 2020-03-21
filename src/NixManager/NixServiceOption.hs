@@ -9,10 +9,13 @@ module NixManager.NixServiceOption
   , optionType
   , optionValue
   , readOptionsFile
+  , locateOptionsFile
   , NixServiceOptionLocation
+  , desiredOptionsFileLocation
   )
 where
 
+import           System.Directory               ( doesFileExist )
 import           Control.Monad                  ( mzero )
 import           Prelude                 hiding ( readFile )
 import           Data.Map.Strict                ( Map )
@@ -66,6 +69,14 @@ decodeOptions =
     . fromEither
     )
     . eitherDecode
+
+desiredOptionsFileLocation :: IO FilePath
+desiredOptionsFileLocation = pure "options.json"
+
+locateOptionsFile :: IO (Maybe FilePath)
+locateOptionsFile = do
+  defExists <- doesFileExist "options.json"
+  if defExists then pure (Just "options.json") else pure Nothing
 
 readOptionsFile :: FilePath -> IO (MaybeError (Map Text NixServiceOption))
 readOptionsFile fp = decodeOptions <$> readFile fp

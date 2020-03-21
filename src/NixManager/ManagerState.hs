@@ -5,18 +5,14 @@ module NixManager.ManagerState
   , msSearchResult
   , msSelectedPackage
   , msLatestMessage
-  , msServiceCache
+  , msServiceState
   , msPackageCache
-  , msSelectedServiceIdx
-  , msServiceExpression
   , msInstallingPackage
   , msSelectedPackageIdx
   , ManagerState(..)
   )
 where
 
-import           NixManager.NixExpr             ( NixExpr )
-import           NixManager.NixService          ( NixService )
 import           NixManager.NixPackage          ( NixPackage
                                                 , npName
                                                 )
@@ -35,6 +31,7 @@ import           Data.Text                      ( Text
                                                 , toLower
                                                 , isInfixOf
                                                 )
+import           NixManager.ServiceState        ( ServiceState )
 
 data ManagerState = ManagerState {
      _msPackageCache :: [NixPackage]
@@ -42,10 +39,8 @@ data ManagerState = ManagerState {
    , _msSelectedPackageIdx :: Maybe Int
    , _msInstallingPackage :: Maybe NixPackage
    , _msLatestMessage :: Maybe Message
-   , _msServiceCache :: [NixService]
-   , _msSelectedServiceIdx :: Maybe Int
-   , _msServiceExpression :: NixExpr
-   } deriving(Show)
+   , _msServiceState :: ServiceState
+   }
 
 makeLenses ''ManagerState
 

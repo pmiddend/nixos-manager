@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.Util where
 
+import           Control.Concurrent             ( threadDelay )
 import           Data.String                    ( IsString )
 import           Data.Bifunctor                 ( first )
 import           Text.Regex                     ( mkRegexWithOpts
@@ -109,16 +110,5 @@ closeTag t = "</" <> t <> ">"
 surroundSimple :: (IsString s, Semigroup s) => s -> s -> s
 surroundSimple tag content = openTag tag <> content <> closeTag tag
 
-replaceTag :: Text -> Text -> Endo Text
-replaceTag from toTag = replace (openTag from) (openTag toTag)
-  . replace (closeTag from) (closeTag toTag)
-
-removeStartTag needle haystack = pack
-  (subRegex (mkRegexWithOpts ("<" <> unpack needle <> "[^>]*>") False True)
-            (unpack haystack)
-            ""
-  )
-
-removeTag :: Text -> Endo Text
-removeTag t = removeStartTag t . replace (closeTag t) ""
-
+threadDelayMillis :: Int -> IO ()
+threadDelayMillis = threadDelay . (* 1000)
