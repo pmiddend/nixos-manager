@@ -11,6 +11,8 @@ where
 
 import           Network.HTTP.Client            ( HttpException )
 import           Prelude                 hiding ( writeFile )
+import           System.FilePath                ( dropFileName )
+import           System.Directory               ( createDirectoryIfMissing )
 import           NixManager.NixServiceOption    ( desiredOptionsFileLocation )
 import           Control.Exception              ( try )
 import           Network.Wreq                   ( get
@@ -65,6 +67,7 @@ start = do
         in  if sc == 200
               then do
                 optLoc <- desiredOptionsFileLocation
+                createDirectoryIfMissing True (dropFileName optLoc)
                 writeFile optLoc (response ^. responseBody)
                 putMVar resultVar (Success optLoc)
               else putMVar

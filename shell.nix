@@ -25,7 +25,7 @@ let
           scientific gi-gobject word-wrap xml-lens xml-conduit data-default wreq
           http-client
         ];
-        executableToolDepends = [ brittany cabal-install hlint ];
+        executableToolDepends = [ brittany cabal-install hlint pkgs.gksu ];
         license = "unknown";
         hydraPlatforms = stdenv.lib.platforms.none;
       };

@@ -25,6 +25,7 @@ executable nix-manager
                      , NixManager.NixServiceOption
                      , NixManager.Docbook
                      , NixManager.NixPackage
+                     , NixManager.Constants
                      , NixManager.NixService
                      , NixManager.NixServiceOptionType
                      , NixManager.PackageSearch

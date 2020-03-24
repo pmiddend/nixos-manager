@@ -15,7 +15,13 @@ module NixManager.NixServiceOption
   )
 where
 
-import           System.Directory               ( doesFileExist )
+import           System.FilePath                ( (</>) )
+import           NixManager.Constants           ( appName )
+import           Data.String                    ( IsString )
+import           System.Directory               ( getXdgDirectory
+                                                , XdgDirectory(XdgCache)
+                                                , doesFileExist
+                                                )
 import           Control.Monad                  ( mzero )
 import           Prelude                 hiding ( readFile )
 import           Data.Map.Strict                ( Map )
@@ -70,13 +76,18 @@ decodeOptions =
     )
     . eitherDecode
 
+optionsFileName :: IsString s => s
+optionsFileName = "options.json"
+
 desiredOptionsFileLocation :: IO FilePath
-desiredOptionsFileLocation = pure "options.json"
+desiredOptionsFileLocation =
+  getXdgDirectory XdgCache (appName </> optionsFileName)
 
 locateOptionsFile :: IO (Maybe FilePath)
 locateOptionsFile = do
-  defExists <- doesFileExist "options.json"
-  if defExists then pure (Just "options.json") else pure Nothing
+  optionsPath <- getXdgDirectory XdgCache (appName </> optionsFileName)
+  defExists   <- doesFileExist optionsPath
+  if defExists then pure (Just optionsPath) else pure Nothing
 
 readOptionsFile :: FilePath -> IO (MaybeError (Map Text NixServiceOption))
 readOptionsFile fp = decodeOptions <$> readFile fp

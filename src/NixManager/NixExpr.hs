@@ -24,9 +24,13 @@ module NixManager.NixExpr
   )
 where
 
+import           System.FilePath                ( dropFileName )
+import           System.Directory               ( doesFileExist
+                                                , createDirectoryIfMissing
+                                                )
 import           NixManager.Util                ( showText
                                                 , fromEither
-                                                , MaybeError
+                                                , MaybeError(Success)
                                                 )
 import           Data.Bifunctor                 ( first )
 import           Control.Monad                  ( void )
@@ -223,8 +227,15 @@ parseNixString :: Text -> MaybeError NixExpr
 parseNixString =
   fromEither . first errorBundlePretty . parse exprParser "string expression"
 
-parseNixFile :: FilePath -> IO (Either String NixExpr)
-parseNixFile fn = first errorBundlePretty . parse exprParser fn <$> readFile fn
+parseNixFile :: FilePath -> NixExpr -> IO (MaybeError NixExpr)
+parseNixFile fn defExpr = do
+  exists <- doesFileExist fn
+  if exists
+    then
+      fromEither . first errorBundlePretty . parse exprParser fn <$> readFile fn
+    else pure (Success defExpr)
 
 writeNixFile :: FilePath -> NixExpr -> IO ()
-writeNixFile fp = writeFile fp . prettyPrint
+writeNixFile fp e = do
+  createDirectoryIfMissing True (dropFileName fp)
+  writeFile fp (prettyPrint e)

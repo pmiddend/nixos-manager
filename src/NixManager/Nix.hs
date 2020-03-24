@@ -9,13 +9,19 @@ module NixManager.Nix
   )
 where
 
+import           Data.String                    ( IsString )
+import           NixManager.Constants           ( appName )
+import           Data.Map.Strict                ( singleton )
 import           Prelude                 hiding ( readFile )
 import           Data.List                      ( intercalate
                                                 , find
                                                 , inits
                                                 )
 import           System.FilePath                ( (</>) )
-import           System.Directory               ( listDirectory )
+import           System.Directory               ( listDirectory
+                                                , getXdgDirectory
+                                                , XdgDirectory(XdgConfig)
+                                                )
 import           Control.Exception              ( catch
                                                 , IOException
                                                 )
@@ -51,7 +57,13 @@ import           Data.Text.Lens                 ( unpacked
                                                 , packed
                                                 )
 import           Control.Monad                  ( void )
-import           NixManager.NixExpr             ( NixExpr(NixSymbol)
+import           NixManager.NixExpr             ( NixExpr
+                                                  ( NixSymbol
+                                                  , NixSet
+                                                  , NixList
+                                                  , NixFunctionDecl
+                                                  )
+                                                , NixFunction(NixFunction)
                                                 , _NixFunctionDecl
                                                 , nfExpr
                                                 , _NixSymbol
@@ -64,7 +76,6 @@ import           NixManager.NixExpr             ( NixExpr(NixSymbol)
 import           NixManager.Util                ( MaybeError(Success, Error)
                                                 , splitRepeat
                                                 , addToError
-                                                , fromEither
                                                 , ifSuccessIO
                                                 )
 import           NixManager.NixServiceOption    ( )
@@ -110,16 +121,33 @@ packageLens :: Traversal' NixExpr NixExpr
 packageLens =
   _NixFunctionDecl . nfExpr . _NixSet . ix "environment.systemPackages"
 
-parsePackages :: IO (MaybeError NixExpr)
-parsePackages =
-  addToError
-      "Error parsing the packages.nix file. This is most likely a syntax error, please investigate the file itself and fix the error. Then restart nixos-manager. The error was: "
-    .   fromEither
+emptyPackagesFile :: NixExpr
+emptyPackagesFile = NixFunctionDecl
+  (NixFunction
+    ["config", "pkgs", "..."]
+    (NixSet (singleton "environment.systemPackages" (NixList mempty)))
+  )
 
-    <$> parseNixFile "packages.nix"
+packagesFileName :: IsString s => s
+packagesFileName = "packages.nix"
+
+locatePackagesFile :: IO FilePath
+locatePackagesFile = getXdgDirectory XdgConfig (appName </> packagesFileName)
+
+parsePackages :: IO (MaybeError NixExpr)
+parsePackages = do
+  pkgsFile <- locatePackagesFile
+  addToError
+      ("Error parsing the "
+      <> packagesFileName
+      <> " file. This is most likely a syntax error, please investigate the file itself and fix the error. Then restart nixos-manager. The error was: "
+      )
+    <$> parseNixFile pkgsFile emptyPackagesFile
 
 writePackages :: NixExpr -> IO ()
-writePackages = writeNixFile "packages.nix"
+writePackages e = do
+  pkgsFile <- locatePackagesFile
+  writeNixFile pkgsFile e
 
 readInstalledPackages :: IO (MaybeError [Text])
 readInstalledPackages = ifSuccessIO parsePackages $ \expr ->

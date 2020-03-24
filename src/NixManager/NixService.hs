@@ -11,7 +11,12 @@ module NixManager.NixService
   )
 where
 
-import           System.Directory               ( doesFileExist )
+import           System.FilePath                ( (</>) )
+import           NixManager.Constants           ( appName )
+import           Data.String                    ( IsString )
+import           System.Directory               ( getXdgDirectory
+                                                , XdgDirectory(XdgConfig)
+                                                )
 import qualified Data.Set                      as Set
 import           Prelude                 hiding ( readFile )
 import           Data.List                      ( isPrefixOf )
@@ -34,11 +39,9 @@ import           NixManager.NixExpr             ( NixExpr
                                                 , writeNixFile
                                                 )
 import           NixManager.Util                ( Endo
-                                                , showText
-                                                , MaybeError(Success)
+                                                , MaybeError
                                                 , addToError
                                                 , predAnd
-                                                , fromEither
                                                 )
 import           NixManager.NixServiceOption    ( NixServiceOptionLocation
                                                 , NixServiceOption
@@ -83,33 +86,25 @@ makeServices options' =
   in
     uncurry NixService <$> toList serviceMap
 
-locateServicesFile :: IO (Maybe FilePath)
-locateServicesFile = do
-  fileExists <- doesFileExist "services.nix" -- TODO: check $XDG_CONFIG_DIRS here
-  if fileExists then pure (Just "services.nix") else pure Nothing
+servicesFileName :: IsString s => s
+servicesFileName = "services.nix"
 
+locateServicesFile :: IO FilePath
+locateServicesFile = getXdgDirectory XdgConfig (appName </> servicesFileName)
 
-readServiceFile :: FilePath -> IO (MaybeError NixExpr)
-readServiceFile file =
+readServices :: IO (MaybeError NixExpr)
+readServices = do
+  svcsFile <- locateServicesFile
   addToError
       ("Error parsing the \""
-      <> showText file
+      <> servicesFileName
       <> "\" file. This is most likely a syntax error, please investigate the file itself and fix the error. Then restart nixos-manager. The error was: "
       )
-    .   fromEither
-
-    <$> parseNixFile "services.nix"
+    <$> parseNixFile svcsFile emptyServiceFileContents
 
 emptyServiceFileContents :: NixExpr
 emptyServiceFileContents =
   NixFunctionDecl (NixFunction ["config", "pkgs", "..."] (NixSet mempty))
-
-readServices :: IO (MaybeError NixExpr)
-readServices = do
-  servicesFile <- locateServicesFile
-  case servicesFile of
-    Just file -> readServiceFile file
-    Nothing   -> pure (Success emptyServiceFileContents)
 
 writeServiceFile :: NixExpr -> IO ()
 writeServiceFile = writeNixFile "services.nix"
