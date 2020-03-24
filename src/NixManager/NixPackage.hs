@@ -3,23 +3,44 @@
 module NixManager.NixPackage
   ( NixPackage(..)
   , npName
+  , npPath
   , npVersion
   , npDescription
   , npInstalled
+  , readPackages
   )
 where
 
+import           NixManager.Util                ( MaybeError
+                                                , fromEither
+                                                )
+import           Data.ByteString.Lazy           ( ByteString )
+import           Data.Map.Strict                ( Map
+                                                , toList
+                                                )
 import           Control.Monad                  ( mzero )
 import           Data.Text                      ( Text )
-import           Control.Lens                   ( makeLenses )
+import           Control.Lens                   ( makeLenses
+                                                , (^.)
+                                                )
 import           Data.Aeson                     ( FromJSON
+                                                , eitherDecode
                                                 , Value(Object)
                                                 , parseJSON
                                                 , (.:)
                                                 )
 
+data NixPackageMeta = NixPackageMeta {
+   _npmName :: Text
+  , _npmVersion :: Text
+  , _npmDescription :: Text
+  } deriving(Eq,Show)
+
+makeLenses ''NixPackageMeta
+
 data NixPackage = NixPackage {
     _npName :: Text
+  , _npPath :: Text
   , _npVersion :: Text
   , _npDescription :: Text
   , _npInstalled :: Bool
@@ -27,15 +48,20 @@ data NixPackage = NixPackage {
 
 makeLenses ''NixPackage
 
-instance FromJSON NixPackage where
+instance FromJSON NixPackageMeta where
   parseJSON (Object v) =
-    NixPackage
-      <$> v
-      .:  "pkgName"
-      <*> v
-      .:  "version"
-      <*> v
-      .:  "description"
-      <*> pure False
+    NixPackageMeta <$> v .: "pkgName" <*> v .: "version" <*> v .: "description"
   parseJSON _ = mzero
 
+readPackages :: ByteString -> MaybeError [NixPackage]
+readPackages = (packagesFromMap <$>) . fromEither . eitherDecode
+
+packagesFromMap :: Map Text NixPackageMeta -> [NixPackage]
+packagesFromMap m =
+  (\(path, meta) -> NixPackage (meta ^. npmName)
+                               path
+                               (meta ^. npmVersion)
+                               (meta ^. npmDescription)
+                               False
+    )
+    <$> toList m

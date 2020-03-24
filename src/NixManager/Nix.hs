@@ -30,14 +30,17 @@ import qualified Data.Text                     as Text
 import           Data.Text                      ( Text
                                                 , toLower
                                                 , strip
+                                                , stripPrefix
                                                 )
 import           Control.Lens                   ( (^.)
                                                 , (.~)
                                                 , (^?)
+                                                , (^?!)
                                                 , ix
                                                 , Traversal'
                                                 , view
                                                 , hasn't
+                                                , folded
                                                 , only
                                                 , (<>~)
                                                 , (&)
@@ -66,6 +69,7 @@ import           NixManager.Util                ( MaybeError(Success, Error)
                                                 )
 import           NixManager.NixServiceOption    ( )
 import           NixManager.NixPackage          ( NixPackage
+                                                , npPath
                                                 , npName
                                                 , npInstalled
                                                 )
@@ -83,10 +87,12 @@ matchName pkgName bins =
 -- TODO: Error handling
 getExecutables :: NixPackage -> IO (FilePath, [FilePath])
 getExecutables pkg = do
+  -- FIXME: error handling
+  let realPath = pkg ^?! npPath . to (stripPrefix "nixpkgs.") . folded
   (_, Just hout, _, _) <- createProcess
-    (proc "nix-build"
-          ["-A", pkg ^. npName . unpacked, "--no-out-link", "<nixpkgs>"]
-    ) { std_out = CreatePipe
+    (proc "nix-build" ["-A", realPath ^. unpacked, "--no-out-link", "<nixpkgs>"]
+      )
+      { std_out = CreatePipe
       }
   packagePath <- view (unpackedChars . packed . to strip . unpacked)
     <$> hGetContents hout
