@@ -7,12 +7,16 @@ module NixManager.View.Packages
   )
 where
 
+import           NixManager.PackagesEvent       ( PackagesEvent
+                                                  ( PackagesEventSearchChanged
+                                                  , PackagesEventPackageSelected
+                                                  , PackagesEventTryInstall
+                                                  , PackagesEventInstall
+                                                  , PackagesEventUninstall
+                                                  )
+                                                )
 import           NixManager.ManagerEvent        ( ManagerEvent
-                                                  ( ManagerEventSearchChanged
-                                                  , ManagerEventPackageSelected
-                                                  , ManagerEventTryInstall
-                                                  , ManagerEventInstall
-                                                  , ManagerEventUninstall
+                                                  ( ManagerEventPackages
                                                   )
                                                 )
 import           NixManager.NixPackage          ( NixPackage
@@ -70,7 +74,8 @@ processSearchChange
   :: (IsDescendantOf Gtk.Entry o, MonadIO f, Gtk.GObject o)
   => o
   -> f ManagerEvent
-processSearchChange w = ManagerEventSearchChanged <$> Gtk.getEntryText w
+processSearchChange w =
+  ManagerEventPackages . PackagesEventSearchChanged <$> Gtk.getEntryText w
 
 searchLabel :: Widget event
 searchLabel =
@@ -107,9 +112,13 @@ rowSelectionHandler :: Maybe Gtk.ListBoxRow -> Gtk.ListBox -> IO ManagerEvent
 rowSelectionHandler (Just row) _ = do
   selectedIndex <- Gtk.listBoxRowGetIndex row
   if selectedIndex == -1
-    then pure (ManagerEventPackageSelected Nothing)
-    else pure (ManagerEventPackageSelected (Just (fromIntegral selectedIndex)))
-rowSelectionHandler _ _ = pure (ManagerEventPackageSelected Nothing)
+    then pure (ManagerEventPackages (PackagesEventPackageSelected Nothing))
+    else pure
+      (ManagerEventPackages
+        (PackagesEventPackageSelected (Just (fromIntegral selectedIndex)))
+      )
+rowSelectionHandler _ _ =
+  pure (ManagerEventPackages (PackagesEventPackageSelected Nothing))
 
 packagesBox
   :: FromWidget (Container Gtk.Box (Children BoxChild)) target
@@ -132,7 +141,7 @@ packagesBox s =
           [ #label := "Try without installing"
           , #sensitive := (packageSelected && not currentPackageInstalled)
           , classes ["try-install-button"]
-          , on #clicked ManagerEventTryInstall
+          , on #clicked (ManagerEventPackages PackagesEventTryInstall)
           ]
         )
       , BoxChild
@@ -142,7 +151,7 @@ packagesBox s =
           [ #label := "Install"
           , #sensitive := (packageSelected && not currentPackageInstalled)
           , classes ["install-button"]
-          , on #clicked ManagerEventInstall
+          , on #clicked (ManagerEventPackages PackagesEventInstall)
           ]
         )
       , BoxChild
@@ -152,7 +161,7 @@ packagesBox s =
           [ #label := "Remove"
           , #sensitive := (packageSelected && currentPackageInstalled)
           , classes ["remove-button"]
-          , on #clicked ManagerEventUninstall
+          , on #clicked (ManagerEventPackages PackagesEventUninstall)
           ]
         )
       ]

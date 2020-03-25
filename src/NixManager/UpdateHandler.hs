@@ -84,6 +84,17 @@ import           NixManager.ManagerState        ( ManagerState(..)
                                                 , msSearchString
                                                 )
 import           NixManager.NixService          ( writeServiceFile )
+import           NixManager.PackagesEvent       ( PackagesEvent
+                                                  ( PackagesEventSearchChanged
+                                                  , PackagesEventPackageSelected
+                                                  , PackagesEventInstall
+                                                  , PackagesEventInstallCompleted
+                                                  , PackagesEventUninstallCompleted
+                                                  , PackagesEventUninstall
+                                                  , PackagesEventTryInstall
+                                                  , PackagesEventShowMessage
+                                                  )
+                                                )
 import           NixManager.ServicesEvent       ( ServicesEvent
                                                   ( ServicesEventDownloadStart
                                                   , ServicesEventSettingChanged
@@ -125,8 +136,10 @@ tryInstall p = do
   case bins of
     (_, []) -> pure
       (Just
-        (ManagerEventShowMessage
-          (errorMessage "No binaries found in this package!")
+        (ManagerEventPackages
+          (PackagesEventShowMessage
+            (errorMessage "No binaries found in this package!")
+          )
         )
       )
     (bp, [singleBinary]) -> do
@@ -136,8 +149,10 @@ tryInstall p = do
       putStrLn $ "found more bins: " <> showText multipleBinaries
       pure
         (Just
-          (ManagerEventShowMessage
-            (errorMessage "Multiple binaries found in this package!")
+          (ManagerEventPackages
+            (PackagesEventShowMessage
+              (errorMessage "Multiple binaries found in this package!")
+            )
           )
         )
 
@@ -149,6 +164,9 @@ adminEvent = Just . ManagerEventAdmin
 
 servicesEvent :: ServicesEvent -> Maybe ManagerEvent
 servicesEvent = Just . ManagerEventServices
+
+packagesEvent :: PackagesEvent -> Maybe ManagerEvent
+packagesEvent = Just . ManagerEventPackages
 
 updateServicesEvent
   :: ManagerState -> ServicesEvent -> Transition ManagerState ManagerEvent
@@ -266,52 +284,62 @@ updateAdminEvent ms _ (AdminEventBuildTypeChanged newType) =
   pureTransition (ms & msAdminState . asActiveBuildType .~ newType)
 
 
+updatePackagesEvent
+  :: ManagerState -> PackagesEvent -> Transition ManagerState ManagerEvent
+updatePackagesEvent s (PackagesEventShowMessage e) =
+  pureTransition (s & msLatestMessage ?~ e)
+updatePackagesEvent s (PackagesEventInstallCompleted cache) = Transition
+  (s & msPackageCache .~ cache)
+  (pure
+    (packagesEvent (PackagesEventShowMessage (infoMessage "Install completed!"))
+    )
+  )
+updatePackagesEvent s (PackagesEventUninstallCompleted cache) = Transition
+  (s & msPackageCache .~ cache)
+  (pure
+    (packagesEvent
+      (PackagesEventShowMessage (infoMessage "Uninstall completed!"))
+    )
+  )
+updatePackagesEvent s PackagesEventInstall = case s ^. msSelectedPackage of
+  Nothing       -> pureTransition s
+  Just selected -> Transition s $ do
+    installResult <- installPackage (selected ^. npName)
+    cacheResult   <- readCache
+    case installResult >>= const cacheResult of
+      Success newCache ->
+        pure (packagesEvent (PackagesEventInstallCompleted newCache))
+      Error e -> pure
+        (packagesEvent
+          (PackagesEventShowMessage (errorMessage ("Install failed: " <> e)))
+        )
+updatePackagesEvent s PackagesEventUninstall = case s ^. msSelectedPackage of
+  Nothing       -> pureTransition s
+  Just selected -> Transition s $ do
+    uninstallResult <- uninstallPackage (selected ^. npName)
+    cacheResult     <- readCache
+    case uninstallResult >>= const cacheResult of
+      Success newCache ->
+        pure (packagesEvent (PackagesEventUninstallCompleted newCache))
+      Error e -> pure
+        (packagesEvent
+          (PackagesEventShowMessage (errorMessage ("Uninstall failed: " <> e)))
+        )
+updatePackagesEvent s PackagesEventTryInstall = case s ^. msSelectedPackage of
+  Nothing -> pureTransition s
+  Just selected ->
+    Transition (s & msInstallingPackage ?~ selected) (tryInstall selected)
+updatePackagesEvent s (PackagesEventPackageSelected i) =
+  pureTransition (s & msSelectedPackageIdx .~ i)
+updatePackagesEvent s (PackagesEventSearchChanged t) =
+  pureTransition (s & msSearchString .~ t)
 
 
 
 update' :: ManagerState -> ManagerEvent -> Transition ManagerState ManagerEvent
 update' s (ManagerEventAdmin    ae) = updateAdminEvent s (s ^. msAdminState) ae
 update' s (ManagerEventServices se) = updateServicesEvent s se
+update' s (ManagerEventPackages se) = updatePackagesEvent s se
 update' _ ManagerEventClosed        = Exit
-update' s (ManagerEventShowMessage e) =
-  pureTransition (s & msLatestMessage ?~ e)
-update' s (ManagerEventInstallCompleted cache) = Transition
-  (s & msPackageCache .~ cache)
-  (pure (Just (ManagerEventShowMessage (infoMessage "Install completed!"))))
-update' s (ManagerEventUninstallCompleted cache) = Transition
-  (s & msPackageCache .~ cache)
-  (pure (Just (ManagerEventShowMessage (infoMessage "Uninstall completed!"))))
-update' s ManagerEventInstall = case s ^. msSelectedPackage of
-  Nothing       -> pureTransition s
-  Just selected -> Transition s $ do
-    installResult <- installPackage (selected ^. npName)
-    cacheResult   <- readCache
-    case installResult >>= const cacheResult of
-      Success newCache -> pure (Just (ManagerEventInstallCompleted newCache))
-      Error e ->
-        pure
-          (Just
-            (ManagerEventShowMessage (errorMessage ("Install failed: " <> e)))
-          )
-update' s ManagerEventUninstall = case s ^. msSelectedPackage of
-  Nothing       -> pureTransition s
-  Just selected -> Transition s $ do
-    uninstallResult <- uninstallPackage (selected ^. npName)
-    cacheResult     <- readCache
-    case uninstallResult >>= const cacheResult of
-      Success newCache -> pure (Just (ManagerEventUninstallCompleted newCache))
-      Error e ->
-        pure
-          (Just
-            (ManagerEventShowMessage (errorMessage ("Uninstall failed: " <> e)))
-          )
-update' s ManagerEventTryInstall = case s ^. msSelectedPackage of
-  Nothing -> pureTransition s
-  Just selected ->
-    Transition (s & msInstallingPackage ?~ selected) (tryInstall selected)
-update' s (ManagerEventPackageSelected i) =
-  pureTransition (s & msSelectedPackageIdx .~ i)
-update' s (ManagerEventSearchChanged t) =
-  pureTransition (s & msSearchString .~ t)
-update' s ManagerEventDiscard = pureTransition s
+update' s ManagerEventDiscard       = pureTransition s
 

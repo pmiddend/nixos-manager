@@ -34,6 +34,7 @@ executable nix-manager
                      , NixManager.Rebuild
                      , NixManager.NixServiceOptionType
                      , NixManager.ServicesEvent
+                     , NixManager.PackagesEvent
                      , NixManager.PackageSearch
                      , NixManager.Message
                      , NixManager.NixExpr
