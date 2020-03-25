@@ -37,8 +37,8 @@ view' :: ManagerState -> AppView Gtk.Window ManagerEvent
 view' s =
   let windowContents = notebook
         []
-        [ page "Packages" (packagesBox s)
+        [ page "Admin"    (adminBox s)
+        , page "Packages" (packagesBox s)
         , page "Services" (servicesBox s)
-        , page "Admin"    (adminBox s)
         ]
   in  bin Gtk.Window windowAttributes windowContents

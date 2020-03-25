@@ -5,8 +5,7 @@
 module NixManager.ManagerMain where
 
 import           NixManager.UpdateHandler       ( update' )
-import           NixManager.AdminState          ( AdminState(AdminStateNothing)
-                                                )
+import           NixManager.AdminState          ( AdminState(AdminState) )
 import           NixManager.ServiceStateData    ( ServiceStateData
                                                   ( ServiceStateData
                                                   )
@@ -102,14 +101,15 @@ import           Prelude                 hiding ( length
 initState :: IO (MaybeError ManagerState)
 initState = ifSuccessIO readCache $ \cache -> do
   serviceState <- initServiceState
-  pure $ Success $ ManagerState { _msPackageCache       = cache
-                                , _msSearchString       = mempty
-                                , _msSelectedPackageIdx = Nothing
-                                , _msInstallingPackage  = Nothing
-                                , _msLatestMessage      = Nothing
-                                , _msServiceState       = serviceState
-                                , _msAdminState = AdminStateNothing mempty
-                                }
+  pure $ Success $ ManagerState
+    { _msPackageCache       = cache
+    , _msSearchString       = mempty
+    , _msSelectedPackageIdx = Nothing
+    , _msInstallingPackage  = Nothing
+    , _msLatestMessage      = Nothing
+    , _msServiceState       = serviceState
+    , _msAdminState         = AdminState mempty Nothing "switch"
+    }
 
 nixMain :: IO ()
 nixMain = do

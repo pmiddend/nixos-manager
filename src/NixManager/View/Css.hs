@@ -19,6 +19,10 @@ styles = mconcat
   , ".unspecified-label { color: #101010; }"
   , ".startup-error-message { font-family: monospace; }"
   , ".option-type-description { font-style: italic; font-size: 13px; }"
+  , ".nixos-manager-headline { font-size: 30px; }"
+  , ".nixos-manager-italic { font-style: italic; }"
+  , ".nixos-manager-monospace { font-family: monospace; }"
+  , ".nixos-manager-grey-background { background-color: #eeeeee; }"
   ]
 
 initCss :: IO ()

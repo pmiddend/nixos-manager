@@ -2,29 +2,31 @@
 module NixManager.AdminState
   ( AdminState(..)
   , AdminBuildState(AdminBuildState)
-  , _AdminStateBuilding
-  , absProcessOutput
+  , asBuildState
+  , asProcessOutput
+  , asActiveBuildType
   , absCounter
+  , absProcessData
   )
 where
 
-import           Control.Lens                   ( makeLenses
-                                                , makePrisms
-                                                )
-import           Data.ByteString                ( ByteString )
+import           Control.Lens                   ( makeLenses )
 import           NixManager.Process             ( ProcessOutput
                                                 , ProcessData
                                                 )
+import           Data.Text                      ( Text )
 
 data AdminBuildState = AdminBuildState {
-    _absProcessOutput :: ProcessOutput
+    _absCounter :: Int
   , _absProcessData :: ProcessData
-  , _absCounter :: Int
   }
 
 makeLenses ''AdminBuildState
 
-data AdminState = AdminStateNothing ProcessOutput
-                | AdminStateBuilding AdminBuildState
+data AdminState = AdminState {
+    _asProcessOutput :: ProcessOutput
+  , _asBuildState :: Maybe AdminBuildState
+  , _asActiveBuildType :: Text
+  }
 
-makePrisms ''AdminState
+makeLenses ''AdminState

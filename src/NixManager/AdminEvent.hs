@@ -15,5 +15,7 @@ data AdminEvent = AdminEventRebuild
                 | AdminEventRebuildStarted ProcessData
                 | AdminEventRebuildWatch ProcessOutput ProcessData
                 | AdminEventRebuildFinished ProcessOutput
+                | AdminEventBuildTypeChanged Text
+                | AdminEventRebuildCancel
 
 makePrisms ''AdminEvent

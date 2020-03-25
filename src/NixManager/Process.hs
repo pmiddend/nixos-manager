@@ -4,6 +4,7 @@ module NixManager.Process
   ( ProcessOutput
   , ProcessData
   , runProcess
+  , terminate
   , updateProcess
   , noStdin
   , poResult
@@ -19,6 +20,7 @@ import           Data.ByteString                ( ByteString
                                                 , hPutStr
                                                 )
 import           Control.Lens                   ( makeLenses
+                                                , view
                                                 , (^.)
                                                 )
 import           System.Process                 ( ProcessHandle
@@ -27,6 +29,7 @@ import           System.Process                 ( ProcessHandle
                                                 , CreateProcess(..)
                                                 , CmdSpec(ShellCommand)
                                                 , StdStream(CreatePipe)
+                                                , terminateProcess
                                                 )
 import           System.IO                      ( Handle )
 import           System.Exit                    ( ExitCode )
@@ -57,6 +60,9 @@ instance Monoid ProcessOutput where
   mempty = ProcessOutput mempty mempty mempty
 
 makeLenses ''ProcessOutput
+
+terminate :: ProcessData -> IO ()
+terminate = terminateProcess . view pdProcessHandle
 
 exprToCmdSpec :: BashExpr -> CmdSpec
 exprToCmdSpec x = ShellCommand (unpack (evalBashExpr x))

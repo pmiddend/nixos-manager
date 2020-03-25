@@ -16,17 +16,17 @@ import           System.Exit                    ( ExitCode
 import           NixManager.Process             ( updateProcess
                                                 , poResult
                                                 , poStdout
+                                                , terminate
                                                 )
 import           NixManager.AdminState          ( AdminState
-                                                  ( AdminStateBuilding
-                                                  , AdminStateNothing
-                                                  )
+                                                , asBuildState
+                                                , asProcessOutput
+                                                , asActiveBuildType
+                                                , absCounter
+                                                , absProcessData
                                                 , AdminBuildState
                                                   ( AdminBuildState
                                                   )
-                                                , _AdminStateBuilding
-                                                , absProcessOutput
-                                                , absCounter
                                                 )
 
 import           NixManager.ServiceStateData    ( ssdServiceExpression
@@ -51,6 +51,9 @@ import           Data.Text.IO                   ( putStrLn )
 import           Data.Foldable                  ( for_ )
 import           Data.Monoid                    ( getFirst )
 import           Control.Lens                   ( (^.)
+                                                , folded
+                                                , traversed
+                                                , (<>~)
                                                 , over
                                                 , (&)
                                                 , (^?)
@@ -64,7 +67,9 @@ import           NixManager.AdminEvent          ( AdminEvent
                                                   ( AdminEventRebuild
                                                   , AdminEventRebuildStarted
                                                   , AdminEventRebuildWatch
+                                                  , AdminEventRebuildCancel
                                                   , AdminEventRebuildFinished
+                                                  , AdminEventBuildTypeChanged
                                                   , AdminEventAskPassWatch
                                                   )
                                                 )
@@ -138,6 +143,10 @@ updateAdminEvent
   -> Transition ManagerState ManagerEvent
 updateAdminEvent ms _ AdminEventRebuild =
   Transition ms (adminEvent . AdminEventAskPassWatch mempty <$> askPass)
+updateAdminEvent ms _ AdminEventRebuildCancel =
+  Transition (ms & msAdminState . asBuildState .~ Nothing) $ do
+    terminate (ms ^?! msAdminState . asBuildState . folded . absProcessData)
+    pure Nothing
 updateAdminEvent ms _ (AdminEventAskPassWatch po pd) = Transition ms $ do
   newpo <- updateProcess pd
   let totalPo = po <> newpo
@@ -151,17 +160,24 @@ updateAdminEvent ms _ (AdminEventAskPassWatch po pd) = Transition ms $ do
     Just (ExitFailure _) -> pure Nothing
 updateAdminEvent ms _ (AdminEventRebuildStarted pd) =
   Transition
-      (ms & msAdminState .~ AdminStateBuilding (AdminBuildState mempty pd 0))
+      (  ms
+      &  msAdminState
+      .  asBuildState
+      ?~ AdminBuildState 0 pd
+      &  msAdminState
+      .  asProcessOutput
+      .~ mempty
+      )
     $ pure (adminEvent (AdminEventRebuildWatch mempty pd))
 updateAdminEvent ms _ (AdminEventRebuildWatch priorOutput pd) =
   Transition
       (  ms
       &  msAdminState
-      .  _AdminStateBuilding
-      .  absProcessOutput
+      .  asProcessOutput
       .~ priorOutput
       &  msAdminState
-      .  _AdminStateBuilding
+      .  asBuildState
+      .  traversed
       .  absCounter
       +~ 1
       )
@@ -173,8 +189,17 @@ updateAdminEvent ms _ (AdminEventRebuildWatch priorOutput pd) =
             threadDelayMillis 500
             pure (adminEvent (AdminEventRebuildWatch newOutput pd))
           Just _ -> pure (adminEvent (AdminEventRebuildFinished newOutput))
-updateAdminEvent ms _ (AdminEventRebuildFinished totalOutput) =
-  pureTransition (ms & msAdminState .~ AdminStateNothing totalOutput)
+updateAdminEvent ms _ (AdminEventRebuildFinished totalOutput) = pureTransition
+  (  ms
+  &  msAdminState
+  .  asBuildState
+  .~ Nothing
+  &  msAdminState
+  .  asProcessOutput
+  .~ (totalOutput & poStdout <>~ "\n\nFinished!")
+  )
+updateAdminEvent ms _ (AdminEventBuildTypeChanged newType) =
+  pureTransition (ms & msAdminState . asActiveBuildType .~ newType)
 
 
 
