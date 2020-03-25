@@ -3,6 +3,7 @@
 module NixManager.ManagerState
   ( msSearchString
   , msSearchResult
+  , msAdminState
   , msSelectedPackage
   , msLatestMessage
   , msServiceState
@@ -32,6 +33,7 @@ import           Data.Text                      ( Text
                                                 , isInfixOf
                                                 )
 import           NixManager.ServiceState        ( ServiceState )
+import           NixManager.AdminState          ( AdminState )
 
 data ManagerState = ManagerState {
      _msPackageCache :: [NixPackage]
@@ -40,6 +42,7 @@ data ManagerState = ManagerState {
    , _msInstallingPackage :: Maybe NixPackage
    , _msLatestMessage :: Maybe Message
    , _msServiceState :: ServiceState
+   , _msAdminState :: AdminState
    }
 
 makeLenses ''ManagerState

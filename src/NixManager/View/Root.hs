@@ -10,7 +10,6 @@ where
 import           NixManager.View.Packages       ( packagesBox )
 import           NixManager.View.Services       ( servicesBox )
 import           NixManager.View.Admin          ( adminBox )
-import           NixManager.Nix                 ( )
 import           GI.Gtk.Declarative             ( Attribute((:=))
                                                 , on
                                                 , bin

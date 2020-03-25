@@ -12,6 +12,7 @@ module NixManager.ServiceState
   , _ServiceStateDone
   , ssddCounter
   , ssddVar
+  , initServiceState
   , ServiceStateDownloadingData(ServiceStateDownloadingData)
   )
 where
@@ -19,9 +20,19 @@ where
 import           Control.Lens                   ( makePrisms
                                                 , makeLenses
                                                 )
-import           NixManager.ServiceStateData    ( ServiceStateData )
+import           NixManager.ServiceStateData    ( ServiceStateData
+                                                  ( ServiceStateData
+                                                  )
+                                                )
 import           NixManager.ServiceDownload     ( ServiceDownloadState )
 import           Data.Text                      ( Text )
+import           NixManager.NixServiceOption    ( readOptionsFile
+                                                , locateOptionsFile
+                                                )
+import           NixManager.NixService          ( makeServices
+                                                , readServices
+                                                )
+import           NixManager.Util                ( MaybeError(Success, Error) )
 
 data ServiceStateDownloadingData = ServiceStateDownloadingData {
     _ssddCounter :: Int
@@ -36,3 +47,20 @@ data ServiceState = ServiceStateInvalidOptions (Maybe Text)
                   | ServiceStateDone ServiceStateData
 
 makePrisms ''ServiceState
+
+-- FIXME: Better happy path
+initServiceState :: IO ServiceState
+initServiceState = do
+  optionsFile' <- locateOptionsFile
+  case optionsFile' of
+    Nothing          -> pure (ServiceStateInvalidOptions Nothing)
+    Just optionsFile -> do
+      options' <- readOptionsFile optionsFile
+      case options' of
+        Error   e       -> pure (ServiceStateInvalidOptions (Just e))
+        Success options -> do
+          services' <- readServices
+          case services' of
+            Error   e        -> pure (ServiceStateInvalidExpr e)
+            Success services -> pure $ ServiceStateDone
+              (ServiceStateData (makeServices options) Nothing services)

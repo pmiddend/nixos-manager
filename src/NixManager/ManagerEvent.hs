@@ -10,6 +10,7 @@ import           NixManager.Message             ( Message )
 import           NixManager.NixPackage          ( NixPackage )
 import           NixManager.NixExpr             ( NixExpr )
 import           NixManager.Util                ( Endo )
+import           NixManager.AdminEvent          ( AdminEvent )
 import           NixManager.ServiceDownload     ( ServiceDownloadState )
 import           NixManager.ServiceState        ( ServiceState )
 
@@ -31,5 +32,6 @@ data ManagerEvent = ManagerEventClosed
       | ManagerEventTryInstall
       | ManagerEventShowMessage Message
       | ManagerEventDiscard
+      | ManagerEventAdmin AdminEvent
 
 makePrisms ''ManagerEvent

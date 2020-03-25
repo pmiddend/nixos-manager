@@ -7,14 +7,17 @@ module NixManager.NixService
   , readServices
   , writeServiceFile
   , serviceOptions
+  , locateServicesFileMaybeCreate
   , makeServices
   )
 where
 
+import           Control.Monad                  ( unless )
 import           System.FilePath                ( (</>) )
 import           NixManager.Constants           ( appName )
 import           Data.String                    ( IsString )
 import           System.Directory               ( getXdgDirectory
+                                                , doesFileExist
                                                 , XdgDirectory(XdgConfig)
                                                 )
 import qualified Data.Set                      as Set
@@ -92,6 +95,14 @@ servicesFileName = "services.nix"
 locateServicesFile :: IO FilePath
 locateServicesFile = getXdgDirectory XdgConfig (appName </> servicesFileName)
 
+locateServicesFileMaybeCreate :: IO FilePath
+locateServicesFileMaybeCreate = do
+  pkgsFile <- locateServicesFile
+  exists   <- doesFileExist pkgsFile
+  unless exists (writeServiceFile emptyServiceFileContents)
+  pure pkgsFile
+
+
 readServices :: IO (MaybeError NixExpr)
 readServices = do
   svcsFile <- locateServicesFile
@@ -107,4 +118,6 @@ emptyServiceFileContents =
   NixFunctionDecl (NixFunction ["config", "pkgs", "..."] (NixSet mempty))
 
 writeServiceFile :: NixExpr -> IO ()
-writeServiceFile = writeNixFile "services.nix"
+writeServiceFile e = do
+  svcsFile <- locateServicesFile
+  writeNixFile svcsFile e

@@ -7,8 +7,9 @@ build-type:          Simple
 executable nix-manager
   main-is:             Main.hs
   other-modules:       NixManager.ManagerMain
-                     , NixManager.Nix
                      , NixManager.ManagerState
+                     , NixManager.UpdateHandler
+                     , NixManager.BashDsl
                      , NixManager.ManagerEvent
                      , NixManager.ServiceDownload
                      , NixManager.ServiceState
@@ -26,7 +27,11 @@ executable nix-manager
                      , NixManager.Docbook
                      , NixManager.NixPackage
                      , NixManager.Constants
+                     , NixManager.AdminState
+                     , NixManager.AdminEvent
+                     , NixManager.Process
                      , NixManager.NixService
+                     , NixManager.Rebuild
                      , NixManager.NixServiceOptionType
                      , NixManager.PackageSearch
                      , NixManager.Message
