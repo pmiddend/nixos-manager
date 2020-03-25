@@ -33,6 +33,7 @@ executable nix-manager
                      , NixManager.NixService
                      , NixManager.Rebuild
                      , NixManager.NixServiceOptionType
+                     , NixManager.ServicesEvent
                      , NixManager.PackageSearch
                      , NixManager.Message
                      , NixManager.NixExpr

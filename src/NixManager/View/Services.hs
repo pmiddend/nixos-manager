@@ -94,6 +94,14 @@ import           Control.Lens                   ( (^.)
                                                 , (^..)
                                                 , (^?!)
                                                 )
+import           NixManager.ServicesEvent       ( ServicesEvent
+                                                  ( ServicesEventSelected
+                                                  , ServicesEventSettingChanged
+                                                  , ServicesEventDownloadStart
+                                                  , ServicesEventStateReload
+                                                  , ServicesEventDownloadCancel
+                                                  )
+                                                )
 import           NixManager.ServiceState        ( ServiceState
                                                   ( ServiceStateInvalidOptions
                                                   , ServiceStateInvalidExpr
@@ -107,11 +115,7 @@ import           NixManager.ManagerState        ( ManagerState
                                                 )
 import           NixManager.ManagerEvent        ( ManagerEvent
                                                   ( ManagerEventDiscard
-                                                  , ManagerEventServiceSelected
-                                                  , ManagerEventSettingChanged
-                                                  , ManagerEventServiceDownloadStart
-                                                  , ManagerEventServiceStateReload
-                                                  , ManagerEventServiceDownloadCancel
+                                                  , ManagerEventServices
                                                   )
                                                 )
 import           NixManager.NixService          ( NixService
@@ -143,9 +147,13 @@ rowSelectionHandler :: Maybe Gtk.ListBoxRow -> Gtk.ListBox -> IO ManagerEvent
 rowSelectionHandler (Just row) _ = do
   selectedIndex <- Gtk.listBoxRowGetIndex row
   if selectedIndex == -1
-    then pure (ManagerEventServiceSelected Nothing)
-    else pure (ManagerEventServiceSelected (Just (fromIntegral selectedIndex)))
-rowSelectionHandler _ _ = pure (ManagerEventServiceSelected Nothing)
+    then pure (ManagerEventServices (ServicesEventSelected Nothing))
+    else pure
+      (ManagerEventServices
+        (ServicesEventSelected (Just (fromIntegral selectedIndex)))
+      )
+rowSelectionHandler _ _ =
+  pure (ManagerEventServices (ServicesEventSelected Nothing))
 
 serviceRows :: ServiceStateData -> Vector.Vector (Bin Gtk.ListBoxRow event)
 serviceRows = toVectorOf (ssdServiceCache . folded . to buildServiceRow)
@@ -172,14 +180,14 @@ buildOptionValueCell serviceExpression serviceOption =
     optionValue :: Maybe NixExpr
     optionValue = serviceExpression ^? optionLens' optionPath . folded
     rawChangeEvent :: Text -> ManagerEvent
-    rawChangeEvent "" =
-      ManagerEventSettingChanged (set (optionLens' optionPath) Nothing)
+    rawChangeEvent "" = ManagerEventServices
+      (ServicesEventSettingChanged (set (optionLens' optionPath) Nothing))
     rawChangeEvent v = case parseNixString v of
-      Error _ -> ManagerEventDiscard
-      Success e ->
-        ManagerEventSettingChanged (set (optionLens' optionPath) (Just e))
-    changeEvent v =
-      ManagerEventSettingChanged (set (optionLens' optionPath) (Just v))
+      Error   _ -> ManagerEventDiscard
+      Success e -> ManagerEventServices
+        (ServicesEventSettingChanged (set (optionLens' optionPath) (Just e)))
+    changeEvent v = ManagerEventServices
+      (ServicesEventSettingChanged (set (optionLens' optionPath) (Just v)))
     textLikeEntry inL outL = widget
       Gtk.Entry
       [ #text := (optionValue ^. pre (traversed . outL) . non "")
@@ -206,23 +214,27 @@ buildOptionValueCell serviceExpression serviceOption =
       --   , #label := "Type not specified, cannot edit."
       --   ]
       Right (NixServiceOptionOneOfString values) ->
-        let activeIndex :: Maybe ComboBoxIndexType
-            activeIndex =
-                optionValue
-                  ^? folded
-                  .  _NixString
-                  .  to (`elemIndex` values)
-                  .  folded
-                  .  to fromIntegral
-            changeCallback :: ComboBoxChangeEvent -> ManagerEvent
-            changeCallback (ComboBoxChangeEvent Nothing) =
-                ManagerEventSettingChanged $ set (optionLens' optionPath) Nothing
-            changeCallback (ComboBoxChangeEvent (Just idx)) =
-                ManagerEventSettingChanged $ set
-                  (optionLens' optionPath)
-                  (Just (values ^?! ix (fromIntegral idx) . re _NixString))
-        in  changeCallback
-              <$> comboBox [] (ComboBoxProperties values activeIndex)
+        let
+          activeIndex :: Maybe ComboBoxIndexType
+          activeIndex =
+            optionValue
+              ^? folded
+              .  _NixString
+              .  to (`elemIndex` values)
+              .  folded
+              .  to fromIntegral
+          changeCallback :: ComboBoxChangeEvent -> ManagerEvent
+          changeCallback (ComboBoxChangeEvent Nothing) = ManagerEventServices
+            (ServicesEventSettingChanged $ set (optionLens' optionPath) Nothing)
+          changeCallback (ComboBoxChangeEvent (Just idx)) =
+            ManagerEventServices
+              (ServicesEventSettingChanged
+                (set (optionLens' optionPath)
+                     (Just (values ^?! ix (fromIntegral idx) . re _NixString))
+                )
+              )
+        in
+          changeCallback <$> comboBox [] (ComboBoxProperties values activeIndex)
       Right NixServiceOptionPackage   -> textLikeEntry NixSymbol _NixSymbol
       Right NixServiceOptionSubmodule -> textLikeEntry NixSymbol _NixSymbol
       Right NixServiceOptionPath      -> textLikeEntry NixSymbol _NixSymbol
@@ -358,18 +370,20 @@ servicesBox' (ServiceStateDownloading ssdd) _ = container
       [#orientation := Gtk.OrientationHorizontal, #halign := Gtk.AlignCenter]
       [ widget
           Gtk.Button
-          [#label := "Cancel", on #clicked ManagerEventServiceDownloadCancel]
+          [ #label := "Cancel"
+          , on #clicked (ManagerEventServices ServicesEventDownloadCancel)
+          ]
       ]
     )
   ]
 servicesBox' (ServiceStateInvalidExpr e) _ = noticeBox
-  ManagerEventServiceStateReload
+  (ManagerEventServices ServicesEventStateReload)
   "Reload service state"
   ("Your service expression file is not valid. Maybe you have edited it by hand and it's become corrupted?\nPlease fix the error and then press the button below. The error is:\n"
   <> e
   )
 servicesBox' (ServiceStateInvalidOptions possibleError) _ = noticeBox
-  ManagerEventServiceDownloadStart
+  (ManagerEventServices ServicesEventDownloadStart)
   "Start Download"
   (invalidOptionsMessage possibleError)
 servicesBox' (ServiceStateDone sd) s = paned

@@ -84,6 +84,17 @@ import           NixManager.ManagerState        ( ManagerState(..)
                                                 , msSearchString
                                                 )
 import           NixManager.NixService          ( writeServiceFile )
+import           NixManager.ServicesEvent       ( ServicesEvent
+                                                  ( ServicesEventDownloadStart
+                                                  , ServicesEventSettingChanged
+                                                  , ServicesEventDownloadCancel
+                                                  , ServicesEventStateResult
+                                                  , ServicesEventStateReload
+                                                  , ServicesEventDownloadCheck
+                                                  , ServicesEventDownloadStarted
+                                                  , ServicesEventSelected
+                                                  )
+                                                )
 import           NixManager.Util                ( MaybeError(Success, Error)
                                                 , showText
                                                 , threadDelayMillis
@@ -135,6 +146,59 @@ pureTransition x = Transition x (pure Nothing)
 
 adminEvent :: AdminEvent -> Maybe ManagerEvent
 adminEvent = Just . ManagerEventAdmin
+
+servicesEvent :: ServicesEvent -> Maybe ManagerEvent
+servicesEvent = Just . ManagerEventServices
+
+updateServicesEvent
+  :: ManagerState -> ServicesEvent -> Transition ManagerState ManagerEvent
+updateServicesEvent s ServicesEventDownloadStart = Transition
+  s
+  (servicesEvent . ServicesEventDownloadStarted <$> ServiceDownload.start)
+updateServicesEvent s (ServicesEventSettingChanged setter) =
+  let newState = over
+        (msServiceState . _ServiceStateDone . ssdServiceExpression)
+        setter
+        s
+  in  Transition newState $ do
+        writeServiceFile
+          (   newState
+          ^?! msServiceState
+          .   _ServiceStateDone
+          .   ssdServiceExpression
+          )
+        pure Nothing
+updateServicesEvent s ServicesEventDownloadCancel = Transition s $ do
+  for_ (s ^? msServiceState . _ServiceStateDownloading . ssddVar)
+       ServiceDownload.cancel
+  pure (servicesEvent ServicesEventStateReload)
+updateServicesEvent s (ServicesEventStateResult newServiceState) =
+  pureTransition (s & msServiceState .~ newServiceState)
+updateServicesEvent s ServicesEventStateReload =
+  Transition s (servicesEvent . ServicesEventStateResult <$> initServiceState)
+updateServicesEvent s (ServicesEventDownloadCheck var) =
+  Transition (s & msServiceState . _ServiceStateDownloading . ssddCounter +~ 1)
+    $ do
+        downloadResult <- ServiceDownload.result var
+        case downloadResult of
+          Just (Error e) -> pure
+            (servicesEvent
+              (ServicesEventStateResult (ServiceStateInvalidOptions (Just e)))
+            )
+          Just (Success _) -> pure (servicesEvent ServicesEventStateReload)
+          Nothing          -> threadDelayMillis 500
+            >> pure (servicesEvent (ServicesEventDownloadCheck var))
+updateServicesEvent s (ServicesEventDownloadStarted var) =
+  Transition
+      (s & msServiceState .~ ServiceStateDownloading
+        (ServiceStateDownloadingData 0 var)
+      )
+    $ do
+        threadDelayMillis 500
+        pure (servicesEvent (ServicesEventDownloadCheck var))
+updateServicesEvent s (ServicesEventSelected i) = pureTransition
+  (s & msServiceState . _ServiceStateDone . ssdSelectedServiceIdx .~ i)
+
 
 updateAdminEvent
   :: ManagerState
@@ -204,57 +268,11 @@ updateAdminEvent ms _ (AdminEventBuildTypeChanged newType) =
 
 
 
+
 update' :: ManagerState -> ManagerEvent -> Transition ManagerState ManagerEvent
-update' s (ManagerEventSettingChanged setter) =
-  let newState = over
-        (msServiceState . _ServiceStateDone . ssdServiceExpression)
-        setter
-        s
-  in  Transition newState $ do
-        writeServiceFile
-          (   newState
-          ^?! msServiceState
-          .   _ServiceStateDone
-          .   ssdServiceExpression
-          )
-        pure Nothing
-
-update' s (ManagerEventAdmin ae) = updateAdminEvent s (s ^. msAdminState) ae
-update' _ ManagerEventClosed = Exit
-update' s ManagerEventServiceDownloadCancel = Transition s $ do
-  for_ (s ^? msServiceState . _ServiceStateDownloading . ssddVar)
-       ServiceDownload.cancel
-  pure (Just ManagerEventServiceStateReload)
-update' s (ManagerEventServiceStateResult newServiceState) =
-  pureTransition (s & msServiceState .~ newServiceState)
-update' s ManagerEventServiceStateReload =
-  Transition s (Just . ManagerEventServiceStateResult <$> initServiceState)
-update' s (ManagerEventServiceDownloadCheck var) =
-  Transition (s & msServiceState . _ServiceStateDownloading . ssddCounter +~ 1)
-    $ do
-        downloadResult <- ServiceDownload.result var
-        case downloadResult of
-          Just (Error e) -> pure
-            (Just
-              (ManagerEventServiceStateResult
-                (ServiceStateInvalidOptions (Just e))
-              )
-            )
-          Just (Success _) -> pure (Just ManagerEventServiceStateReload)
-          Nothing          -> threadDelayMillis 500
-            >> pure (Just (ManagerEventServiceDownloadCheck var))
-update' s (ManagerEventServiceDownloadStarted var) =
-  Transition
-      (s & msServiceState .~ ServiceStateDownloading
-        (ServiceStateDownloadingData 0 var)
-      )
-    $ do
-        threadDelayMillis 500
-        pure (Just (ManagerEventServiceDownloadCheck var))
-update' s ManagerEventServiceDownloadStart = Transition
-  s
-  (Just . ManagerEventServiceDownloadStarted <$> ServiceDownload.start)
-
+update' s (ManagerEventAdmin    ae) = updateAdminEvent s (s ^. msAdminState) ae
+update' s (ManagerEventServices se) = updateServicesEvent s se
+update' _ ManagerEventClosed        = Exit
 update' s (ManagerEventShowMessage e) =
   pureTransition (s & msLatestMessage ?~ e)
 update' s (ManagerEventInstallCompleted cache) = Transition
@@ -293,8 +311,6 @@ update' s ManagerEventTryInstall = case s ^. msSelectedPackage of
     Transition (s & msInstallingPackage ?~ selected) (tryInstall selected)
 update' s (ManagerEventPackageSelected i) =
   pureTransition (s & msSelectedPackageIdx .~ i)
-update' s (ManagerEventServiceSelected i) = pureTransition
-  (s & msServiceState . _ServiceStateDone . ssdSelectedServiceIdx .~ i)
 update' s (ManagerEventSearchChanged t) =
   pureTransition (s & msSearchString .~ t)
 update' s ManagerEventDiscard = pureTransition s
