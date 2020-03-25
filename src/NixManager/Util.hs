@@ -3,19 +3,23 @@
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.Util where
 
+import           Data.ByteString                ( ByteString )
+import qualified Data.ByteString.Lazy          as BSL
 import           Control.Concurrent             ( threadDelay )
 import           Data.String                    ( IsString )
 import           Data.Bifunctor                 ( first )
-import           Text.Regex                     ( mkRegexWithOpts
-                                                , subRegex
-                                                )
+import qualified Data.Text.Lazy                as TL
+import qualified Data.Text.Lazy.Encoding       as TLE
 import           Data.Text                      ( Text
                                                 , pack
                                                 , unpack
-                                                , replace
                                                 )
 import           Data.List                      ( unfoldr )
 import           Prelude                 hiding ( putStrLn )
+import           Control.Lens                   ( Getter
+                                                , to
+                                                )
+import qualified Data.Text.Encoding            as Encoding
 
 data MaybeError e = Error Text
                   | Success e
@@ -112,3 +116,18 @@ surroundSimple tag content = openTag tag <> content <> closeTag tag
 
 threadDelayMillis :: Int -> IO ()
 threadDelayMillis = threadDelay . (* 1000)
+
+decodeUtf8 :: Getter ByteString Text
+decodeUtf8 = to Encoding.decodeUtf8
+
+encodeUtf8 :: Getter Text ByteString
+encodeUtf8 = to Encoding.encodeUtf8
+
+decodeUtf8Lazy :: Getter BSL.ByteString Text
+decodeUtf8Lazy = to (TL.toStrict . TLE.decodeUtf8)
+
+encodeUtf8Lazy :: Getter Text BSL.ByteString
+encodeUtf8Lazy = to (TLE.encodeUtf8 . TL.fromStrict)
+
+fromStrictBS :: Getter ByteString BSL.ByteString
+fromStrictBS = to BSL.fromStrict

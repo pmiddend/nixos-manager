@@ -5,6 +5,7 @@ module NixManager.Process
   , ProcessData
   , runProcess
   , terminate
+  , waitUntilFinished
   , updateProcess
   , noStdin
   , poResult
@@ -13,11 +14,13 @@ module NixManager.Process
   )
 where
 
+import           Debug.Trace                    ( traceShowId )
 import           Data.Foldable                  ( for_ )
 import           Data.Monoid                    ( First(First) )
 import           Data.ByteString                ( ByteString
                                                 , hGetNonBlocking
                                                 , hPutStr
+                                                , hGetContents
                                                 )
 import           Control.Lens                   ( makeLenses
                                                 , view
@@ -30,6 +33,7 @@ import           System.Process                 ( ProcessHandle
                                                 , CmdSpec(ShellCommand)
                                                 , StdStream(CreatePipe)
                                                 , terminateProcess
+                                                , waitForProcess
                                                 )
 import           System.IO                      ( Handle )
 import           System.Exit                    ( ExitCode )
@@ -91,6 +95,13 @@ runProcess stdinString command = do
     }
   for_ stdinString (hPutStr hin)
   pure (ProcessData hout herr ph)
+
+waitUntilFinished :: ProcessData -> IO ProcessOutput
+waitUntilFinished pd = do
+  stdout   <- hGetContents (pd ^. pdStdoutHandle)
+  stderr   <- hGetContents (pd ^. pdStderrHandle)
+  exitCode <- waitForProcess (pd ^. pdProcessHandle)
+  pure (ProcessOutput stdout stderr (First (Just exitCode)))
 
 updateProcess :: ProcessData -> IO ProcessOutput
 updateProcess pd = do

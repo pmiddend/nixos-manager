@@ -48,11 +48,9 @@ executable nix-manager
                      , gi-gobject
                      , lens
                      , text
-                     , regex-pcre
                      , xml-lens
                      , xml-conduit
                      , data-default
-                     , regex-compat
                      , bytestring
                      , bifunctors
                      , process

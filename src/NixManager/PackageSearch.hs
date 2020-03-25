@@ -12,6 +12,15 @@ module NixManager.PackageSearch
   )
 where
 
+import           System.Exit                    ( ExitCode
+                                                  ( ExitSuccess
+                                                  , ExitFailure
+                                                  )
+                                                )
+import           NixManager.BashDsl             ( BashExpr(BashCommand)
+                                                , BashArg(BashLiteralArg)
+                                                , nixSearch
+                                                )
 import           NixManager.Constants           ( appName )
 import           Data.Map.Strict                ( singleton )
 import           Control.Monad                  ( void
@@ -23,20 +32,23 @@ import           System.Directory               ( listDirectory
                                                 , XdgDirectory(XdgConfig)
                                                 )
 import           System.FilePath                ( (</>) )
-import           Data.ByteString.Lazy.Lens      ( unpackedChars )
 import           Data.List                      ( intercalate
                                                 , find
                                                 , inits
                                                 )
 import           Data.Text                      ( Text
+                                                , pack
                                                 , toLower
                                                 , strip
                                                 , stripPrefix
                                                 )
 import           NixManager.Util                ( MaybeError(Success, Error)
+                                                , decodeUtf8
+                                                , fromStrictBS
                                                 , splitRepeat
                                                 , addToError
                                                 , ifSuccessIO
+                                                , showText
                                                 )
 import qualified Data.Text                     as Text
 import           Data.String                    ( IsString )
@@ -59,12 +71,6 @@ import           NixManager.NixExpr             ( NixExpr
 import           Control.Exception              ( catch
                                                 , IOException
                                                 )
-import           Data.ByteString.Lazy           ( hGetContents )
-import           System.Process                 ( createProcess
-                                                , proc
-                                                , std_out
-                                                , StdStream(CreatePipe)
-                                                )
 import           NixManager.NixPackage          ( NixPackage
                                                 , npPath
                                                 , npName
@@ -77,7 +83,6 @@ import           Control.Lens                   ( (^.)
                                                 , (^?!)
                                                 , ix
                                                 , Traversal'
-                                                , view
                                                 , hasn't
                                                 , folded
                                                 , only
@@ -86,20 +91,34 @@ import           Control.Lens                   ( (^.)
                                                 , to
                                                 , (%~)
                                                 )
-import           Data.Text.Lens                 ( unpacked
-                                                , packed
+import           Data.Text.Lens                 ( unpacked )
+import           NixManager.Process             ( runProcess
+                                                , waitUntilFinished
+                                                , poStdout
+                                                , poStderr
+                                                , poResult
                                                 )
+import           Data.Monoid                    ( First(getFirst) )
 
 searchPackages :: Text -> IO (MaybeError [NixPackage])
 searchPackages t = do
-  (_, Just hout, _, _) <- createProcess
-    (proc "nix" ["search", t ^. unpacked, "--json"]) { std_out = CreatePipe }
-  out <- hGetContents hout
-  pure
-    (addToError
+  pd <- runProcess Nothing (nixSearch t)
+  po <- waitUntilFinished pd
+  let
+    processedResult = addToError
       "Error parsing output of \"nix search\" command. This could be due to changes in this command in a later version (and doesn't fix itself). Please open an issue in the nixos-manager repository. The error was: "
-      (readPackages out)
-    )
+      (readPackages (po ^. poStdout . fromStrictBS))
+  case po ^?! poResult . to getFirst . folded of
+    ExitSuccess      -> pure processedResult
+    ExitFailure 1    -> pure processedResult
+    ExitFailure code -> pure
+      (Error
+        (  "Error executing \"nix search\" command (exit code "
+        <> showText code
+        <> "): standard error output: "
+        <> (po ^. poStderr . decodeUtf8)
+        )
+      )
 
 
 matchName :: String -> [FilePath] -> Maybe FilePath
@@ -115,14 +134,14 @@ getExecutables :: NixPackage -> IO (FilePath, [FilePath])
 getExecutables pkg = do
   -- FIXME: error handling
   let realPath = pkg ^?! npPath . to (stripPrefix "nixpkgs.") . folded
-  (_, Just hout, _, _) <- createProcess
-    (proc "nix-build" ["-A", realPath ^. unpacked, "--no-out-link", "<nixpkgs>"]
-      )
-      { std_out = CreatePipe
-      }
-  packagePath <- view (unpackedChars . packed . to strip . unpacked)
-    <$> hGetContents hout
-  let binPath = packagePath </> "bin"
+  pd <- runProcess
+    Nothing
+    (BashCommand "nix-build"
+                 ["-A", BashLiteralArg realPath, "--no-out-link", "<nixpkgs>"]
+    )
+  po <- waitUntilFinished pd
+  let packagePath = po ^. poStdout . decodeUtf8 . to strip . unpacked
+  let binPath     = packagePath </> "bin"
   bins <- listDirectory binPath `catch` \(_ :: IOException) -> pure []
   let normalizedName = pkg ^. npName . to toLower . unpacked
   case matchName normalizedName bins of
@@ -130,7 +149,7 @@ getExecutables pkg = do
     Just matched -> pure (binPath, [matched])
 
 startProgram :: FilePath -> IO ()
-startProgram fn = void $ createProcess (proc fn [])
+startProgram fn = void (runProcess Nothing (BashCommand (pack fn) []))
 
 packageLens :: Traversal' NixExpr NixExpr
 packageLens =

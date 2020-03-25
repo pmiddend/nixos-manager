@@ -5,6 +5,7 @@ module NixManager.BashDsl
   , evalBashExpr
   , mkdir
   , cp
+  , nixSearch
   , nixosRebuild
   , RebuildMode(..)
   )
@@ -61,6 +62,9 @@ mkdir recursive paths = BashCommand
 
 cp :: FilePath -> FilePath -> BashExpr
 cp from to = BashCommand "cp" (BashLiteralArg <$> [pack from, pack to])
+
+nixSearch :: Text -> BashExpr
+nixSearch term = BashCommand "nix" ["search", BashLiteralArg term, "--json"]
 
 data RebuildMode = RebuildSwitch
  | RebuildBoot
