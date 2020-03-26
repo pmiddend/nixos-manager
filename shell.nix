@@ -1,58 +1,33 @@
-{ nixpkgs ? import <nixpkgs> {}, compiler ? "default", doBenchmark ? false }:
-
+{ nixpkgs ? import ./nix/nixos-unstable.nix }:
 let
-
-  inherit (nixpkgs) pkgs;
-
-  f = { mkDerivation, aeson, base, brittany, bytestring
-      , cabal-install, containers, directory, filepath, gi-gtk
-      , gi-gtk-declarative, gi-gtk-declarative-app-simple
-      , haskell-gi-base, hlint, lens, lens-aeson, process, stdenv, text
-      , megaparsec, gi-gdk, pipes, scientific
-      , gi-gobject, word-wrap, xml-lens, xml-conduit, data-default, wreq
-      , http-client
-      }:
-      mkDerivation {
-        pname = "nix-manager";
-        version = "1.0";
-        src = ./.;
-        isLibrary = false;
-        isExecutable = true;
-        executableHaskellDepends = [
-          aeson base bytestring containers directory filepath gi-gtk
-          gi-gtk-declarative gi-gtk-declarative-app-simple haskell-gi-base
-          lens lens-aeson process text megaparsec gi-gdk pipes
-          scientific gi-gobject word-wrap xml-lens xml-conduit data-default wreq
-          http-client
-        ];
-        executableToolDepends = [ brittany cabal-install hlint pkgs.gksu ];
-        license = "unknown";
-        hydraPlatforms = stdenv.lib.platforms.none;
-      };
-
-  haskellPackages_ = if compiler == "default"
-                       then pkgs.haskellPackages
-                     else pkgs.haskell.packages.${compiler};
-
-  haskellPackages = haskellPackages_.override {
-    overrides = self: super: {
-      gi-gtk-declarative = super.gi-gtk-declarative.overrideAttrs (oldAttrs: {
-        doCheck = false;
-        # why doesn't this work?
-        broken = false;
+  overlay = self: super: {
+    myHaskellPackages =
+      super.haskell.packages.ghc883.override (old: {
+        overrides = self.lib.composeExtensions (old.overrides or (_: _: {}))
+          (hself: hsuper: {
+            ghc = hsuper.ghc // { withPackages = hsuper.ghc.withHoogle; };
+            ghcWithPackages = hself.ghc.withPackages;
+            gi-gtk-declarative = hsuper.gi-gtk-declarative.overrideAttrs (oldAttrs: {
+              doCheck = false;
+              # why doesn't this work?
+              broken = false;
+            });
+          });
       });
-      gi-gtk-declarative-app-simple = super.gi-gtk-declarative-app-simple.overrideAttrs (oldAttrs: {
-        doCheck = false;
-        # why doesn't this work?
-        broken = false;
-      });
-    };
   };
 
-  variant = if doBenchmark then pkgs.haskell.lib.doBenchmark else pkgs.lib.id;
+  pkgs = import nixpkgs {
+    overlays = [overlay];
+  };
 
-  drv = variant (haskellPackages.callPackage f {});
+  drv = pkgs.myHaskellPackages.callCabal2nix "nix-manager" ./nix-manager.cabal {};
 
+  drvWithTools = drv.env.overrideAttrs (
+    old: with pkgs.myHaskellPackages; {
+      nativeBuildInputs = old.nativeBuildInputs ++ [
+        brittany cabal-install hlint pkgs.gksu
+      ];
+    }
+  );
 in
-
-  if pkgs.lib.inNixShell then drv.env else drv
+  drvWithTools
