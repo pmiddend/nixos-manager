@@ -31,7 +31,7 @@ import           Data.Aeson                     ( FromJSON
                                                 )
 
 data NixPackageMeta = NixPackageMeta {
-   _npmName :: Text
+    _npmName :: Text
   , _npmVersion :: Text
   , _npmDescription :: Text
   } deriving(Eq,Show)

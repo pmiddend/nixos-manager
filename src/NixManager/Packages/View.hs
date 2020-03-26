@@ -7,12 +7,14 @@ module NixManager.Packages.View
   )
 where
 
+import           NixManager.View.ProgressBar    ( progressBar )
 import           NixManager.Packages.Event      ( Event
                                                   ( EventSearchChanged
                                                   , EventPackageSelected
                                                   , EventTryInstall
                                                   , EventInstall
                                                   , EventUninstall
+                                                  , EventTryInstallCancel
                                                   )
                                                 )
 import           NixManager.ManagerEvent        ( ManagerEvent
@@ -22,6 +24,7 @@ import           NixManager.ManagerEvent        ( ManagerEvent
 import           NixManager.NixPackage          ( NixPackage
                                                 , npInstalled
                                                 , npName
+                                                , npPath
                                                 )
 import           Data.Semigroup                 ( Any(Any)
                                                 , getAny
@@ -60,9 +63,11 @@ import           NixManager.ManagerState        ( ManagerState
                                                 , msPackagesState
                                                 )
 import           NixManager.Packages.State      ( psSearchString
+                                                , isCounter
                                                 , psSearchResult
                                                 , psSelectedPackage
                                                 , psLatestMessage
+                                                , psInstallingPackage
                                                 )
 import           NixManager.Util                ( mwhen )
 import           NixManager.Message             ( messageText
@@ -108,7 +113,9 @@ buildResultRow
 buildResultRow pkg = bin
   Gtk.ListBoxRow
   [classes (mwhen (pkg ^. npInstalled) ["package-row-installed"])]
-  (widget Gtk.Label [#label := (pkg ^. npName)])
+  (widget Gtk.Label
+          [#label := ((pkg ^. npName) <> " (" <> (pkg ^. npPath) <> ")")]
+  )
 
 rowSelectionHandler :: Maybe Gtk.ListBoxRow -> Gtk.ListBox -> IO ManagerEvent
 rowSelectionHandler (Just row) _ = do
@@ -135,10 +142,8 @@ packagesBox s =
     packageSelected         = isJust (s ^. msPackagesState . psSelectedPackage)
     currentPackageInstalled = getAny
       (s ^. msPackagesState . psSelectedPackage . folded . npInstalled . to Any)
-    packageButtonRow = container
-      Gtk.Box
-      [#orientation := Gtk.OrientationHorizontal, #spacing := 10]
-      [ BoxChild
+    tryInstallCell = case s ^. msPackagesState . psInstallingPackage of
+      Nothing -> BoxChild
         (defaultBoxChildProperties { expand = True, fill = True })
         (widget
           Gtk.Button
@@ -148,6 +153,27 @@ packagesBox s =
           , on #clicked (ManagerEventPackages EventTryInstall)
           ]
         )
+      Just is ->
+        BoxChild (defaultBoxChildProperties { expand = True, fill = True })
+          $ container
+              Gtk.Box
+              [#orientation := Gtk.OrientationHorizontal, #spacing := 5]
+              [ BoxChild defaultBoxChildProperties $ widget
+                Gtk.Button
+                [ #label := "gtk-cancel"
+                , #useStock := True
+                , #alwaysShowImage := True
+                , on #clicked (ManagerEventPackages EventTryInstallCancel)
+                ]
+              , BoxChild
+                  (defaultBoxChildProperties { fill = True, expand = True })
+                $ progressBar [#showText := True, #text := "Downloading..."]
+                              (is ^. isCounter)
+              ]
+    packageButtonRow = container
+      Gtk.Box
+      [#orientation := Gtk.OrientationHorizontal, #spacing := 10]
+      [ tryInstallCell
       , BoxChild
         (defaultBoxChildProperties { expand = True, fill = True })
         (widget
@@ -194,6 +220,7 @@ packagesBox s =
                  (widget
                    Gtk.Label
                    [ #label := (e ^. messageText)
+                   , #useMarkup := True
                    , classes
                      [ if has (messageType . _ErrorMessage) e
                          then "error-message"

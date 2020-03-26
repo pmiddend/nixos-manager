@@ -6,6 +6,9 @@ where
 import           NixManager.NixPackage          ( NixPackage )
 import           Data.Text                      ( Text )
 import           NixManager.Message             ( Message )
+import           NixManager.Process             ( ProcessData
+                                                , ProcessOutput
+                                                )
 
 
 data Event = EventSearchChanged Text
@@ -15,4 +18,8 @@ data Event = EventSearchChanged Text
            | EventUninstallCompleted [NixPackage]
            | EventUninstall
            | EventTryInstall
+           | EventTryInstallStarted NixPackage ProcessData
+           | EventTryInstallFailed Message
+           | EventTryInstallCancel
+           | EventTryInstallWatch ProcessData ProcessOutput
            | EventShowMessage Message

@@ -8,10 +8,12 @@ module NixManager.PackageSearch
   , readCache
   , startProgram
   , uninstallPackage
-  , getExecutables
+  , executablesFromStorePath
+  , dryInstall
   )
 where
 
+import           Data.ByteString                ( ByteString )
 import           System.Exit                    ( ExitCode
                                                   ( ExitSuccess
                                                   , ExitFailure
@@ -93,6 +95,7 @@ import           Control.Lens                   ( (^.)
                                                 )
 import           Data.Text.Lens                 ( unpacked )
 import           NixManager.Process             ( runProcess
+                                                , ProcessData
                                                 , waitUntilFinished
                                                 , poStdout
                                                 , poStderr
@@ -129,18 +132,20 @@ matchName pkgName bins =
       parts = intercalate "-" <$> reverse (inits undashed)
   in  find (`elem` bins) parts
 
--- TODO: Error handling
-getExecutables :: NixPackage -> IO (FilePath, [FilePath])
-getExecutables pkg = do
-  -- FIXME: error handling
+dryInstall :: NixPackage -> IO ProcessData
+dryInstall pkg =
   let realPath = pkg ^?! npPath . to (stripPrefix "nixpkgs.") . folded
-  pd <- runProcess
-    Nothing
-    (BashCommand "nix-build"
-                 ["-A", BashLiteralArg realPath, "--no-out-link", "<nixpkgs>"]
-    )
-  po <- waitUntilFinished pd
-  let packagePath = po ^. poStdout . decodeUtf8 . to strip . unpacked
+  in  runProcess
+        Nothing
+        (BashCommand
+          "nix-build"
+          ["-A", BashLiteralArg realPath, "--no-out-link", "<nixpkgs>"]
+        )
+
+executablesFromStorePath
+  :: NixPackage -> ByteString -> IO (FilePath, [FilePath])
+executablesFromStorePath pkg stdout = do
+  let packagePath = stdout ^. decodeUtf8 . to strip . unpacked
   let binPath     = packagePath </> "bin"
   bins <- listDirectory binPath `catch` \(_ :: IOException) -> pure []
   let normalizedName = pkg ^. npName . to toLower . unpacked

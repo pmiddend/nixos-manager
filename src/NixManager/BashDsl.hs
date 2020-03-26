@@ -45,10 +45,13 @@ surround c e = c <> e <> c
 escape :: Text -> Text
 escape = replace "\"" "\\\""
 
+bashSpecial :: Text -> Bool
+bashSpecial t = " " `isInfixOf` t || "<" `isInfixOf` t || ">" `isInfixOf` t
+
 maybeSurround :: BashArg -> Text
 maybeSurround (BashRawArg t) = t
-maybeSurround (BashLiteralArg t) | " " `isInfixOf` t = surround "\"" (escape t)
-                                 | otherwise         = escape t
+maybeSurround (BashLiteralArg t) | bashSpecial t = surround "\"" (escape t)
+                                 | otherwise     = escape t
 
 evalBashExpr :: BashExpr -> Text
 evalBashExpr (BashAnd l r) = evalBashExpr l <> " && " <> evalBashExpr r

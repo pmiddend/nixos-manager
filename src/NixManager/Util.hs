@@ -13,6 +13,7 @@ import qualified Data.Text.Lazy.Encoding       as TLE
 import           Data.Text                      ( Text
                                                 , pack
                                                 , unpack
+                                                , replace
                                                 )
 import           Data.List                      ( unfoldr )
 import           Prelude                 hiding ( putStrLn )
@@ -131,3 +132,6 @@ encodeUtf8Lazy = to (TLE.encodeUtf8 . TL.fromStrict)
 
 fromStrictBS :: Getter ByteString BSL.ByteString
 fromStrictBS = to BSL.fromStrict
+
+replaceHtmlEntities :: Text -> Text
+replaceHtmlEntities = replace "<" "&lt;" . replace ">" "&gt"

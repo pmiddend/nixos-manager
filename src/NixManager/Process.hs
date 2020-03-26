@@ -14,7 +14,6 @@ module NixManager.Process
   )
 where
 
-import           Debug.Trace                    ( traceShowId )
 import           Data.Foldable                  ( for_ )
 import           Data.Monoid                    ( First(First) )
 import           Data.ByteString                ( ByteString

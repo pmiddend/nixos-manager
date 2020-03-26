@@ -9,9 +9,14 @@ module NixManager.Packages.State
   , psPackageCache
   , psSelectedIdx
   , initState
+  , isProcessData
+  , InstallingState(InstallingState)
+  , isPackage
+  , isCounter
   )
 where
 
+import           NixManager.Process             ( ProcessData )
 import           NixManager.PackageSearch       ( readCache )
 import           NixManager.Util                ( MaybeError(Success)
                                                 , ifSuccessIO
@@ -35,12 +40,19 @@ import           Data.Text                      ( Text
                                                 , isInfixOf
                                                 )
 
+data InstallingState = InstallingState {
+  _isPackage :: NixPackage
+  , _isCounter :: Int
+  , _isProcessData :: ProcessData
+  }
+
+makeLenses ''InstallingState
 
 data State = State {
     _psPackageCache :: [NixPackage]
   , _psSearchString :: Text
   , _psSelectedIdx :: Maybe Int
-  , _psInstallingPackage :: Maybe NixPackage
+  , _psInstallingPackage :: Maybe InstallingState
   , _psLatestMessage :: Maybe Message
   }
 

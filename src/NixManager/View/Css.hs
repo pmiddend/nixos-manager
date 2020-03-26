@@ -12,7 +12,7 @@ styles = mconcat
   , ".install-button { background-image: image(#cdffcd); font-weight: bold; }"
   , ".try-install-button { background-image: image(#cdffcd); }"
   , ".remove-button { background-image: image(#ffaeae); }"
-  , ".error-message { background-image: image(#e1d08e); }"
+  , ".error-message { background-image: image(#fff3cd); }"
   , ".info-message { background-image: image(#bef7ff); }"
   , ".service-headline { font-size: 40px; }"
   , ".service-option-title { font-family: monospace; font-weight: bold; }"
