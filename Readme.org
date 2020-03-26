@@ -33,4 +33,7 @@ I’m using Haskell as the language of choice, simply because =hnix= is availabl
 
 ** Current status
 
-The software is currently completely unusable. Please be patient.
+- The frontend for =nixos-rebuild= works. It doesn’t support =--upgrade= yet, though.
+- Rebuilding copies =packages.nix= and =services.nix= to =/etc/nixos/nixos-manager=. Without these files being included in your =configuration.nix=, they’re worthless, though.
+- Configuring services works, with some minor quirks.
+- Trying packages works, and installing/uninstalling too. The =packages.nix= will be updated accordingly.
