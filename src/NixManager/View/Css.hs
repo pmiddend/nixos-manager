@@ -14,6 +14,8 @@ styles = mconcat
   , ".remove-button { background-image: image(#ffaeae); }"
   , ".error-message { background-image: image(#fff3cd); }"
   , ".info-message { background-image: image(#bef7ff); }"
+  , ".package-row-even { }"
+  , ".package-row-odd { background-color: #f2f2f2; }"
   , ".service-headline { font-size: 40px; }"
   , ".service-option-title { font-family: monospace; font-weight: bold; }"
   , ".unspecified-label { color: #101010; }"

@@ -25,13 +25,19 @@ import           NixManager.NixPackage          ( NixPackage
                                                 , npInstalled
                                                 , npName
                                                 , npPath
+                                                , npDescription
                                                 )
 import           Data.Semigroup                 ( Any(Any)
                                                 , getAny
                                                 )
-import           Data.Maybe                     ( isJust )
+import           Data.Maybe                     ( isJust
+                                                , fromMaybe
+                                                )
 import           Prelude                 hiding ( length )
-import           Data.Text                      ( length )
+import           Data.Text                      ( length
+                                                , Text
+                                                , stripPrefix
+                                                )
 import           GI.Gtk.Declarative.Container.Class
                                                 ( Children )
 import           GI.Gtk.Declarative             ( bin
@@ -51,10 +57,11 @@ import           GI.Gtk.Declarative             ( bin
                                                 , on
                                                 , onM
                                                 )
-import           Data.Vector.Lens               ( toVectorOf )
+import qualified Data.Vector                   as Vector
 import qualified GI.Gtk                        as Gtk
 import           Data.GI.Base.Overloading       ( IsDescendantOf )
 import           Control.Lens                   ( (^.)
+                                                , (^..)
                                                 , to
                                                 , has
                                                 , folded
@@ -69,7 +76,10 @@ import           NixManager.Packages.State      ( psSearchString
                                                 , psLatestMessage
                                                 , psInstallingPackage
                                                 )
-import           NixManager.Util                ( mwhen )
+import           NixManager.Util                ( mwhen
+                                                , replaceHtmlEntities
+                                                )
+import           NixManager.View.GtkUtil        ( paddedAround )
 import           NixManager.Message             ( messageText
                                                 , messageType
                                                 , _ErrorMessage
@@ -107,14 +117,36 @@ searchBox = container
              searchField
   ]
 
+stripPrefixSafe :: Text -> Text -> Text
+stripPrefixSafe prefix t = fromMaybe t (stripPrefix prefix t)
+
+formatPkgLabel :: NixPackage -> Text
+formatPkgLabel pkg =
+  let path = stripPrefixSafe "nixpkgs." (pkg ^. npPath)
+      name = pkg ^. npName
+      firstLine =
+          if path == name then name else name <> (" (<tt>" <> path <> "</tt>)")
+  in  firstLine
+        <> "\n<i>"
+        <> (pkg ^. npDescription . to replaceHtmlEntities)
+        <> "</i>"
+
 
 buildResultRow
-  :: FromWidget (Bin Gtk.ListBoxRow) target => NixPackage -> target event
-buildResultRow pkg = bin
+  :: FromWidget (Bin Gtk.ListBoxRow) target => Int -> NixPackage -> target event
+buildResultRow i pkg = bin
   Gtk.ListBoxRow
-  [classes (mwhen (pkg ^. npInstalled) ["package-row-installed"])]
-  (widget Gtk.Label
-          [#label := ((pkg ^. npName) <> " (" <> (pkg ^. npPath) <> ")")]
+  [ classes
+      (  (mwhen (pkg ^. npInstalled) ["package-row-installed"])
+      <> [if i `mod` 2 == 0 then "package-row-even" else "package-row-odd"]
+      )
+  ]
+  (widget
+    Gtk.Label
+    [ #useMarkup := True
+    , #label := formatPkgLabel pkg
+    , #halign := Gtk.AlignStart
+    ]
   )
 
 rowSelectionHandler :: Maybe Gtk.ListBoxRow -> Gtk.ListBox -> IO ManagerEvent
@@ -136,9 +168,11 @@ packagesBox
 packagesBox s =
   let
     searchValid = (s ^. msPackagesState . psSearchString . to length) >= 2
-    resultRows  = toVectorOf
-      (msPackagesState . psSearchResult . folded . to buildResultRow)
-      s
+    resultRows  = Vector.fromList
+      (zipWith buildResultRow
+               [0 ..]
+               (s ^.. msPackagesState . psSearchResult . folded)
+      )
     packageSelected         = isJust (s ^. msPackagesState . psSelectedPackage)
     currentPackageInstalled = getAny
       (s ^. msPackagesState . psSelectedPackage . folded . npInstalled . to Any)
@@ -199,7 +233,10 @@ packagesBox s =
       then bin
         Gtk.ScrolledWindow
         []
-        (container Gtk.ListBox [onM #rowSelected rowSelectionHandler] resultRows
+        (container
+          Gtk.ListBox
+          [onM #rowSelected rowSelectionHandler, classes ["packages-list"]]
+          resultRows
         )
       else widget
         Gtk.Label
@@ -207,7 +244,7 @@ packagesBox s =
         , #expand := True
         ]
   in
-    container
+    paddedAround 10 $ container
       Gtk.Box
       [#orientation := Gtk.OrientationVertical, #spacing := 10]
       (  [ BoxChild (defaultBoxChildProperties { padding = 5 }) searchBox

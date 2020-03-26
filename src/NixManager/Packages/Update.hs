@@ -58,6 +58,7 @@ import           NixManager.Packages.Event      ( Event
                                                   , EventInstall
                                                   , EventInstallCompleted
                                                   , EventUninstallCompleted
+                                                  , EventTryInstallSuccess
                                                   , EventUninstall
                                                   , EventTryInstallCancel
                                                   , EventTryInstall
@@ -153,6 +154,17 @@ updateEvent s (EventTryInstallFailed e) = pureTransition
   .  psInstallingPackage
   .~ Nothing
   )
+updateEvent s EventTryInstallSuccess = pureTransition
+  (  s
+  &  msPackagesState
+  .  psLatestMessage
+  ?~ infoMessage
+       "Downloaded and started the application!\nIf nothing happens, it's probably a terminal application and can not be started from NixOS manager."
+
+  &  msPackagesState
+  .  psInstallingPackage
+  .~ Nothing
+  )
 updateEvent s (EventTryInstallWatch pd po) =
   Transition
       (s & msPackagesState . psInstallingPackage . traversed . isCounter +~ 1)
@@ -180,7 +192,7 @@ updateEvent s (EventTryInstallWatch pd po) =
                       )
                     (bp, [singleBinary]) -> do
                       startProgram (bp </> singleBinary)
-                      pure Nothing
+                      pure (packagesEvent EventTryInstallSuccess)
                     multipleBinaries -> do
                       putStrLn
                         $  "found more bins: "

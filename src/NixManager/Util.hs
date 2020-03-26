@@ -134,4 +134,5 @@ fromStrictBS :: Getter ByteString BSL.ByteString
 fromStrictBS = to BSL.fromStrict
 
 replaceHtmlEntities :: Text -> Text
-replaceHtmlEntities = replace "<" "&lt;" . replace ">" "&gt"
+replaceHtmlEntities =
+  replace "<" "&lt;" . replace ">" "&gt;" . replace "&" "&amp;"

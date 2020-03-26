@@ -20,6 +20,7 @@ data Event = EventSearchChanged Text
            | EventTryInstall
            | EventTryInstallStarted NixPackage ProcessData
            | EventTryInstallFailed Message
+           | EventTryInstallSuccess
            | EventTryInstallCancel
            | EventTryInstallWatch ProcessData ProcessOutput
            | EventShowMessage Message
