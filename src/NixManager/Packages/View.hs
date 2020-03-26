@@ -2,17 +2,17 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
-module NixManager.View.Packages
+module NixManager.Packages.View
   ( packagesBox
   )
 where
 
-import           NixManager.PackagesEvent       ( PackagesEvent
-                                                  ( PackagesEventSearchChanged
-                                                  , PackagesEventPackageSelected
-                                                  , PackagesEventTryInstall
-                                                  , PackagesEventInstall
-                                                  , PackagesEventUninstall
+import           NixManager.Packages.Event      ( Event
+                                                  ( EventSearchChanged
+                                                  , EventPackageSelected
+                                                  , EventTryInstall
+                                                  , EventInstall
+                                                  , EventUninstall
                                                   )
                                                 )
 import           NixManager.ManagerEvent        ( ManagerEvent
@@ -56,11 +56,13 @@ import           Control.Lens                   ( (^.)
                                                 , has
                                                 , folded
                                                 )
-import           NixManager.ManagerState        ( msSearchString
-                                                , ManagerState
-                                                , msSearchResult
-                                                , msSelectedPackage
-                                                , msLatestMessage
+import           NixManager.ManagerState        ( ManagerState
+                                                , msPackagesState
+                                                )
+import           NixManager.Packages.State      ( psSearchString
+                                                , psSearchResult
+                                                , psSelectedPackage
+                                                , psLatestMessage
                                                 )
 import           NixManager.Util                ( mwhen )
 import           NixManager.Message             ( messageText
@@ -75,7 +77,7 @@ processSearchChange
   => o
   -> f ManagerEvent
 processSearchChange w =
-  ManagerEventPackages . PackagesEventSearchChanged <$> Gtk.getEntryText w
+  ManagerEventPackages . EventSearchChanged <$> Gtk.getEntryText w
 
 searchLabel :: Widget event
 searchLabel =
@@ -112,13 +114,13 @@ rowSelectionHandler :: Maybe Gtk.ListBoxRow -> Gtk.ListBox -> IO ManagerEvent
 rowSelectionHandler (Just row) _ = do
   selectedIndex <- Gtk.listBoxRowGetIndex row
   if selectedIndex == -1
-    then pure (ManagerEventPackages (PackagesEventPackageSelected Nothing))
+    then pure (ManagerEventPackages (EventPackageSelected Nothing))
     else pure
       (ManagerEventPackages
-        (PackagesEventPackageSelected (Just (fromIntegral selectedIndex)))
+        (EventPackageSelected (Just (fromIntegral selectedIndex)))
       )
 rowSelectionHandler _ _ =
-  pure (ManagerEventPackages (PackagesEventPackageSelected Nothing))
+  pure (ManagerEventPackages (EventPackageSelected Nothing))
 
 packagesBox
   :: FromWidget (Container Gtk.Box (Children BoxChild)) target
@@ -126,11 +128,13 @@ packagesBox
   -> target ManagerEvent
 packagesBox s =
   let
-    searchValid     = (s ^. msSearchString . to length) >= 2
-    resultRows      = toVectorOf (msSearchResult . folded . to buildResultRow) s
-    packageSelected = isJust (s ^. msSelectedPackage)
-    currentPackageInstalled =
-      getAny (s ^. msSelectedPackage . folded . npInstalled . to Any)
+    searchValid = (s ^. msPackagesState . psSearchString . to length) >= 2
+    resultRows  = toVectorOf
+      (msPackagesState . psSearchResult . folded . to buildResultRow)
+      s
+    packageSelected         = isJust (s ^. msPackagesState . psSelectedPackage)
+    currentPackageInstalled = getAny
+      (s ^. msPackagesState . psSelectedPackage . folded . npInstalled . to Any)
     packageButtonRow = container
       Gtk.Box
       [#orientation := Gtk.OrientationHorizontal, #spacing := 10]
@@ -141,7 +145,7 @@ packagesBox s =
           [ #label := "Try without installing"
           , #sensitive := (packageSelected && not currentPackageInstalled)
           , classes ["try-install-button"]
-          , on #clicked (ManagerEventPackages PackagesEventTryInstall)
+          , on #clicked (ManagerEventPackages EventTryInstall)
           ]
         )
       , BoxChild
@@ -151,7 +155,7 @@ packagesBox s =
           [ #label := "Install"
           , #sensitive := (packageSelected && not currentPackageInstalled)
           , classes ["install-button"]
-          , on #clicked (ManagerEventPackages PackagesEventInstall)
+          , on #clicked (ManagerEventPackages EventInstall)
           ]
         )
       , BoxChild
@@ -161,7 +165,7 @@ packagesBox s =
           [ #label := "Remove"
           , #sensitive := (packageSelected && currentPackageInstalled)
           , classes ["remove-button"]
-          , on #clicked (ManagerEventPackages PackagesEventUninstall)
+          , on #clicked (ManagerEventPackages EventUninstall)
           ]
         )
       ]
@@ -199,7 +203,7 @@ packagesBox s =
                  )
              ]
            )
-           (s ^. msLatestMessage)
+           (s ^. msPackagesState . psLatestMessage)
 
       <> [ packageButtonRow
          , widget Gtk.HSeparator []

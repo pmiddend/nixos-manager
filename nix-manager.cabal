@@ -11,13 +11,17 @@ executable nix-manager
                      , NixManager.UpdateHandler
                      , NixManager.BashDsl
                      , NixManager.ManagerEvent
-                     , NixManager.ServiceDownload
-                     , NixManager.ServiceState
-                     , NixManager.ServiceStateData
-                     , NixManager.View.Packages
+                     , NixManager.Services.Download
+                     , NixManager.Services.State
+                     , NixManager.Services.StateData
+                     , NixManager.Services.Event
+                     , NixManager.Services.Update
+                     , NixManager.Services.View
+                     , NixManager.Packages.Event
+                     , NixManager.Packages.Update
+                     , NixManager.Packages.State
+                     , NixManager.Packages.View
                      , NixManager.View.GtkUtil
-                     , NixManager.View.Services
-                     , NixManager.View.Admin
                      , NixManager.View.Root
                      , NixManager.View.ComboBox
                      , NixManager.View.Css
@@ -27,14 +31,14 @@ executable nix-manager
                      , NixManager.Docbook
                      , NixManager.NixPackage
                      , NixManager.Constants
-                     , NixManager.AdminState
-                     , NixManager.AdminEvent
                      , NixManager.Process
                      , NixManager.NixService
                      , NixManager.Rebuild
                      , NixManager.NixServiceOptionType
-                     , NixManager.ServicesEvent
-                     , NixManager.PackagesEvent
+                     , NixManager.Admin.View
+                     , NixManager.Admin.Event
+                     , NixManager.Admin.State
+                     , NixManager.Admin.Update
                      , NixManager.PackageSearch
                      , NixManager.Message
                      , NixManager.NixExpr

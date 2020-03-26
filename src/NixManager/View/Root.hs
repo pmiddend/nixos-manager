@@ -7,9 +7,9 @@ module NixManager.View.Root
   )
 where
 
-import           NixManager.View.Packages       ( packagesBox )
-import           NixManager.View.Services       ( servicesBox )
-import           NixManager.View.Admin          ( adminBox )
+import qualified NixManager.Packages.View      as PackagesView
+import qualified NixManager.Services.View      as ServicesView
+import qualified NixManager.Admin.View         as AdminView
 import           GI.Gtk.Declarative             ( Attribute((:=))
                                                 , on
                                                 , bin
@@ -37,8 +37,8 @@ view' :: ManagerState -> AppView Gtk.Window ManagerEvent
 view' s =
   let windowContents = notebook
         []
-        [ page "Admin"    (adminBox s)
-        , page "Packages" (packagesBox s)
-        , page "Services" (servicesBox s)
+        [ page "Admin"    (AdminView.adminBox s)
+        , page "Packages" (PackagesView.packagesBox s)
+        , page "Services" (ServicesView.servicesBox s)
         ]
   in  bin Gtk.Window windowAttributes windowContents

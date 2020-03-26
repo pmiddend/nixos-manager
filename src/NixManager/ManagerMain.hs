@@ -5,89 +5,19 @@
 module NixManager.ManagerMain where
 
 import           NixManager.UpdateHandler       ( update' )
-import           NixManager.AdminState          ( AdminState(AdminState) )
-import           NixManager.ServiceStateData    ( ServiceStateData
-                                                  ( ServiceStateData
-                                                  )
-                                                , ssdServiceExpression
-                                                , ssdSelectedServiceIdx
-                                                )
-import           NixManager.ServiceState        ( ServiceState
-                                                  ( ServiceStateDownloading
-                                                  , ServiceStateInvalidOptions
-                                                  , ServiceStateInvalidExpr
-                                                  , ServiceStateDone
-                                                  )
-                                                , _ServiceStateDone
-                                                , _ServiceStateDownloading
-                                                , ssddCounter
-                                                , initServiceState
-                                                , ssddVar
-                                                , ServiceStateDownloadingData
-                                                  ( ServiceStateDownloadingData
-                                                  )
-                                                )
-import qualified NixManager.ServiceDownload    as ServiceDownload
+import qualified NixManager.Admin.State        as AdminState
+import qualified NixManager.Services.State     as ServicesState
+import qualified NixManager.Packages.State     as PackagesState
 import           NixManager.View.ErrorDialog    ( runErrorDialog )
-import           System.FilePath                ( (</>) )
 import           NixManager.View.Css            ( initCss )
-import           Data.Text.IO                   ( putStrLn )
-import           Data.Foldable                  ( for_ )
-import           Control.Lens                   ( (^.)
-                                                , over
-                                                , (&)
-                                                , (^?)
-                                                , (?~)
-                                                , (.~)
-                                                , (+~)
-                                                , (^?!)
-                                                )
-import           NixManager.AdminEvent          ( AdminEvent
-                                                  ( AdminEventRebuild
-                                                  , AdminEventRebuildStarted
-                                                  )
-                                                )
-import           NixManager.ManagerState        ( ManagerState(..)
-                                                , msInstallingPackage
-                                                , msSelectedPackage
-                                                , msAdminState
-                                                , msServiceState
-                                                , msLatestMessage
-                                                , msPackageCache
-                                                , msSelectedPackageIdx
-                                                , msSearchString
-                                                )
-import           NixManager.NixServiceOption    ( readOptionsFile
-                                                , locateOptionsFile
-                                                )
-import           NixManager.NixService          ( makeServices
-                                                , writeServiceFile
-                                                , readServices
-                                                )
+import           NixManager.ManagerState        ( ManagerState(..) )
 import           NixManager.Util                ( MaybeError(Success, Error)
                                                 , ifSuccessIO
-                                                , showText
-                                                , threadDelayMillis
-                                                )
-import           NixManager.Message             ( errorMessage
-                                                , infoMessage
-                                                )
-import           NixManager.ManagerEvent        ( ManagerEvent(..) )
-import           NixManager.Rebuild             ( rebuild )
-import           NixManager.PackageSearch       ( installPackage
-                                                , readCache
-                                                , startProgram
-                                                , uninstallPackage
-                                                , getExecutables
-                                                )
-import           NixManager.NixPackage          ( NixPackage
-                                                , npName
                                                 )
 import           NixManager.View.Root           ( view' )
 import           GI.Gtk.Declarative.App.Simple  ( App(App)
                                                 , view
                                                 , update
-                                                , Transition(Transition, Exit)
                                                 , inputs
                                                 , initialState
                                                 , run
@@ -99,17 +29,12 @@ import           Prelude                 hiding ( length
                                                 )
 
 initState :: IO (MaybeError ManagerState)
-initState = ifSuccessIO readCache $ \cache -> do
-  serviceState <- initServiceState
-  pure $ Success $ ManagerState
-    { _msPackageCache       = cache
-    , _msSearchString       = mempty
-    , _msSelectedPackageIdx = Nothing
-    , _msInstallingPackage  = Nothing
-    , _msLatestMessage      = Nothing
-    , _msServiceState       = serviceState
-    , _msAdminState         = AdminState mempty Nothing "switch"
-    }
+initState = ifSuccessIO PackagesState.initState $ \packagesState -> do
+  serviceState <- ServicesState.initState
+  pure $ Success $ ManagerState { _msPackagesState = packagesState
+                                , _msServiceState  = serviceState
+                                , _msAdminState    = AdminState.initState
+                                }
 
 nixMain :: IO ()
 nixMain = do

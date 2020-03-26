@@ -1,64 +1,23 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RankNTypes #-}
 module NixManager.ManagerState
-  ( msSearchString
-  , msSearchResult
-  , msAdminState
-  , msSelectedPackage
-  , msLatestMessage
+  ( msAdminState
   , msServiceState
-  , msPackageCache
-  , msInstallingPackage
-  , msSelectedPackageIdx
+  , msPackagesState
   , ManagerState(..)
   )
 where
 
-import           NixManager.NixPackage          ( NixPackage
-                                                , npName
-                                                )
-import           NixManager.Message
-import           Control.Lens                   ( makeLenses
-                                                , folded
-                                                , filtered
-                                                , (^.)
-                                                , (^..)
-                                                , ix
-                                                , (^?)
-                                                , Getter
-                                                , to
-                                                )
-import           Data.Text                      ( Text
-                                                , toLower
-                                                , isInfixOf
-                                                )
-import           NixManager.ServiceState        ( ServiceState )
-import           NixManager.AdminState          ( AdminState )
+import           Control.Lens                   ( makeLenses )
+import qualified NixManager.Services.State     as Services
+import qualified NixManager.Admin.State        as Admin
+import qualified NixManager.Packages.State     as Packages
 
 data ManagerState = ManagerState {
-     _msPackageCache :: [NixPackage]
-   , _msSearchString :: Text
-   , _msSelectedPackageIdx :: Maybe Int
-   , _msInstallingPackage :: Maybe NixPackage
-   , _msLatestMessage :: Maybe Message
-   , _msServiceState :: ServiceState
-   , _msAdminState :: AdminState
+     _msPackagesState :: Packages.State
+   , _msServiceState :: Services.State
+   , _msAdminState :: Admin.State
    }
 
 makeLenses ''ManagerState
 
-packageMatches :: Text -> NixPackage -> Bool
-packageMatches t p = toLower t `isInfixOf` (p ^. npName . to toLower)
-
-msSearchResult :: Getter ManagerState [NixPackage]
-msSearchResult = to
-  (\s -> s ^.. msPackageCache . folded . filtered
-    (packageMatches (s ^. msSearchString))
-  )
-
-msSelectedPackage :: Getter ManagerState (Maybe NixPackage)
-msSelectedPackage = to f
- where
-  f s = case s ^. msSelectedPackageIdx of
-    Nothing     -> Nothing
-    Just pkgIdx -> s ^? msSearchResult . ix pkgIdx

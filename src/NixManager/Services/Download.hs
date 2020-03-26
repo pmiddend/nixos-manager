@@ -1,11 +1,11 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
-module NixManager.ServiceDownload
+module NixManager.Services.Download
   ( result
   , start
   , cancel
-  , ServiceDownloadState
-  , ServiceDownloadResult
+  , DownloadState
+  , DownloadResult
   )
 where
 
@@ -41,21 +41,21 @@ import           Data.ByteString.Lazy           ( ByteString
                                                 , writeFile
                                                 )
 
-type ServiceDownloadResult = MaybeError FilePath
+type DownloadResult = MaybeError FilePath
 
-type ServiceDownloadVar = MVar ServiceDownloadResult
+type DownloadVar = MVar DownloadResult
 
-data ServiceDownloadState = ServiceDownloadState {
-  _sdsVar :: ServiceDownloadVar
+data DownloadState = DownloadState {
+  _sdsVar :: DownloadVar
   , _sdsThreadId :: ThreadId
   }
 
-makeLenses ''ServiceDownloadState
+makeLenses ''DownloadState
 
 tryDownload :: IO (Either HttpException (Response ByteString))
 tryDownload = try (get "https://nixos.org/nixos/options.json")
 
-start :: IO ServiceDownloadState
+start :: IO DownloadState
 start = do
   resultVar      <- newEmptyMVar
   resultThreadId <- forkIO $ do
@@ -73,10 +73,10 @@ start = do
               else putMVar
                 resultVar
                 (Error ("HTTP error, status code: " <> showText sc))
-  pure (ServiceDownloadState resultVar resultThreadId)
+  pure (DownloadState resultVar resultThreadId)
 
-cancel :: ServiceDownloadState -> IO ()
+cancel :: DownloadState -> IO ()
 cancel = killThread . view sdsThreadId
 
-result :: ServiceDownloadState -> IO (Maybe ServiceDownloadResult)
+result :: DownloadState -> IO (Maybe DownloadResult)
 result = tryTakeMVar . view sdsVar

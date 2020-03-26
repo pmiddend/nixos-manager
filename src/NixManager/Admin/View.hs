@@ -4,7 +4,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
-module NixManager.View.Admin
+module NixManager.Admin.View
   ( adminBox
   )
 where
@@ -48,10 +48,10 @@ import           NixManager.ManagerEvent        ( ManagerEvent
                                                   ( ManagerEventAdmin
                                                   )
                                                 )
-import           NixManager.AdminEvent          ( AdminEvent
-                                                  ( AdminEventRebuild
-                                                  , AdminEventRebuildCancel
-                                                  , AdminEventBuildTypeChanged
+import           NixManager.Admin.Event         ( Event
+                                                  ( EventRebuild
+                                                  , EventRebuildCancel
+                                                  , EventBuildTypeChanged
                                                   )
                                                 )
 import           NixManager.ManagerState        ( ManagerState
@@ -60,8 +60,7 @@ import           NixManager.ManagerState        ( ManagerState
 import           GI.Gtk.Declarative.Widget      ( Widget )
 import           GI.Gtk.Declarative.Container.Box
                                                 ( BoxChildProperties )
-import           NixManager.AdminState          ( AdminState
-                                                , asActiveBuildType
+import           NixManager.Admin.State         ( asActiveBuildType
                                                 , asProcessOutput
                                                 , absCounter
                                                 , asBuildState
@@ -111,14 +110,14 @@ rebuildTypes = fst <$> rebuildTypesWithDescription
 rebuildRow as =
   let changeCallback :: ComboBoxChangeEvent -> ManagerEvent
       changeCallback (ComboBoxChangeEvent (Just idx)) = ManagerEventAdmin
-        (AdminEventBuildTypeChanged (rebuildTypes ^?! ix (fromIntegral idx)))
+        (EventBuildTypeChanged (rebuildTypes ^?! ix (fromIntegral idx)))
   in  [ BoxChild defaultBoxChildProperties $ container
           Gtk.Box
           [#orientation := Gtk.OrientationHorizontal, #spacing := 8]
           [ BoxChild fillNoExpand $ widget
             Gtk.Button
             [ #label := "Apply Changes"
-            , on #clicked (ManagerEventAdmin AdminEventRebuild)
+            , on #clicked (ManagerEventAdmin EventRebuild)
             , #valign := Gtk.AlignCenter
             ]
           , BoxChild fillNoExpand $ widget
@@ -152,7 +151,7 @@ buildingBox buildState =
       [ BoxChild fillNoExpand $ widget
         Gtk.Button
         [ #label := "gtk-cancel"
-        , on #clicked (ManagerEventAdmin AdminEventRebuildCancel)
+        , on #clicked (ManagerEventAdmin EventRebuildCancel)
         , #valign := Gtk.AlignCenter
         , #useStock := True
         , #alwaysShowImage := True

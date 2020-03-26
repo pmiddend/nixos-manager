@@ -3,13 +3,12 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
-module NixManager.View.Services
+module NixManager.Services.View
   ( servicesBox
   )
 where
 
 import           NixManager.View.ProgressBar    ( progressBar )
-import           NixManager.View.GtkUtil        ( paddedAround )
 import           NixManager.Docbook             ( parseDocbook
                                                 , docbookToPango
                                                 )
@@ -44,10 +43,10 @@ import           Data.Text                      ( intercalate
 import           NixManager.Util                ( showText
                                                 , MaybeError(Error, Success)
                                                 )
-import           NixManager.ServiceStateData    ( ServiceStateData
-                                                , ssdServiceCache
-                                                , ssdSelectedServiceIdx
-                                                , ssdServiceExpression
+import           NixManager.Services.StateData  ( StateData
+                                                , sdCache
+                                                , sdSelectedIdx
+                                                , sdExpression
                                                 )
 import           NixManager.NixServiceOption    ( optionType
                                                 , NixServiceOption
@@ -55,9 +54,6 @@ import           NixManager.NixServiceOption    ( optionType
                                                 , optionDescription
                                                 )
 import           GI.Gtk.Declarative.Widget      ( Widget )
-import           GI.Gtk.Declarative.Container.Class
-                                                ( Children )
-import           GI.Gtk.Declarative.Container   ( Container )
 import           GI.Gtk.Declarative.SingleWidget
                                                 ( SingleWidget )
 import           GI.Gtk.Declarative             ( bin
@@ -94,21 +90,21 @@ import           Control.Lens                   ( (^.)
                                                 , (^..)
                                                 , (^?!)
                                                 )
-import           NixManager.ServicesEvent       ( ServicesEvent
-                                                  ( ServicesEventSelected
-                                                  , ServicesEventSettingChanged
-                                                  , ServicesEventDownloadStart
-                                                  , ServicesEventStateReload
-                                                  , ServicesEventDownloadCancel
+import           NixManager.Services.Event      ( Event
+                                                  ( EventSelected
+                                                  , EventSettingChanged
+                                                  , EventDownloadStart
+                                                  , EventStateReload
+                                                  , EventDownloadCancel
                                                   )
                                                 )
-import           NixManager.ServiceState        ( ServiceState
-                                                  ( ServiceStateInvalidOptions
-                                                  , ServiceStateInvalidExpr
-                                                  , ServiceStateDone
-                                                  , ServiceStateDownloading
+import           NixManager.Services.State      ( State
+                                                  ( StateInvalidOptions
+                                                  , StateInvalidExpr
+                                                  , StateDone
+                                                  , StateDownloading
                                                   )
-                                                , ssddCounter
+                                                , sddCounter
                                                 )
 import           NixManager.ManagerState        ( ManagerState
                                                 , msServiceState
@@ -147,20 +143,20 @@ rowSelectionHandler :: Maybe Gtk.ListBoxRow -> Gtk.ListBox -> IO ManagerEvent
 rowSelectionHandler (Just row) _ = do
   selectedIndex <- Gtk.listBoxRowGetIndex row
   if selectedIndex == -1
-    then pure (ManagerEventServices (ServicesEventSelected Nothing))
-    else pure
-      (ManagerEventServices
-        (ServicesEventSelected (Just (fromIntegral selectedIndex)))
-      )
-rowSelectionHandler _ _ =
-  pure (ManagerEventServices (ServicesEventSelected Nothing))
+    then pure (ManagerEventServices (EventSelected Nothing))
+    else
+      pure
+        (ManagerEventServices
+          (EventSelected (Just (fromIntegral selectedIndex)))
+        )
+rowSelectionHandler _ _ = pure (ManagerEventServices (EventSelected Nothing))
 
-serviceRows :: ServiceStateData -> Vector.Vector (Bin Gtk.ListBoxRow event)
-serviceRows = toVectorOf (ssdServiceCache . folded . to buildServiceRow)
+serviceRows :: StateData -> Vector.Vector (Bin Gtk.ListBoxRow event)
+serviceRows = toVectorOf (sdCache . folded . to buildServiceRow)
 
 servicesLeftPane
   :: FromWidget (Bin Gtk.ScrolledWindow) target
-  => ServiceStateData
+  => StateData
   -> ManagerState
   -> target ManagerEvent
 servicesLeftPane sd _ = bin
@@ -181,13 +177,13 @@ buildOptionValueCell serviceExpression serviceOption =
     optionValue = serviceExpression ^? optionLens' optionPath . folded
     rawChangeEvent :: Text -> ManagerEvent
     rawChangeEvent "" = ManagerEventServices
-      (ServicesEventSettingChanged (set (optionLens' optionPath) Nothing))
+      (EventSettingChanged (set (optionLens' optionPath) Nothing))
     rawChangeEvent v = case parseNixString v of
       Error   _ -> ManagerEventDiscard
       Success e -> ManagerEventServices
-        (ServicesEventSettingChanged (set (optionLens' optionPath) (Just e)))
+        (EventSettingChanged (set (optionLens' optionPath) (Just e)))
     changeEvent v = ManagerEventServices
-      (ServicesEventSettingChanged (set (optionLens' optionPath) (Just v)))
+      (EventSettingChanged (set (optionLens' optionPath) (Just v)))
     textLikeEntry inL outL = widget
       Gtk.Entry
       [ #text := (optionValue ^. pre (traversed . outL) . non "")
@@ -225,10 +221,10 @@ buildOptionValueCell serviceExpression serviceOption =
               .  to fromIntegral
           changeCallback :: ComboBoxChangeEvent -> ManagerEvent
           changeCallback (ComboBoxChangeEvent Nothing) = ManagerEventServices
-            (ServicesEventSettingChanged $ set (optionLens' optionPath) Nothing)
+            (EventSettingChanged $ set (optionLens' optionPath) Nothing)
           changeCallback (ComboBoxChangeEvent (Just idx)) =
             ManagerEventServices
-              (ServicesEventSettingChanged
+              (EventSettingChanged
                 (set (optionLens' optionPath)
                      (Just (values ^?! ix (fromIntegral idx) . re _NixString))
                 )
@@ -300,16 +296,16 @@ servicesRightPane
   :: ( FromWidget (SingleWidget Gtk.Label) target
      , FromWidget (Bin Gtk.ScrolledWindow) target
      )
-  => ServiceStateData
+  => StateData
   -> NixManager.ManagerState.ManagerState
   -> target ManagerEvent
 
-servicesRightPane sd _ = case sd ^. ssdSelectedServiceIdx of
+servicesRightPane sd _ = case sd ^. sdSelectedIdx of
   Nothing ->
     widget Gtk.Label [#label := "Please select a service from the left pane"]
   Just idx ->
     let
-      svc      = sd ^?! ssdServiceCache . ix idx
+      svc      = sd ^?! sdCache . ix idx
       svcLabel = svc ^. serviceLoc . to (intercalate "." . tail)
       optBox =
         container Gtk.Box
@@ -321,7 +317,7 @@ servicesRightPane sd _ = case sd ^. ssdSelectedServiceIdx of
                           [classes ["service-headline"], #label := svcLabel]
                   )
               : (svc ^.. serviceOptions . folded . to
-                  (buildOptionRows (sd ^. ssdServiceExpression))
+                  (buildOptionRows (sd ^. sdExpression))
                 )
               )
     in
@@ -357,12 +353,12 @@ noticeBox buttonEvent buttonText message = container
     )
   ]
 
-servicesBox' (ServiceStateDownloading ssdd) _ = container
+servicesBox' (StateDownloading ssdd) _ = container
   Gtk.Box
   [#orientation := Gtk.OrientationVertical, #spacing := 10]
   [ BoxChild defaultBoxChildProperties
              (widget Gtk.Label [#label := "Downloading services..."])
-  , BoxChild defaultBoxChildProperties (progressBar [] (ssdd ^. ssddCounter))
+  , BoxChild defaultBoxChildProperties (progressBar [] (ssdd ^. sddCounter))
   , BoxChild
     defaultBoxChildProperties
     (container
@@ -371,22 +367,22 @@ servicesBox' (ServiceStateDownloading ssdd) _ = container
       [ widget
           Gtk.Button
           [ #label := "Cancel"
-          , on #clicked (ManagerEventServices ServicesEventDownloadCancel)
+          , on #clicked (ManagerEventServices EventDownloadCancel)
           ]
       ]
     )
   ]
-servicesBox' (ServiceStateInvalidExpr e) _ = noticeBox
-  (ManagerEventServices ServicesEventStateReload)
+servicesBox' (StateInvalidExpr e) _ = noticeBox
+  (ManagerEventServices EventStateReload)
   "Reload service state"
   ("Your service expression file is not valid. Maybe you have edited it by hand and it's become corrupted?\nPlease fix the error and then press the button below. The error is:\n"
   <> e
   )
-servicesBox' (ServiceStateInvalidOptions possibleError) _ = noticeBox
-  (ManagerEventServices ServicesEventDownloadStart)
+servicesBox' (StateInvalidOptions possibleError) _ = noticeBox
+  (ManagerEventServices EventDownloadStart)
   "Start Download"
   (invalidOptionsMessage possibleError)
-servicesBox' (ServiceStateDone sd) s = paned
+servicesBox' (StateDone sd) s = paned
   []
   (pane defaultPaneProperties (servicesLeftPane sd s))
   (pane defaultPaneProperties (servicesRightPane sd s))
