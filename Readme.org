@@ -2,15 +2,15 @@
 
 ** Welcome screen, featuring a frontend for =nixos-rebuild=
 
-[[./screenshots/v3.png]]
+[[./screenshots/admin.png]]
 
 ** Search and install (or try) packages
 
-[[./screenshots/v1.png]]
+[[./screenshots/packages.png]]
 
 ** Configure services
 
-[[./screenshots/v2.png]]
+[[./screenshots/services.png]]
 
 
 ** What’s the goal of this?
