@@ -221,5 +221,12 @@ updateEvent s (EventTryInstallWatch pd po) =
 
 updateEvent s (EventPackageSelected i) =
   pureTransition (s & msPackagesState . psSelectedIdx .~ i)
-updateEvent s (EventSearchChanged t) =
-  pureTransition (s & msPackagesState . psSearchString .~ t)
+updateEvent s (EventSearchChanged t) = pureTransition
+  (  s
+  &  msPackagesState
+  .  psSearchString
+  .~ t
+  &  msPackagesState
+  .  psSelectedIdx
+  .~ Nothing
+  )

@@ -37,7 +37,7 @@ import           NixManager.View.ComboBox       ( comboBox
                                                   )
                                                 )
 import qualified Data.Vector                   as Vector
-import           Data.Text                      ( intercalate
+import           Data.Text                      ( isInfixOf
                                                 , Text
                                                 )
 import           NixManager.Util                ( showText
@@ -46,11 +46,13 @@ import           NixManager.Util                ( showText
 import           NixManager.Services.StateData  ( StateData
                                                 , sdCache
                                                 , sdSelectedIdx
+                                                , sdSearchString
                                                 , sdExpression
                                                 )
 import           NixManager.NixServiceOption    ( optionType
                                                 , NixServiceOption
                                                 , optionLoc
+                                                , flattenLocation
                                                 , optionDescription
                                                 )
 import           GI.Gtk.Declarative.Widget      ( Widget )
@@ -78,6 +80,8 @@ import qualified GI.Gtk                        as Gtk
 import           Control.Lens                   ( (^.)
                                                 , re
                                                 , Traversal'
+                                                , filtered
+                                                , view
                                                 , pre
                                                 , traversed
                                                 , set
@@ -93,6 +97,7 @@ import           Control.Lens                   ( (^.)
 import           NixManager.Services.Event      ( Event
                                                   ( EventSelected
                                                   , EventSettingChanged
+                                                  , EventSearchChanged
                                                   , EventDownloadStart
                                                   , EventStateReload
                                                   , EventDownloadCancel
@@ -136,7 +141,7 @@ buildServiceRow svc = bin
   Gtk.ListBoxRow
   []
   (widget Gtk.Label
-          [#label := (svc ^. serviceLoc . to tail . to (intercalate "."))]
+          [#label := (svc ^. serviceLoc . to tail . to flattenLocation)]
   )
 
 rowSelectionHandler :: Maybe Gtk.ListBoxRow -> Gtk.ListBox -> IO ManagerEvent
@@ -151,19 +156,36 @@ rowSelectionHandler (Just row) _ = do
         )
 rowSelectionHandler _ _ = pure (ManagerEventServices (EventSelected Nothing))
 
-serviceRows :: StateData -> Vector.Vector (Bin Gtk.ListBoxRow event)
-serviceRows = toVectorOf (sdCache . folded . to buildServiceRow)
+filterPredicate :: StateData -> NixService -> Bool
+filterPredicate sd =
+  ((sd ^. sdSearchString) `isInfixOf`) . flattenLocation . view serviceLoc
 
-servicesLeftPane
-  :: FromWidget (Bin Gtk.ScrolledWindow) target
-  => StateData
-  -> ManagerState
-  -> target ManagerEvent
-servicesLeftPane sd _ = bin
-  Gtk.ScrolledWindow
-  []
-  (container Gtk.ListBox [onM #rowSelected rowSelectionHandler] (serviceRows sd)
-  )
+
+serviceRows :: StateData -> Vector.Vector (Bin Gtk.ListBoxRow event)
+serviceRows sd = toVectorOf
+  (sdCache . folded . filtered (filterPredicate sd) . to buildServiceRow)
+  sd
+
+servicesLeftPane sd _ =
+  let searchField = widget
+        Gtk.SearchEntry
+        [ #placeholderText := "Search service..."
+        , #maxWidthChars := 50
+        , onM
+          #searchChanged
+          ((ManagerEventServices . EventSearchChanged <$>) . Gtk.getEntryText)
+        , #halign := Gtk.AlignFill
+        ]
+      serviceList = container Gtk.ListBox
+                              [onM #rowSelected rowSelectionHandler]
+                              (serviceRows sd)
+  in  container
+        Gtk.Box
+        [#orientation := Gtk.OrientationVertical]
+        [ BoxChild defaultBoxChildProperties searchField
+        , BoxChild (defaultBoxChildProperties { expand = True, fill = True })
+          $ bin Gtk.ScrolledWindow [] serviceList
+        ]
 
 optionLens' :: Text -> Traversal' NixExpr (Maybe NixExpr)
 optionLens' optionPath = _NixFunctionDecl . nfExpr . _NixSet . at optionPath
@@ -172,7 +194,7 @@ buildOptionValueCell :: NixExpr -> NixServiceOption -> Widget ManagerEvent
 buildOptionValueCell serviceExpression serviceOption =
   let
     optionPath :: Text
-    optionPath = serviceOption ^. optionLoc . to (intercalate ".")
+    optionPath = serviceOption ^. optionLoc . to flattenLocation
     optionValue :: Maybe NixExpr
     optionValue = serviceExpression ^? optionLens' optionPath . folded
     rawChangeEvent :: Text -> ManagerEvent
@@ -272,7 +294,7 @@ buildOptionRows serviceExpression serviceOption =
               Gtk.Label
               [ classes ["service-option-title"]
               , #label
-                := (serviceOption ^. optionLoc . to (intercalate "." . drop 2))
+                := (serviceOption ^. optionLoc . to (flattenLocation . drop 2))
               , #halign := Gtk.AlignStart
               ]
         , BoxChild defaultBoxChildProperties
@@ -305,8 +327,9 @@ servicesRightPane sd _ = case sd ^. sdSelectedIdx of
     widget Gtk.Label [#label := "Please select a service from the left pane"]
   Just idx ->
     let
-      svc      = sd ^?! sdCache . ix idx
-      svcLabel = svc ^. serviceLoc . to (intercalate "." . tail)
+      svc =
+        (sd ^.. sdCache . folded . filtered (filterPredicate sd)) ^?! ix idx
+      svcLabel = svc ^. serviceLoc . to (flattenLocation . tail)
       optBox =
         container Gtk.Box
                   [#orientation := Gtk.OrientationVertical, #spacing := 10]

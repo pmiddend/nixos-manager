@@ -53,6 +53,7 @@ initState = do
         Success options -> do
           services' <- readServices
           case services' of
-            Error   e        -> pure (StateInvalidExpr e)
-            Success services -> pure
-              $ StateDone (StateData (makeServices options) Nothing services)
+            Error e -> pure (StateInvalidExpr e)
+            Success services ->
+              pure $ StateDone
+                (StateData (makeServices options) Nothing services mempty)

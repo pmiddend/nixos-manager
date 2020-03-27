@@ -5,6 +5,7 @@ where
 
 import           NixManager.Services.StateData  ( sdExpression
                                                 , sdSelectedIdx
+                                                , sdSearchString
                                                 )
 import           NixManager.Services.State      ( State
                                                   ( StateDownloading
@@ -37,6 +38,7 @@ import           NixManager.Services.Event      ( Event
                                                   , EventSettingChanged
                                                   , EventDownloadCancel
                                                   , EventStateResult
+                                                  , EventSearchChanged
                                                   , EventStateReload
                                                   , EventDownloadCheck
                                                   , EventDownloadStarted
@@ -62,6 +64,17 @@ pureTransition x = Transition x (pure Nothing)
 updateEvent :: ManagerState -> Event -> Transition ManagerState ManagerEvent
 updateEvent s EventDownloadStart =
   Transition s (servicesEvent . EventDownloadStarted <$> ServiceDownload.start)
+updateEvent s (EventSearchChanged t) = pureTransition
+  (  s
+  &  msServiceState
+  .  _StateDone
+  .  sdSearchString
+  .~ t
+  &  msServiceState
+  .  _StateDone
+  .  sdSelectedIdx
+  .~ Nothing
+  )
 updateEvent s (EventSettingChanged setter) =
   let newState = over (msServiceState . _StateDone . sdExpression) setter s
   in  Transition newState $ do
