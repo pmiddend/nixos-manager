@@ -7,6 +7,7 @@ data IconName = SystemRun
               | SystemSoftwareInstall
               | EditDelete
               | ProcessStop
+              | ViewRefresh
               deriving(Eq)
 
 instance Show IconName where
@@ -14,3 +15,4 @@ instance Show IconName where
   show SystemSoftwareInstall = "system-software-install"
   show EditDelete            = "edit-delete"
   show ProcessStop           = "process-stop"
+  show ViewRefresh           = "view-refresh"

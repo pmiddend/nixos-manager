@@ -9,6 +9,8 @@ module NixManager.Admin.View
   )
 where
 
+import qualified NixManager.View.IconName      as IconName
+import           NixManager.View.ImageButton    ( imageButton )
 import           NixManager.View.ProgressBar    ( progressBar )
 import           Data.List                      ( elemIndex )
 import           NixManager.View.ComboBox       ( comboBox
@@ -20,25 +22,17 @@ import           NixManager.View.ComboBox       ( comboBox
                                                   )
                                                 )
 import           Data.Text                      ( Text )
-import           NixManager.Util                ( showText )
 import           Data.Text.Encoding             ( decodeUtf8 )
 import           NixManager.Process             ( poStdout
                                                 , poStderr
-                                                , poResult
                                                 )
 import           GI.Gtk.Declarative             ( bin
-                                                , onM
                                                 , on
-                                                , pane
-                                                , paned
                                                 , classes
                                                 , fill
                                                 , expand
-                                                , defaultPaneProperties
                                                 , BoxChild(BoxChild)
                                                 , defaultBoxChildProperties
-                                                , FromWidget
-                                                , Bin
                                                 , widget
                                                 , Attribute((:=))
                                                 , container
@@ -70,9 +64,7 @@ import           Control.Lens                   ( (^.)
                                                 , to
                                                 , (^?!)
                                                 , ix
-                                                , _1
                                                 )
-import           Data.Monoid                    ( getFirst )
 
 adminBox :: ManagerState -> Widget ManagerEvent
 adminBox s = container
@@ -114,12 +106,13 @@ rebuildRow as =
   in  [ BoxChild defaultBoxChildProperties $ container
           Gtk.Box
           [#orientation := Gtk.OrientationHorizontal, #spacing := 8]
-          [ BoxChild fillNoExpand $ widget
-            Gtk.Button
+          [ BoxChild fillNoExpand $ imageButton
             [ #label := "Apply Changes"
             , on #clicked (ManagerEventAdmin EventRebuild)
             , #valign := Gtk.AlignCenter
+            , #alwaysShowImage := True
             ]
+            IconName.ViewRefresh
           , BoxChild fillNoExpand $ widget
             Gtk.Label
             [#label := "Build type: ", #valign := Gtk.AlignCenter]
@@ -148,14 +141,13 @@ buildingBox buildState =
   [ BoxChild defaultBoxChildProperties $ container
       Gtk.Box
       [#orientation := Gtk.OrientationHorizontal, #spacing := 8]
-      [ BoxChild fillNoExpand $ widget
-        Gtk.Button
-        [ #label := "gtk-cancel"
+      [ BoxChild fillNoExpand $ imageButton
+        [ #label := "Cancel"
         , on #clicked (ManagerEventAdmin EventRebuildCancel)
         , #valign := Gtk.AlignCenter
-        , #useStock := True
         , #alwaysShowImage := True
         ]
+        IconName.ProcessStop
       , BoxChild (defaultBoxChildProperties { fill = True, expand = True })
         $ progressBar [#showText := True, #text := "Rebuilding..."]
                       (buildState ^. absCounter)
