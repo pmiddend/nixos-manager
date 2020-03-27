@@ -42,6 +42,7 @@ import           Data.Text                      ( isInfixOf
                                                 )
 import           NixManager.Util                ( showText
                                                 , MaybeError(Error, Success)
+                                                , predAnd
                                                 )
 import           NixManager.Services.StateData  ( StateData
                                                 , sdCache
@@ -158,7 +159,9 @@ rowSelectionHandler _ _ = pure (ManagerEventServices (EventSelected Nothing))
 
 filterPredicate :: StateData -> NixService -> Bool
 filterPredicate sd =
-  ((sd ^. sdSearchString) `isInfixOf`) . flattenLocation . view serviceLoc
+  (((sd ^. sdSearchString) `isInfixOf`) `predAnd` (not . ("<" `isInfixOf`)))
+    . flattenLocation
+    . view serviceLoc
 
 
 serviceRows :: StateData -> Vector.Vector (Bin Gtk.ListBoxRow event)
