@@ -8,6 +8,8 @@ module NixManager.Services.View
   )
 where
 
+import           Data.Maybe                     ( fromMaybe )
+import           NixManager.View.GtkUtil        ( expandAndFill )
 import           NixManager.View.ProgressBar    ( progressBar )
 import           NixManager.Docbook             ( parseDocbook
                                                 , docbookToPango
@@ -65,8 +67,6 @@ import           GI.Gtk.Declarative             ( bin
                                                 , pane
                                                 , paned
                                                 , classes
-                                                , fill
-                                                , expand
                                                 , defaultPaneProperties
                                                 , BoxChild(BoxChild)
                                                 , defaultBoxChildProperties
@@ -79,6 +79,7 @@ import           GI.Gtk.Declarative             ( bin
 import           Data.Vector.Lens               ( toVectorOf )
 import qualified GI.Gtk                        as Gtk
 import           Control.Lens                   ( (^.)
+                                                , non
                                                 , re
                                                 , Traversal'
                                                 , filtered
@@ -186,8 +187,7 @@ servicesLeftPane sd _ =
         Gtk.Box
         [#orientation := Gtk.OrientationVertical]
         [ BoxChild defaultBoxChildProperties searchField
-        , BoxChild (defaultBoxChildProperties { expand = True, fill = True })
-          $ bin Gtk.ScrolledWindow [] serviceList
+        , BoxChild expandAndFill $ bin Gtk.ScrolledWindow [] serviceList
         ]
 
 optionLens' :: Text -> Traversal' NixExpr (Maybe NixExpr)
@@ -229,11 +229,6 @@ buildOptionValueCell serviceExpression serviceOption =
                 := (optionValue ^. pre (traversed . _NixBoolean) . non False)
               , on #stateSet changeCallback
               ]
-      -- Right NixServiceOptionUnspecified -> widget
-      --   Gtk.Label
-      --   [ classes ["unspecified-label"]
-      --   , #label := "Type not specified, cannot edit."
-      --   ]
       Right (NixServiceOptionOneOfString values) ->
         let
           activeIndex :: Maybe ComboBoxIndexType
@@ -247,6 +242,8 @@ buildOptionValueCell serviceExpression serviceOption =
           changeCallback :: ComboBoxChangeEvent -> ManagerEvent
           changeCallback (ComboBoxChangeEvent Nothing) = ManagerEventServices
             (EventSettingChanged $ set (optionLens' optionPath) Nothing)
+          changeCallback (ComboBoxChangeEvent (Just 0)) = ManagerEventServices
+            (EventSettingChanged $ set (optionLens' optionPath) Nothing)
           changeCallback (ComboBoxChangeEvent (Just idx)) =
             ManagerEventServices
               (EventSettingChanged
@@ -255,7 +252,11 @@ buildOptionValueCell serviceExpression serviceOption =
                 )
               )
         in
-          changeCallback <$> comboBox [] (ComboBoxProperties values activeIndex)
+          changeCallback <$> comboBox
+            []
+            (ComboBoxProperties ("<no value>" : values)
+                                (Just (fromMaybe 0 activeIndex))
+            )
       Right NixServiceOptionPackage   -> textLikeEntry NixSymbol _NixSymbol
       Right NixServiceOptionSubmodule -> textLikeEntry NixSymbol _NixSymbol
       Right NixServiceOptionPath      -> textLikeEntry NixSymbol _NixSymbol
@@ -292,14 +293,13 @@ buildOptionRows serviceExpression serviceOption =
         , #spacing := 10
         , #margin := 15
         ]
-        [ BoxChild (defaultBoxChildProperties { expand = True, fill = True })
-          $ widget
-              Gtk.Label
-              [ classes ["service-option-title"]
-              , #label
-                := (serviceOption ^. optionLoc . to (flattenLocation . drop 2))
-              , #halign := Gtk.AlignStart
-              ]
+        [ BoxChild expandAndFill $ widget
+          Gtk.Label
+          [ classes ["service-option-title"]
+          , #label
+            := (serviceOption ^. optionLoc . to (flattenLocation . drop 2))
+          , #halign := Gtk.AlignStart
+          ]
         , BoxChild defaultBoxChildProperties
           $ buildOptionValueCell serviceExpression serviceOption
         ]
@@ -354,9 +354,7 @@ servicesRightPane sd _ = case sd ^. sdSelectedIdx of
 servicesBox s = container
   Gtk.Box
   []
-  [ BoxChild (defaultBoxChildProperties { expand = True, fill = True })
-             (servicesBox' (s ^. msServiceState) s)
-  ]
+  [BoxChild expandAndFill (servicesBox' (s ^. msServiceState) s)]
 
 invalidOptionsMessage :: Maybe Text -> Text
 invalidOptionsMessage (Just e) =

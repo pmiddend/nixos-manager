@@ -34,3 +34,5 @@ paddedAround spacing =
                                          , expand  = True
                                          , fill    = True
                                          }
+
+expandAndFill = defaultBoxChildProperties { expand = True, fill = True }
