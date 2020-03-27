@@ -8,6 +8,7 @@ module NixManager.Packages.View
 where
 
 import           NixManager.View.ProgressBar    ( progressBar )
+import qualified NixManager.View.IconName      as IconName
 import           NixManager.Packages.Event      ( Event
                                                   ( EventSearchChanged
                                                   , EventPackageSelected
@@ -80,6 +81,7 @@ import           NixManager.Util                ( mwhen
                                                 , replaceHtmlEntities
                                                 )
 import           NixManager.View.GtkUtil        ( paddedAround )
+import           NixManager.View.ImageButton    ( imageButton )
 import           NixManager.Message             ( messageText
                                                 , messageType
                                                 , _ErrorMessage
@@ -137,7 +139,7 @@ buildResultRow
 buildResultRow i pkg = bin
   Gtk.ListBoxRow
   [ classes
-      (  (mwhen (pkg ^. npInstalled) ["package-row-installed"])
+      (  mwhen (pkg ^. npInstalled) ["package-row-installed"]
       <> [if i `mod` 2 == 0 then "package-row-even" else "package-row-odd"]
       )
   ]
@@ -179,26 +181,26 @@ packagesBox s =
     tryInstallCell = case s ^. msPackagesState . psInstallingPackage of
       Nothing -> BoxChild
         (defaultBoxChildProperties { expand = True, fill = True })
-        (widget
-          Gtk.Button
+        (imageButton
           [ #label := "Try without installing"
           , #sensitive := (packageSelected && not currentPackageInstalled)
           , classes ["try-install-button"]
           , on #clicked (ManagerEventPackages EventTryInstall)
+          , #alwaysShowImage := True
           ]
+          IconName.SystemRun
         )
       Just is ->
         BoxChild (defaultBoxChildProperties { expand = True, fill = True })
           $ container
               Gtk.Box
               [#orientation := Gtk.OrientationHorizontal, #spacing := 5]
-              [ BoxChild defaultBoxChildProperties $ widget
-                Gtk.Button
-                [ #label := "gtk-cancel"
-                , #useStock := True
-                , #alwaysShowImage := True
+              [ BoxChild defaultBoxChildProperties $ imageButton
+                [ #alwaysShowImage := True
                 , on #clicked (ManagerEventPackages EventTryInstallCancel)
+                , #label := "Cancel"
                 ]
+                IconName.ProcessStop
               , BoxChild
                   (defaultBoxChildProperties { fill = True, expand = True })
                 $ progressBar [#showText := True, #text := "Downloading..."]
@@ -210,23 +212,25 @@ packagesBox s =
       [ tryInstallCell
       , BoxChild
         (defaultBoxChildProperties { expand = True, fill = True })
-        (widget
-          Gtk.Button
+        (imageButton
           [ #label := "Install"
           , #sensitive := (packageSelected && not currentPackageInstalled)
           , classes ["install-button"]
           , on #clicked (ManagerEventPackages EventInstall)
+          , #alwaysShowImage := True
           ]
+          IconName.SystemSoftwareInstall
         )
       , BoxChild
         (defaultBoxChildProperties { expand = True, fill = True })
-        (widget
-          Gtk.Button
+        (imageButton
           [ #label := "Remove"
           , #sensitive := (packageSelected && currentPackageInstalled)
           , classes ["remove-button"]
+          , #alwaysShowImage := True
           , on #clicked (ManagerEventPackages EventUninstall)
           ]
+          IconName.EditDelete
         )
       ]
     resultBox = if searchValid

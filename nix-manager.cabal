@@ -27,6 +27,8 @@ executable nix-manager
                      , NixManager.View.Css
                      , NixManager.View.ErrorDialog
                      , NixManager.View.ProgressBar
+                     , NixManager.View.ImageButton
+                     , NixManager.View.IconName
                      , NixManager.NixServiceOption
                      , NixManager.Docbook
                      , NixManager.NixPackage

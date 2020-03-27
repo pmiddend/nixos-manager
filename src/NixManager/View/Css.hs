@@ -9,9 +9,7 @@ import qualified GI.Gtk                        as Gtk
 styles :: ByteString
 styles = mconcat
   [ ".package-row-installed { background-color: #cdffcd; }"
-  , ".install-button { background-image: image(#cdffcd); font-weight: bold; }"
-  , ".try-install-button { background-image: image(#cdffcd); }"
-  , ".remove-button { background-image: image(#ffaeae); }"
+  , ".install-button { font-weight: bold; }"
   , ".error-message { background-image: image(#fff3cd); }"
   , ".info-message { background-image: image(#bef7ff); }"
   , ".package-row-even { }"
