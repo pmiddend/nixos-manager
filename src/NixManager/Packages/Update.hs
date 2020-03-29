@@ -159,7 +159,7 @@ updateEvent s EventTryInstallSuccess = pureTransition
   &  msPackagesState
   .  psLatestMessage
   ?~ infoMessage
-       "Downloaded and started the application!\nIf nothing happens, it's probably a terminal application and can not be started from NixOS manager."
+       "Downloaded and started the application!\nIf nothing happens, it's probably a terminal application and cannot be started from NixOS manager."
 
   &  msPackagesState
   .  psInstallingPackage
