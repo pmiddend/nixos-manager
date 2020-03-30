@@ -80,19 +80,19 @@ fillNoExpand = defaultBoxChildProperties { expand = False, fill = True }
 rebuildTypesWithDescription :: [(Text, Text)]
 rebuildTypesWithDescription =
   [ ( "switch"
-    , "Build and activate the new configuration, and make it the boot default. That is, the configuration is added to the GRUB boot menu as the default menu entry, so that subsequent reboots will boot the system into the new configuration. Previous configurations activated with nixos-rebuild switch or nixos-rebuild boot remain available in the GRUB menu."
+    , "Build and activate the changes immediately. You can go back to previous configurations by rebooting and selecting an older generation."
     )
   , ( "boot"
-    , "Build the new configuration and make it the boot default (as with nixos-rebuild switch), but do not activate it. That is, the system continues to run the previous configuration until the next reboot."
+    , "Build the new configuration and make it the boot default, but do not activate it. That is, the system continues to run the previous configuration until the next reboot."
     )
   , ( "test"
-    , "Build and activate the new configuration, but do not add it to the GRUB boot menu. Thus, if you reboot the system (or if it crashes), you will automatically revert to the default configuration (i.e. the configuration resulting from the last call to nixos-rebuild switch or nixos-rebuild boot)."
+    , "Build and activate the new configuration, but do not add it to the GRUB boot menu. Thus, if you reboot the system (or if it crashes), you will automatically revert to the default configuration (i.e. the configuration resulting from the last rebuild)."
     )
   , ( "dry-build"
     , "Show what store paths would be built or downloaded by any of the operations above, but otherwise do nothing."
     )
   , ( "dry-activate"
-    , "Build the new configuration, but instead of activating it, show what changes would be performed by the activation (i.e. by nixos-rebuild test). For instance, this command will print which systemd units would be restarted. The list of changes is not guaranteed to be complete."
+    , "Build the new configuration, but instead of activating it, show what changes would be performed by the activation. For instance, this command will print which systemd units would be restarted. The list of changes is not guaranteed to be complete."
     )
   ]
 
