@@ -9,7 +9,6 @@ module NixManager.NixServiceOption
   , optionType
   , optionValue
   , readOptionsFile
-  , flattenLocation
   , locateOptionsFile
   , NixServiceOptionLocation
   , desiredOptionsFileLocation
@@ -34,9 +33,9 @@ import           NixManager.Util                ( MaybeError
 import           Data.ByteString.Lazy           ( ByteString
                                                 , readFile
                                                 )
-import           Data.Text                      ( Text
-                                                , intercalate
-                                                )
+import           Data.Text                      ( Text )
+import           NixManager.NixServiceOptionLocation
+                                                ( NixServiceOptionLocation )
 import           NixManager.NixServiceOptionType
                                                 ( NixServiceOptionType
                                                 , parseNixServiceOptionType
@@ -49,11 +48,6 @@ import           Data.Aeson                     ( FromJSON
                                                 , (.:)
                                                 , eitherDecode
                                                 )
-
-type NixServiceOptionLocation = [Text]
-
-flattenLocation :: NixServiceOptionLocation -> Text
-flattenLocation = intercalate "."
 
 data NixServiceOption = NixServiceOption {
    _optionDescription :: Text

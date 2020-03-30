@@ -6,6 +6,7 @@ where
 import           NixManager.Services.StateData  ( sdExpression
                                                 , sdSelectedIdx
                                                 , sdSearchString
+                                                , sdCategory
                                                 )
 import           NixManager.Services.State      ( State
                                                   ( StateDownloading
@@ -43,6 +44,7 @@ import           NixManager.Services.Event      ( Event
                                                   , EventDownloadCheck
                                                   , EventDownloadStarted
                                                   , EventSelected
+                                                  , EventCategoryChanged
                                                   )
                                                 )
 import           NixManager.Util                ( MaybeError(Success, Error)
@@ -64,6 +66,8 @@ pureTransition x = Transition x (pure Nothing)
 updateEvent :: ManagerState -> Event -> Transition ManagerState ManagerEvent
 updateEvent s EventDownloadStart =
   Transition s (servicesEvent . EventDownloadStarted <$> ServiceDownload.start)
+updateEvent s (EventCategoryChanged newCategory) =
+  pureTransition (s & msServiceState . _StateDone . sdCategory .~ newCategory)
 updateEvent s (EventSearchChanged t) = pureTransition
   (  s
   &  msServiceState

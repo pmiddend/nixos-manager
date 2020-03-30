@@ -12,6 +12,7 @@ module NixManager.NixService
   )
 where
 
+import           Data.Maybe                     ( mapMaybe )
 import           Control.Monad                  ( unless )
 import           System.FilePath                ( (</>) )
 import           NixManager.Constants           ( appName )
@@ -22,7 +23,6 @@ import           System.Directory               ( getXdgDirectory
                                                 )
 import qualified Data.Set                      as Set
 import           Prelude                 hiding ( readFile )
-import           Data.List                      ( isPrefixOf )
 import           Data.Map.Strict                ( Map
                                                 , insertWith
                                                 , toList
@@ -44,10 +44,13 @@ import           NixManager.NixExpr             ( NixExpr
 import           NixManager.Util                ( Endo
                                                 , MaybeError
                                                 , addToError
-                                                , predAnd
                                                 )
-import           NixManager.NixServiceOption    ( NixServiceOptionLocation
-                                                , NixServiceOption
+import           NixManager.NixServiceOptionLocation
+                                                ( NixServiceOptionLocation
+                                                , removeLastComponent
+                                                , isPrefixOf
+                                                )
+import           NixManager.NixServiceOption    ( NixServiceOption
                                                 , optionLoc
                                                 )
 
@@ -59,21 +62,19 @@ data NixService = NixService {
 
 makeLenses ''NixService
 
-canBeEnabled :: NixServiceOptionLocation -> Bool
-canBeEnabled = (== "enable") . last
+-- canBeEnabled :: NixServiceOptionLocation -> Bool
+-- canBeEnabled = (== "enable") . last
 
-isService :: NixServiceOptionLocation -> Bool
-isService = (== "services") . head
+-- isService :: NixServiceOptionLocation -> Bool
+-- isService = (== "services") . head
 
 makeServices :: Map Text NixServiceOption -> [NixService]
 makeServices options' =
   let
     options = elems options'
     servicePaths :: Set.Set NixServiceOptionLocation
-    servicePaths = Set.fromList
-      (init <$> filter (canBeEnabled `predAnd` isService)
-                       (view optionLoc <$> options)
-      )
+    servicePaths =
+      Set.fromList (removeLastComponent `mapMaybe` (view optionLoc <$> options))
     serviceForOption :: NixServiceOption -> Maybe NixServiceOptionLocation
     serviceForOption opt = case Set.lookupLT (opt ^. optionLoc) servicePaths of
       Nothing -> Nothing

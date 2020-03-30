@@ -8,6 +8,8 @@ import           NixManager.Util                ( Endo )
 import           NixManager.Services.Download   ( DownloadState )
 import           NixManager.Services.State      ( State )
 import           Data.Text                      ( Text )
+import           NixManager.Services.ServiceCategory
+                                                ( ServiceCategory )
 
 data Event = EventDownloadStart
            | EventSelected (Maybe Int)
@@ -18,4 +20,5 @@ data Event = EventDownloadStart
            | EventStateReload
            | EventSearchChanged Text
            | EventSettingChanged (Endo NixExpr)
+           | EventCategoryChanged ServiceCategory
 

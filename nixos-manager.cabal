@@ -5,7 +5,6 @@ maintainer:          Philipp Middendorf <pmidden@mailbox.org>
 copyright:           Philipp Middendorf <pmidden@mailbox.org>
 category:            GUI
 cabal-version:       >=1.10
-name:                nix-manager
 version:             1.0
 license-file:        LICENSE
 build-type:          Simple
@@ -23,6 +22,7 @@ executable nix-manager
                      , NixManager.Services.Event
                      , NixManager.Services.Update
                      , NixManager.Services.View
+                     , NixManager.Services.ServiceCategory
                      , NixManager.Packages.Event
                      , NixManager.Packages.Update
                      , NixManager.Packages.State
@@ -36,6 +36,7 @@ executable nix-manager
                      , NixManager.View.ImageButton
                      , NixManager.View.IconName
                      , NixManager.NixServiceOption
+                     , NixManager.NixServiceOptionLocation
                      , NixManager.Docbook
                      , NixManager.NixPackage
                      , NixManager.Constants
