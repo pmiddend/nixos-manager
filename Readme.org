@@ -14,7 +14,6 @@
 
 [[./screenshots/services.png]]
 
-
 ** What’s the goal of this?
 
 The idea is to build something to *configure NixOS graphically*. To me, this means: managing the installed software packages, and managing the enabled services, as well as updating and garbage-collecting. For the moment, I’m focusing on a solution for a declarative, global configuration.
@@ -32,6 +31,48 @@ Since the NixOS configuration is very “free-form”, I have to make some assum
 ** Technology
 
 I’m using Haskell as the language of choice, simply because =hnix= is available and allows me to easily parse and serialize the relevant Nix configuration files. The GUI is made via =gi-gtk-declarative=, which serves me well and is pretty stable.
+
+** Building
+
+nixos-manager isn’t in nixpkgs yet, so you’ll have to build it using…Nix!
+
+#+begin_src bash
+nix-build
+#+end_src
+
+This would suffice, /if/ =gi-gtk-declarative= wasn’t broken in nixpkgs currently (its tests don’t work). So you have to allow the installation of “broken packages”. The error message you get will tell you how, but the simplest way is:
+
+#+begin_src bash
+mkdir -p $HOME/.config/nixpkgs && echo "{ allowBroken = true; }" > $HOME/.config/nixpkgs/config.nix
+#+end_src
+
+*Caution*: this will overwrite any existing =config.nix= file. Check that first.
+
+After the build processed has finished, run =result/bin/nixos-manager=.
+
+** Setup
+
+To use nixos-manager, you have to tell NixOS to read its configuration files. To do that, open your =/etc/nixos/configuration.nix= file and look for a line containing ~imports = …~. Usually it looks something like this:
+
+#+begin_src nix
+  imports =
+    [ # Include the results of the hardware scan.
+      ./hardware-configuration.nix
+    ];
+#+end_src
+
+So =imports= contains an array of Nix files. You can extend this array by just listing more files, separated by spaces. To use NixOS manager, extend the list as such:
+
+#+begin_src nix
+  imports =
+    [ # Include the results of the hardware scan.
+      ./hardware-configuration.nix
+      ./nixos-manager/services.nix
+      ./nixos-manager/packages.nix
+    ];
+#+end_src
+
+nixos-manager will create these two files when you apply changes.
 
 ** Current status
 
