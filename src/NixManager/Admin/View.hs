@@ -9,9 +9,15 @@ module NixManager.Admin.View
   )
 where
 
+import           System.Exit                    ( ExitCode
+                                                  ( ExitFailure
+                                                  , ExitSuccess
+                                                  )
+                                                )
 import qualified NixManager.View.IconName      as IconName
 import           NixManager.View.GtkUtil        ( expandAndFill
                                                 , fillNoExpand
+                                                , paddedAround
                                                 )
 import           NixManager.View.ImageButton    ( imageButton )
 import           NixManager.View.ProgressBar    ( progressBar )
@@ -28,6 +34,7 @@ import           Data.Text                      ( Text )
 import           Data.Text.Encoding             ( decodeUtf8 )
 import           NixManager.Process             ( poStdout
                                                 , poStderr
+                                                , poResult
                                                 )
 import           GI.Gtk.Declarative             ( bin
                                                 , on
@@ -61,11 +68,14 @@ import           NixManager.Admin.State         ( asActiveBuildType
                                                 , asBuildState
                                                 )
 import           Control.Lens                   ( (^.)
+                                                , has
+                                                , _Nothing
                                                 , folded
                                                 , to
                                                 , (^?!)
                                                 , ix
                                                 )
+import           Data.Monoid                    ( getFirst )
 
 adminBox :: ManagerState -> Widget ManagerEvent
 adminBox s = container
@@ -172,6 +182,30 @@ adminBox' ms =
     rebuildButtons = maybe (rebuildRow (ms ^. msAdminState))
                            buildingBox
                            (ms ^. msAdminState . asBuildState)
+    statusLabel ExitSuccess = widget
+      Gtk.Label
+      [ #label := "Build finished successfully!"
+      , #useMarkup := True
+      , classes ["info-message"]
+      ]
+    statusLabel _ = widget
+      Gtk.Label
+      [ #label
+        := "Build failed! Please check the build details below to find out what's wrong."
+      , #useMarkup := True
+      , classes ["error-message"]
+      ]
+    lastStatusRow =
+      case
+          ( has (msAdminState . asBuildState . _Nothing) ms
+          , ms ^. msAdminState . asProcessOutput . poResult . to getFirst
+          )
+        of
+          (True, Just v) ->
+            [ BoxChild defaultBoxChildProperties
+                       (paddedAround 5 (statusLabel v))
+            ]
+          _ -> []
     rebuildDetails =
       [ BoxChild expandAndFill
           $ bin Gtk.Expander [#label := "Build details"]
@@ -230,5 +264,6 @@ adminBox' ms =
       ]
     $  headlineItems
     <> rebuildButtons
+    <> lastStatusRow
     <> rebuildDetails
 
