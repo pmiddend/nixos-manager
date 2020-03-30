@@ -24,6 +24,7 @@ import           NixManager.Admin.State         ( State
                                                 , asProcessOutput
                                                 , asActiveBuildType
                                                 , absCounter
+                                                , asDetailsState
                                                 , absProcessData
                                                 , BuildState(BuildState)
                                                 )
@@ -45,6 +46,7 @@ import           NixManager.Admin.Event         ( Event
                                                   , EventRebuildStarted
                                                   , EventRebuildWatch
                                                   , EventRebuildCancel
+                                                  , EventChangeDetails
                                                   , EventRebuildFinished
                                                   , EventBuildTypeChanged
                                                   , EventAskPassWatch
@@ -131,6 +133,6 @@ updateEvent ms _ (EventRebuildFinished totalOutput) = pureTransition
   )
 updateEvent ms _ (EventBuildTypeChanged newType) =
   pureTransition (ms & msAdminState . asActiveBuildType .~ newType)
-
-
+updateEvent ms _ (EventChangeDetails newDetails) =
+  pureTransition (ms & msAdminState . asDetailsState .~ newDetails)
 

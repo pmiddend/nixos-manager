@@ -9,10 +9,16 @@ module NixManager.Admin.State
   , absCounter
   , absProcessData
   , initState
+  , asDetailsState
+  , detailsBool
+  , DetailsState(..)
   )
 where
 
-import           Control.Lens                   ( makeLenses )
+import           Control.Lens                   ( makeLenses
+                                                , Iso'
+                                                , iso
+                                                )
 import           NixManager.Process             ( ProcessOutput
                                                 , ProcessData
                                                 )
@@ -25,13 +31,25 @@ data BuildState = BuildState {
 
 makeLenses ''BuildState
 
+data DetailsState = DetailsContracted
+                  | DetailsExpanded
+
+detailsBool :: Iso' DetailsState Bool
+detailsBool = iso toBool fromBool
+ where
+  toBool DetailsContracted = False
+  toBool DetailsExpanded   = True
+  fromBool False = DetailsContracted
+  fromBool True  = DetailsExpanded
+
 data State = State {
     _asProcessOutput :: ProcessOutput
   , _asBuildState :: Maybe BuildState
   , _asActiveBuildType :: Text
+  , _asDetailsState :: DetailsState
   }
 
 makeLenses ''State
 
 initState :: State
-initState = State mempty Nothing "switch"
+initState = State mempty Nothing "switch" DetailsContracted

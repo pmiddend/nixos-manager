@@ -9,6 +9,7 @@ import           NixManager.Process             ( ProcessData
                                                 , ProcessOutput
                                                 )
 import           Data.Text                      ( Text )
+import           NixManager.Admin.State         ( DetailsState )
 
 data Event = EventRebuild
                 | EventAskPassWatch ProcessOutput ProcessData
@@ -17,5 +18,6 @@ data Event = EventRebuild
                 | EventRebuildFinished ProcessOutput
                 | EventBuildTypeChanged Text
                 | EventRebuildCancel
+                | EventChangeDetails DetailsState
 
 makePrisms ''Event

@@ -39,6 +39,7 @@ import           NixManager.Process             ( poStdout
 import           GI.Gtk.Declarative             ( bin
                                                 , on
                                                 , classes
+                                                , onM
                                                 , fill
                                                 , expand
                                                 , BoxChild(BoxChild)
@@ -56,6 +57,7 @@ import           NixManager.Admin.Event         ( Event
                                                   ( EventRebuild
                                                   , EventRebuildCancel
                                                   , EventBuildTypeChanged
+                                                  , EventChangeDetails
                                                   )
                                                 )
 import           NixManager.ManagerState        ( ManagerState
@@ -63,13 +65,21 @@ import           NixManager.ManagerState        ( ManagerState
                                                 )
 import           GI.Gtk.Declarative.Widget      ( Widget )
 import           NixManager.Admin.State         ( asActiveBuildType
+                                                , DetailsState
+                                                  ( DetailsExpanded
+                                                  , DetailsContracted
+                                                  )
                                                 , asProcessOutput
                                                 , absCounter
                                                 , asBuildState
+                                                , asDetailsState
+                                                , detailsBool
                                                 )
 import           Control.Lens                   ( (^.)
                                                 , has
                                                 , _Nothing
+                                                , view
+                                                , from
                                                 , folded
                                                 , to
                                                 , (^?!)
@@ -206,9 +216,31 @@ adminBox' ms =
                        (paddedAround 5 (statusLabel v))
             ]
           _ -> []
+    processExpanded w = do
+      expandedState <- Gtk.getExpanderExpanded w
+      putStrLn ("expanded: " <> show expandedState)
+      pure
+        ( ManagerEventAdmin
+        . EventChangeDetails
+        . view (from detailsBool)
+        . not
+        $ expandedState
+        )
     rebuildDetails =
       [ BoxChild expandAndFill
-          $ bin Gtk.Expander [#label := "Build details"]
+          $ bin
+              Gtk.Expander
+              [ #label := "Build details"
+              , #expanded := (ms ^. msAdminState . asDetailsState . detailsBool)
+              , onM #activate processExpanded
+                -- ( (( ManagerEventAdmin
+                --    . EventChangeDetails
+                --    . transformExpandedState
+                --    ) <$>
+                --   )
+                -- . Gtk.getExpanderExpanded
+                -- )
+              ]
           $ container
               Gtk.Box
               [#orientation := Gtk.OrientationVertical]
