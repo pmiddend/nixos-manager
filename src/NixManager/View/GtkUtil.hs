@@ -16,6 +16,7 @@ import           GI.Gtk.Declarative             ( bin
                                                 , classes
                                                 , container
                                                 , BoxChild(BoxChild)
+                                                , BoxChildProperties
                                                 , on
                                                 )
 import qualified GI.Gtk                        as Gtk
@@ -35,4 +36,9 @@ paddedAround spacing =
                                          , fill    = True
                                          }
 
+expandAndFill :: BoxChildProperties
 expandAndFill = defaultBoxChildProperties { expand = True, fill = True }
+
+fillNoExpand :: BoxChildProperties
+fillNoExpand = defaultBoxChildProperties { expand = False, fill = True }
+

@@ -10,6 +10,9 @@ module NixManager.Admin.View
 where
 
 import qualified NixManager.View.IconName      as IconName
+import           NixManager.View.GtkUtil        ( expandAndFill
+                                                , fillNoExpand
+                                                )
 import           NixManager.View.ImageButton    ( imageButton )
 import           NixManager.View.ProgressBar    ( progressBar )
 import           Data.List                      ( elemIndex )
@@ -52,8 +55,6 @@ import           NixManager.ManagerState        ( ManagerState
                                                 , msAdminState
                                                 )
 import           GI.Gtk.Declarative.Widget      ( Widget )
-import           GI.Gtk.Declarative.Container.Box
-                                                ( BoxChildProperties )
 import           NixManager.Admin.State         ( asActiveBuildType
                                                 , asProcessOutput
                                                 , absCounter
@@ -73,9 +74,6 @@ adminBox s = container
   [ BoxChild (defaultBoxChildProperties { expand = True, fill = True })
              (adminBox' s)
   ]
-
-fillNoExpand :: BoxChildProperties
-fillNoExpand = defaultBoxChildProperties { expand = False, fill = True }
 
 rebuildTypesWithDescription :: [(Text, Text)]
 rebuildTypesWithDescription =
@@ -155,7 +153,73 @@ buildingBox buildState =
   ]
 
 adminBox' ms =
-  container
+  let
+    headlineItems =
+      [ BoxChild fillNoExpand $ widget
+        Gtk.Label
+        [ #label := "Welcome to NixOS-Manager"
+        , classes ["nixos-manager-headline"]
+        ]
+      , BoxChild fillNoExpand $ widget
+        Gtk.Label
+        [ #label
+          := "Select the “Packages” and “Services” tabs above to make changes to your system.\nOnce you're done with that, apply the changes using the form below."
+        , #wrap := True
+        , classes ["nixos-manager-italic"]
+        ]
+      , BoxChild fillNoExpand $ widget Gtk.Separator []
+      ]
+    rebuildButtons = maybe (rebuildRow (ms ^. msAdminState))
+                           buildingBox
+                           (ms ^. msAdminState . asBuildState)
+    rebuildDetails =
+      [ BoxChild expandAndFill
+          $ bin Gtk.Expander [#label := "Build details"]
+          $ container
+              Gtk.Box
+              [#orientation := Gtk.OrientationVertical]
+              [ BoxChild fillNoExpand $ widget Gtk.Separator []
+              , BoxChild defaultBoxChildProperties
+                $ widget Gtk.Label [#label := "Build command standard output:"]
+              , BoxChild
+                (defaultBoxChildProperties { expand = True, fill = True })
+              $ bin Gtk.ScrolledWindow
+                    [classes ["nixos-manager-grey-background"]]
+              $ widget
+                  Gtk.Label
+                  [ #label
+                    := (  ms
+                       ^. msAdminState
+                       .  asProcessOutput
+                       .  poStdout
+                       .  to decodeUtf8
+                       )
+                  , classes ["nixos-manager-monospace"]
+                  , #valign := Gtk.AlignStart
+                  ]
+              , BoxChild defaultBoxChildProperties
+                $ widget Gtk.Label [#label := "Build command standard error:"]
+              , BoxChild
+                (defaultBoxChildProperties { expand = True, fill = True })
+              $ bin Gtk.ScrolledWindow
+                    [classes ["nixos-manager-grey-background"]]
+              $ widget
+                  Gtk.Label
+                  [ #label
+                    := (  ms
+                       ^. msAdminState
+                       .  asProcessOutput
+                       .  poStderr
+                       .  to decodeUtf8
+                       )
+                  , #wrap := True
+                  , #valign := Gtk.AlignStart
+                  , classes ["nixos-manager-monospace"]
+                  ]
+              ]
+      ]
+  in
+    container
       Gtk.Box
       [ #orientation := Gtk.OrientationVertical
       , #spacing := 3
@@ -164,48 +228,7 @@ adminBox' ms =
       , #marginTop := 5
       , #marginBottom := 5
       ]
-    $  [ BoxChild fillNoExpand $ widget
-         Gtk.Label
-         [ #label := "Welcome to NixOS-Manager"
-         , classes ["nixos-manager-headline"]
-         ]
-       , BoxChild fillNoExpand $ widget
-         Gtk.Label
-         [ #label
-           := "Select the “Packages” and “Services” tabs above to make changes to your system.\nOnce you're done with that, apply the changes using the form below."
-         , #wrap := True
-         , classes ["nixos-manager-italic"]
-         ]
-       , BoxChild fillNoExpand $ widget Gtk.Separator []
-       ]
-    <> maybe (rebuildRow (ms ^. msAdminState))
-             buildingBox
-             (ms ^. msAdminState . asBuildState)
-    <> [ BoxChild fillNoExpand $ widget Gtk.Separator []
-       , BoxChild defaultBoxChildProperties
-         $ widget Gtk.Label [#label := "Build command standard output:"]
-       , BoxChild (defaultBoxChildProperties { expand = True, fill = True })
-       $ bin Gtk.ScrolledWindow [classes ["nixos-manager-grey-background"]]
-       $ widget
-           Gtk.Label
-           [ #label
-             := (ms ^. msAdminState . asProcessOutput . poStdout . to decodeUtf8
-                )
-           , classes ["nixos-manager-monospace"]
-           , #valign := Gtk.AlignStart
-           ]
-       , BoxChild defaultBoxChildProperties
-         $ widget Gtk.Label [#label := "Build command standard error:"]
-       , BoxChild (defaultBoxChildProperties { expand = True, fill = True })
-       $ bin Gtk.ScrolledWindow [classes ["nixos-manager-grey-background"]]
-       $ widget
-           Gtk.Label
-           [ #label
-             := (ms ^. msAdminState . asProcessOutput . poStderr . to decodeUtf8
-                )
-           , #wrap := True
-           , #valign := Gtk.AlignStart
-           , classes ["nixos-manager-monospace"]
-           ]
-       ]
+    $  headlineItems
+    <> rebuildButtons
+    <> rebuildDetails
 
