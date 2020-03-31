@@ -5,9 +5,10 @@ module NixManager.Admin.State
   , BuildState(BuildState)
   , asBuildState
   , asProcessOutput
-  , asActiveBuildType
+  , asActiveRebuildMode
   , absCounter
   , absProcessData
+  , asChanges
   , initState
   , asDetailsState
   , detailsBool
@@ -15,6 +16,13 @@ module NixManager.Admin.State
   )
 where
 
+import           NixManager.NixRebuildMode      ( NixRebuildMode
+                                                  ( NixRebuildSwitch
+                                                  )
+                                                )
+import           NixManager.Changes             ( ChangeType
+                                                , determineChanges
+                                                )
 import           Control.Lens                   ( makeLenses
                                                 , Iso'
                                                 , iso
@@ -22,7 +30,6 @@ import           Control.Lens                   ( makeLenses
 import           NixManager.Process             ( ProcessOutput
                                                 , ProcessData
                                                 )
-import           Data.Text                      ( Text )
 
 data BuildState = BuildState {
     _absCounter :: Int
@@ -45,11 +52,13 @@ detailsBool = iso toBool fromBool
 data State = State {
     _asProcessOutput :: ProcessOutput
   , _asBuildState :: Maybe BuildState
-  , _asActiveBuildType :: Text
+  , _asActiveRebuildMode :: NixRebuildMode
   , _asDetailsState :: DetailsState
+  , _asChanges :: ChangeType
   }
 
 makeLenses ''State
 
-initState :: State
-initState = State mempty Nothing "switch" DetailsContracted
+initState :: IO State
+initState =
+  State mempty Nothing NixRebuildSwitch DetailsContracted <$> determineChanges

@@ -1,8 +1,8 @@
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedLists #-}
-module NixManager.UpdateHandler
-  ( update'
+module NixManager.Update
+  ( update
   )
 where
 
@@ -23,11 +23,11 @@ import           Prelude                 hiding ( length
 pureTransition :: ManagerState -> Transition ManagerState ManagerEvent
 pureTransition x = Transition x (pure Nothing)
 
-update' :: ManagerState -> ManagerEvent -> Transition ManagerState ManagerEvent
-update' s (ManagerEventAdmin ae) =
+update :: ManagerState -> ManagerEvent -> Transition ManagerState ManagerEvent
+update s (ManagerEventAdmin ae) =
   AdminUpdate.updateEvent s (s ^. msAdminState) ae
-update' s (ManagerEventServices se) = ServicesUpdate.updateEvent s se
-update' s (ManagerEventPackages se) = PackagesUpdate.updateEvent s se
-update' _ ManagerEventClosed        = Exit
-update' s ManagerEventDiscard       = pureTransition s
+update s (ManagerEventServices se) = ServicesUpdate.updateEvent s se
+update s (ManagerEventPackages se) = PackagesUpdate.updateEvent s se
+update _ ManagerEventClosed        = Exit
+update s ManagerEventDiscard       = pureTransition s
 

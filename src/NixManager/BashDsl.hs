@@ -1,21 +1,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.BashDsl
-  ( BashExpr(..)
-  , BashArg(..)
-  , evalBashExpr
+  ( Expr(..)
+  , Arg(..)
+  , evalExpr
   , mkdir
   , cp
+  , mv
   , nixSearch
-  , nixosRebuild
-  , RebuildMode(..)
   )
 where
 
 import           Data.List.NonEmpty             ( NonEmpty )
 import           Data.Foldable                  ( toList )
-import           NixManager.Util                ( mwhen
-                                                , showText
-                                                )
+import           NixManager.Util                ( mwhen )
 import           Data.Text                      ( Text
                                                 , unwords
                                                 , replace
@@ -30,14 +27,16 @@ import           Prelude                 hiding ( unwords
                                                 )
 
 
-data BashArg = BashLiteralArg Text
-             | BashRawArg Text
+data Arg = LiteralArg Text
+             | RawArg Text
 
-instance IsString BashArg where
-  fromString = BashLiteralArg . pack
+instance IsString Arg where
+  fromString = LiteralArg . pack
 
-data BashExpr = BashCommand Text [BashArg]
-              | BashAnd BashExpr BashExpr
+data Expr = Command Text [Arg]
+          | And Expr Expr
+          | Or Expr Expr
+          | Subshell Expr
 
 surround :: Text -> Text -> Text
 surround c e = c <> e <> c
@@ -45,51 +44,30 @@ surround c e = c <> e <> c
 escape :: Text -> Text
 escape = replace "\"" "\\\""
 
-bashSpecial :: Text -> Bool
-bashSpecial t = " " `isInfixOf` t || "<" `isInfixOf` t || ">" `isInfixOf` t
+specialChar :: Text -> Bool
+specialChar t = " " `isInfixOf` t || "<" `isInfixOf` t || ">" `isInfixOf` t
 
-maybeSurround :: BashArg -> Text
-maybeSurround (BashRawArg t) = t
-maybeSurround (BashLiteralArg t) | bashSpecial t = surround "\"" (escape t)
-                                 | otherwise     = escape t
+maybeSurround :: Arg -> Text
+maybeSurround (RawArg t) = t
+maybeSurround (LiteralArg t) | specialChar t = surround "\"" (escape t)
+                             | otherwise     = escape t
 
-evalBashExpr :: BashExpr -> Text
-evalBashExpr (BashAnd l r) = evalBashExpr l <> " && " <> evalBashExpr r
-evalBashExpr (BashCommand c args) =
-  c <> " " <> unwords (maybeSurround <$> args)
+evalExpr :: Expr -> Text
+evalExpr (And     l r     ) = evalExpr l <> " && " <> evalExpr r
+evalExpr (Or      l r     ) = evalExpr l <> " || " <> evalExpr r
+evalExpr (Command c args  ) = c <> " " <> unwords (maybeSurround <$> args)
+evalExpr (Subshell subExpr) = "(" <> evalExpr subExpr <> ")"
 
-mkdir :: Bool -> NonEmpty FilePath -> BashExpr
-mkdir recursive paths = BashCommand
+mkdir :: Bool -> NonEmpty FilePath -> Expr
+mkdir recursive paths = Command
   "mkdir"
-  (mwhen recursive ["-p"] <> toList (BashLiteralArg . pack <$> paths))
+  (mwhen recursive ["-p"] <> toList (LiteralArg . pack <$> paths))
 
-cp :: FilePath -> FilePath -> BashExpr
-cp from to = BashCommand "cp" (BashLiteralArg <$> [pack from, pack to])
+cp :: FilePath -> FilePath -> Expr
+cp from to = Command "cp" (LiteralArg <$> [pack from, pack to])
 
-nixSearch :: Text -> BashExpr
-nixSearch term = BashCommand "nix" ["search", BashLiteralArg term, "--json"]
+mv :: FilePath -> FilePath -> Expr
+mv from to = Command "mv" (LiteralArg <$> [pack from, pack to])
 
-data RebuildMode = RebuildSwitch
- | RebuildBoot
- | RebuildTest
- | RebuildBuild
- | RebuildDryBuild
- | RebuildDryActivate
- | RebuildEdit
- | RebuildBuildVm
- | RebuildBuildVmWithBootloader
-
-instance Show RebuildMode where
-  show RebuildSwitch                = "switch"
-  show RebuildBoot                  = "boot"
-  show RebuildTest                  = "test"
-  show RebuildBuild                 = "build"
-  show RebuildDryBuild              = "dry-build"
-  show RebuildDryActivate           = "dry-activate"
-  show RebuildEdit                  = "edit"
-  show RebuildBuildVm               = "build-vm"
-  show RebuildBuildVmWithBootloader = "build-vm-with-booloader"
-
-nixosRebuild :: RebuildMode -> BashExpr
-nixosRebuild mode =
-  BashCommand "nixos-rebuild" [BashLiteralArg (showText mode)]
+nixSearch :: Text -> Expr
+nixSearch term = Command "nix" ["search", LiteralArg term, "--json"]

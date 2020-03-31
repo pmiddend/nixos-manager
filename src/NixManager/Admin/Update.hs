@@ -8,6 +8,12 @@ module NixManager.Admin.Update
   )
 where
 
+import           NixManager.ManagerEvent        ( adminEvent
+                                                , ManagerEvent
+                                                , pureTransition
+                                                , packagesEvent
+                                                )
+import qualified NixManager.Packages.Event     as PackagesEvent
 import           Data.Text.Encoding             ( decodeUtf8 )
 import           System.Exit                    ( ExitCode
                                                   ( ExitSuccess
@@ -22,7 +28,8 @@ import           NixManager.Process             ( updateProcess
 import           NixManager.Admin.State         ( State
                                                 , asBuildState
                                                 , asProcessOutput
-                                                , asActiveBuildType
+                                                , asChanges
+                                                , asActiveRebuildMode
                                                 , absCounter
                                                 , asDetailsState
                                                 , absProcessData
@@ -44,11 +51,13 @@ import           Control.Lens                   ( (^.)
 import           NixManager.Admin.Event         ( Event
                                                   ( EventRebuild
                                                   , EventRebuildStarted
+                                                  , EventReload
+                                                  , EventReloadFinished
                                                   , EventRebuildWatch
                                                   , EventRebuildCancel
                                                   , EventChangeDetails
                                                   , EventRebuildFinished
-                                                  , EventBuildTypeChanged
+                                                  , EventRebuildModeChanged
                                                   , EventAskPassWatch
                                                   )
                                                 )
@@ -56,8 +65,11 @@ import           NixManager.ManagerState        ( ManagerState(..)
                                                 , msAdminState
                                                 )
 import           NixManager.Util                ( threadDelayMillis )
-import           NixManager.ManagerEvent        ( ManagerEvent(..) )
-import           NixManager.Rebuild             ( askPass
+import           NixManager.Changes             ( determineChanges
+                                                , ChangeType(NoChanges)
+                                                )
+import           NixManager.NixRebuildMode      ( parseRebuildMode )
+import           NixManager.NixRebuild          ( askPass
                                                 , rebuild
                                                 )
 import           GI.Gtk.Declarative.App.Simple  ( Transition(Transition) )
@@ -65,12 +77,6 @@ import           Prelude                 hiding ( length
                                                 , putStrLn
                                                 )
 
-
-adminEvent :: Event -> Maybe ManagerEvent
-adminEvent = Just . ManagerEventAdmin
-
-pureTransition :: ManagerState -> Transition ManagerState ManagerEvent
-pureTransition x = Transition x (pure Nothing)
 
 updateEvent
   :: ManagerState -> State -> Event -> Transition ManagerState ManagerEvent
@@ -88,7 +94,8 @@ updateEvent ms _ (EventAskPassWatch po pd) = Transition ms $ do
       threadDelayMillis 500
       pure (adminEvent (EventAskPassWatch totalPo pd))
     Just ExitSuccess -> do
-      rebuildPo <- rebuild (totalPo ^. poStdout . to decodeUtf8)
+      rebuildPo <- rebuild (ms ^. msAdminState . asActiveRebuildMode)
+                           (totalPo ^. poStdout . to decodeUtf8)
       pure (adminEvent (EventRebuildStarted rebuildPo))
     Just (ExitFailure _) -> pure Nothing
 updateEvent ms _ (EventRebuildStarted pd) =
@@ -121,18 +128,28 @@ updateEvent ms _ (EventRebuildWatch priorOutput pd) =
           Nothing -> do
             threadDelayMillis 500
             pure (adminEvent (EventRebuildWatch newOutput pd))
-          Just _ -> pure (adminEvent (EventRebuildFinished newOutput))
-updateEvent ms _ (EventRebuildFinished totalOutput) = pureTransition
-  (  ms
-  &  msAdminState
-  .  asBuildState
-  .~ Nothing
-  &  msAdminState
-  .  asProcessOutput
-  .~ (totalOutput & poStdout <>~ "\n\nFinished!")
-  )
-updateEvent ms _ (EventBuildTypeChanged newType) =
-  pureTransition (ms & msAdminState . asActiveBuildType .~ newType)
+          Just code -> pure (adminEvent (EventRebuildFinished newOutput code))
+updateEvent ms _ (EventRebuildFinished totalOutput _exitCode) =
+  Transition
+      (  ms
+      &  msAdminState
+      .  asBuildState
+      .~ Nothing
+      &  msAdminState
+      .  asProcessOutput
+      .~ (totalOutput & poStdout <>~ "\nFinished!")
+      &  msAdminState
+      .  asChanges
+      .~ NoChanges
+      )
+    $ pure (packagesEvent PackagesEvent.EventReload)
+updateEvent ms _ (EventRebuildModeChanged newType) =
+  pureTransition $ case parseRebuildMode newType of
+    Nothing       -> ms
+    Just newType' -> ms & msAdminState . asActiveRebuildMode .~ newType'
 updateEvent ms _ (EventChangeDetails newDetails) =
   pureTransition (ms & msAdminState . asDetailsState .~ newDetails)
-
+updateEvent ms _ EventReload =
+  Transition ms $ adminEvent . EventReloadFinished <$> determineChanges
+updateEvent ms _ (EventReloadFinished newChanges) =
+  pureTransition (ms & msAdminState . asChanges .~ newChanges)

@@ -4,18 +4,24 @@
 module NixManager.NixService
   ( NixService
   , serviceLoc
-  , readServices
-  , writeServiceFile
+  , readLocalServiceFile
+  , writeLocalServiceFile
   , serviceOptions
-  , locateServicesFileMaybeCreate
+  , locateLocalServicesFile
+  , locateRootServicesFile
+  , locateLocalServicesFileMaybeCreate
   , makeServices
   )
 where
 
 import           Data.Maybe                     ( mapMaybe )
 import           Control.Monad                  ( unless )
-import           System.FilePath                ( (</>) )
-import           NixManager.Constants           ( appName )
+import           System.FilePath                ( (</>)
+                                                , takeFileName
+                                                )
+import           NixManager.Constants           ( appName
+                                                , rootManagerPath
+                                                )
 import           Data.String                    ( IsString )
 import           System.Directory               ( getXdgDirectory
                                                 , doesFileExist
@@ -93,20 +99,26 @@ makeServices options' =
 servicesFileName :: IsString s => s
 servicesFileName = "services.nix"
 
-locateServicesFile :: IO FilePath
-locateServicesFile = getXdgDirectory XdgConfig (appName </> servicesFileName)
+locateLocalServicesFile :: IO FilePath
+locateLocalServicesFile =
+  getXdgDirectory XdgConfig (appName </> servicesFileName)
 
-locateServicesFileMaybeCreate :: IO FilePath
-locateServicesFileMaybeCreate = do
-  pkgsFile <- locateServicesFile
+locateRootServicesFile :: IO FilePath
+locateRootServicesFile = do
+  localFile <- locateLocalServicesFile
+  pure (rootManagerPath </> takeFileName localFile)
+
+locateLocalServicesFileMaybeCreate :: IO FilePath
+locateLocalServicesFileMaybeCreate = do
+  pkgsFile <- locateLocalServicesFile
   exists   <- doesFileExist pkgsFile
-  unless exists (writeServiceFile emptyServiceFileContents)
+  unless exists (writeLocalServiceFile emptyServiceFileContents)
   pure pkgsFile
 
 
-readServices :: IO (MaybeError NixExpr)
-readServices = do
-  svcsFile <- locateServicesFile
+readLocalServiceFile :: IO (MaybeError NixExpr)
+readLocalServiceFile = do
+  svcsFile <- locateLocalServicesFile
   addToError
       ("Error parsing the \""
       <> servicesFileName
@@ -118,7 +130,7 @@ emptyServiceFileContents :: NixExpr
 emptyServiceFileContents =
   NixFunctionDecl (NixFunction ["config", "pkgs", "..."] (NixSet mempty))
 
-writeServiceFile :: NixExpr -> IO ()
-writeServiceFile e = do
-  svcsFile <- locateServicesFile
+writeLocalServiceFile :: NixExpr -> IO ()
+writeLocalServiceFile e = do
+  svcsFile <- locateLocalServicesFile
   writeNixFile svcsFile e

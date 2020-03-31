@@ -17,19 +17,30 @@ import           NixManager.Packages.Event      ( Event
                                                   , EventUninstall
                                                   , EventTryInstallCancel
                                                   )
+                                                , InstallationType
+                                                  ( Cancelled
+                                                  , Uncancelled
+                                                  )
                                                 )
 import           NixManager.ManagerEvent        ( ManagerEvent
                                                   ( ManagerEventPackages
                                                   )
                                                 )
+import           NixManager.NixPackageStatus    ( _NixPackageInstalled
+                                                , _NixPackagePendingInstall
+                                                , _NixPackagePendingUninstall
+                                                , NixPackageStatus
+                                                  ( NixPackageNothing
+                                                  , NixPackageInstalled
+                                                  , NixPackagePendingInstall
+                                                  , NixPackagePendingUninstall
+                                                  )
+                                                )
 import           NixManager.NixPackage          ( NixPackage
-                                                , npInstalled
+                                                , npStatus
                                                 , npName
                                                 , npPath
                                                 , npDescription
-                                                )
-import           Data.Semigroup                 ( Any(Any)
-                                                , getAny
                                                 )
 import           Data.Maybe                     ( isJust
                                                 , fromMaybe
@@ -77,9 +88,7 @@ import           NixManager.Packages.State      ( psSearchString
                                                 , psLatestMessage
                                                 , psInstallingPackage
                                                 )
-import           NixManager.Util                ( mwhen
-                                                , replaceHtmlEntities
-                                                )
+import           NixManager.Util                ( replaceHtmlEntities )
 import           NixManager.View.GtkUtil        ( paddedAround )
 import           NixManager.View.ImageButton    ( imageButton )
 import           NixManager.Message             ( messageText
@@ -124,25 +133,29 @@ stripPrefixSafe prefix t = fromMaybe t (stripPrefix prefix t)
 
 formatPkgLabel :: NixPackage -> Text
 formatPkgLabel pkg =
-  let path = stripPrefixSafe "nixpkgs." (pkg ^. npPath)
-      name = pkg ^. npName
-      firstLine =
-          if path == name then name else name <> (" (<tt>" <> path <> "</tt>)")
-  in  firstLine
-        <> "\n<i>"
-        <> (pkg ^. npDescription . to replaceHtmlEntities)
-        <> "</i>"
+  let
+    path = stripPrefixSafe "nixpkgs." (pkg ^. npPath)
+    name = pkg ^. npName
+    firstLine =
+      if path == name then name else name <> (" (<tt>" <> path <> "</tt>)")
+    formatStatus NixPackageNothing        = ""
+    formatStatus NixPackageInstalled      = "\n<b>Installed</b>"
+    formatStatus NixPackagePendingInstall = "\n<b>Marked for installation</b>"
+    formatStatus NixPackagePendingUninstall =
+      "\n<b>Marked for uninstallation</b>"
+  in
+    firstLine
+    <> "\n<i>"
+    <> (pkg ^. npDescription . to replaceHtmlEntities)
+    <> "</i>"
+    <> formatStatus (pkg ^. npStatus)
 
 
 buildResultRow
   :: FromWidget (Bin Gtk.ListBoxRow) target => Int -> NixPackage -> target event
 buildResultRow i pkg = bin
   Gtk.ListBoxRow
-  [ classes
-      (  mwhen (pkg ^. npInstalled) ["package-row-installed"]
-      <> [if i `mod` 2 == 0 then "package-row-even" else "package-row-odd"]
-      )
-  ]
+  [classes [if i `mod` 2 == 0 then "package-row-even" else "package-row-odd"]]
   (widget
     Gtk.Label
     [ #useMarkup := True
@@ -175,15 +188,25 @@ packagesBox s =
                [0 ..]
                (s ^.. msPackagesState . psSearchResult . folded)
       )
-    packageSelected         = isJust (s ^. msPackagesState . psSelectedPackage)
-    currentPackageInstalled = getAny
-      (s ^. msPackagesState . psSelectedPackage . folded . npInstalled . to Any)
+    packageSelected = isJust (s ^. msPackagesState . psSelectedPackage)
+    currentPackageStatus =
+      msPackagesState . psSelectedPackage . folded . npStatus
+    currentPackageInstalled =
+      has (currentPackageStatus . _NixPackageInstalled) s
+    currentPackagePendingInstall =
+      has (currentPackageStatus . _NixPackagePendingInstall) s
+    currentPackagePendingUninstall =
+      has (currentPackageStatus . _NixPackagePendingUninstall) s
     tryInstallCell = case s ^. msPackagesState . psInstallingPackage of
       Nothing -> BoxChild
         (defaultBoxChildProperties { expand = True, fill = True })
         (imageButton
           [ #label := "Try without installing"
-          , #sensitive := (packageSelected && not currentPackageInstalled)
+          , #sensitive
+            := (  packageSelected
+               && not currentPackageInstalled
+               && not currentPackagePendingUninstall
+               )
           , classes ["try-install-button"]
           , on #clicked (ManagerEventPackages EventTryInstall)
           , #alwaysShowImage := True
@@ -213,10 +236,25 @@ packagesBox s =
       , BoxChild
         (defaultBoxChildProperties { expand = True, fill = True })
         (imageButton
-          [ #label := "Install"
-          , #sensitive := (packageSelected && not currentPackageInstalled)
+          [ #label
+            := (if currentPackagePendingUninstall
+                 then "Cancel uninstall"
+                 else "Mark for installation"
+               )
+          , #sensitive
+            := (  packageSelected
+               && not currentPackageInstalled
+               && not currentPackagePendingInstall
+               )
           , classes ["install-button"]
-          , on #clicked (ManagerEventPackages EventInstall)
+          , on
+            #clicked
+            (ManagerEventPackages
+              (if currentPackagePendingUninstall
+                then EventInstall Cancelled
+                else EventInstall Uncancelled
+              )
+            )
           , #alwaysShowImage := True
           ]
           IconName.SystemSoftwareInstall
@@ -224,11 +262,25 @@ packagesBox s =
       , BoxChild
         (defaultBoxChildProperties { expand = True, fill = True })
         (imageButton
-          [ #label := "Remove"
-          , #sensitive := (packageSelected && currentPackageInstalled)
+          [ #label
+            := (if currentPackageInstalled
+                 then "Mark for removal"
+                 else "Cancel installation"
+               )
+          , #sensitive
+            := (  packageSelected
+               && (currentPackageInstalled || currentPackagePendingInstall)
+               )
           , classes ["remove-button"]
           , #alwaysShowImage := True
-          , on #clicked (ManagerEventPackages EventUninstall)
+          , on
+            #clicked
+            (ManagerEventPackages
+              (if currentPackageInstalled
+                then EventUninstall Uncancelled
+                else EventUninstall Cancelled
+              )
+            )
           ]
           IconName.EditDelete
         )

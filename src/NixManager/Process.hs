@@ -36,8 +36,8 @@ import           System.Process                 ( ProcessHandle
                                                 )
 import           System.IO                      ( Handle )
 import           System.Exit                    ( ExitCode )
-import           NixManager.BashDsl             ( BashExpr
-                                                , evalBashExpr
+import           NixManager.BashDsl             ( Expr
+                                                , evalExpr
                                                 )
 import           Data.Text                      ( unpack )
 
@@ -67,13 +67,13 @@ makeLenses ''ProcessOutput
 terminate :: ProcessData -> IO ()
 terminate = terminateProcess . view pdProcessHandle
 
-exprToCmdSpec :: BashExpr -> CmdSpec
-exprToCmdSpec x = ShellCommand (unpack (evalBashExpr x))
+exprToCmdSpec :: Expr -> CmdSpec
+exprToCmdSpec x = ShellCommand (unpack (evalExpr x))
 
 noStdin :: Maybe ByteString
 noStdin = Nothing
 
-runProcess :: Maybe ByteString -> BashExpr -> IO ProcessData
+runProcess :: Maybe ByteString -> Expr -> IO ProcessData
 runProcess stdinString command = do
   (Just hin, Just hout, Just herr, ph) <- createProcess $ CreateProcess
     { cmdspec            = exprToCmdSpec command

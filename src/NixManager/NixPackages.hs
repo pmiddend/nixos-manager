@@ -1,11 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module NixManager.PackageSearch
+module NixManager.NixPackages
   ( searchPackages
-  , locatePackagesFileMaybeCreate
+  , locateLocalPackagesFile
+  , locateRootPackagesFile
+  , locateLocalPackagesFileMaybeCreate
   , installPackage
-  , readCache
+  , readInstalledPackages
+  , readPendingPackages
+  , readPendingUninstallPackages
+  , readPackageCache
   , startProgram
   , uninstallPackage
   , executablesFromStorePath
@@ -13,17 +18,19 @@ module NixManager.PackageSearch
   )
 where
 
+import           NixManager.Constants           ( appName
+                                                , rootManagerPath
+                                                )
 import           Data.ByteString                ( ByteString )
 import           System.Exit                    ( ExitCode
                                                   ( ExitSuccess
                                                   , ExitFailure
                                                   )
                                                 )
-import           NixManager.BashDsl             ( BashExpr(BashCommand)
-                                                , BashArg(BashLiteralArg)
+import           NixManager.BashDsl             ( Expr(Command)
+                                                , Arg(LiteralArg)
                                                 , nixSearch
                                                 )
-import           NixManager.Constants           ( appName )
 import           Data.Map.Strict                ( singleton )
 import           Control.Monad                  ( void
                                                 , unless
@@ -33,8 +40,11 @@ import           System.Directory               ( listDirectory
                                                 , doesFileExist
                                                 , XdgDirectory(XdgConfig)
                                                 )
-import           System.FilePath                ( (</>) )
+import           System.FilePath                ( (</>)
+                                                , takeFileName
+                                                )
 import           Data.List                      ( intercalate
+                                                , (\\)
                                                 , find
                                                 , inits
                                                 )
@@ -73,11 +83,18 @@ import           NixManager.NixExpr             ( NixExpr
 import           Control.Exception              ( catch
                                                 , IOException
                                                 )
+import           NixManager.NixPackageStatus    ( NixPackageStatus
+                                                  ( NixPackageNothing
+                                                  , NixPackageInstalled
+                                                  , NixPackagePendingInstall
+                                                  , NixPackagePendingUninstall
+                                                  )
+                                                )
 import           NixManager.NixPackage          ( NixPackage
                                                 , npPath
                                                 , npName
-                                                , npInstalled
-                                                , readPackages
+                                                , npStatus
+                                                , readPackagesJson
                                                 )
 import           Control.Lens                   ( (^.)
                                                 , (.~)
@@ -110,7 +127,7 @@ searchPackages t = do
   let
     processedResult = addToError
       "Error parsing output of \"nix search\" command. This could be due to changes in this command in a later version (and doesn't fix itself). Please open an issue in the nixos-manager repository. The error was: "
-      (readPackages (po ^. poStdout . fromStrictBS))
+      (readPackagesJson (po ^. poStdout . fromStrictBS))
   case po ^?! poResult . to getFirst . folded of
     ExitSuccess      -> pure processedResult
     ExitFailure 1    -> pure processedResult
@@ -137,9 +154,8 @@ dryInstall pkg =
   let realPath = pkg ^?! npPath . to (stripPrefix "nixpkgs.") . folded
   in  runProcess
         Nothing
-        (BashCommand
-          "nix-build"
-          ["-A", BashLiteralArg realPath, "--no-out-link", "<nixpkgs>"]
+        (Command "nix-build"
+                 ["-A", LiteralArg realPath, "--no-out-link", "<nixpkgs>"]
         )
 
 executablesFromStorePath
@@ -154,7 +170,7 @@ executablesFromStorePath pkg stdout = do
     Just matched -> pure (binPath, [matched])
 
 startProgram :: FilePath -> IO ()
-startProgram fn = void (runProcess Nothing (BashCommand (pack fn) []))
+startProgram fn = void (runProcess Nothing (Command (pack fn) []))
 
 packageLens :: Traversal' NixExpr NixExpr
 packageLens =
@@ -170,59 +186,106 @@ emptyPackagesFile = NixFunctionDecl
 packagesFileName :: IsString s => s
 packagesFileName = "packages.nix"
 
-locatePackagesFile :: IO FilePath
-locatePackagesFile = getXdgDirectory XdgConfig (appName </> packagesFileName)
+locateLocalPackagesFile :: IO FilePath
+locateLocalPackagesFile =
+  getXdgDirectory XdgConfig (appName </> packagesFileName)
 
-locatePackagesFileMaybeCreate :: IO FilePath
-locatePackagesFileMaybeCreate = do
-  pkgsFile <- locatePackagesFile
+locateRootPackagesFile :: IO FilePath
+locateRootPackagesFile = do
+  localFile <- locateLocalPackagesFile
+  pure (rootManagerPath </> takeFileName localFile)
+
+locateLocalPackagesFileMaybeCreate :: IO FilePath
+locateLocalPackagesFileMaybeCreate = do
+  pkgsFile <- locateLocalPackagesFile
   exists   <- doesFileExist pkgsFile
-  unless exists (writePackages emptyPackagesFile)
+  unless exists (writeLocalPackages emptyPackagesFile)
   pure pkgsFile
 
-parsePackages :: IO (MaybeError NixExpr)
-parsePackages = do
-  pkgsFile <- locatePackagesFile
+parsePackagesExpr :: FilePath -> IO (MaybeError NixExpr)
+parsePackagesExpr fp =
   addToError
       ("Error parsing the "
-      <> packagesFileName
+      <> showText fp
       <> " file. This is most likely a syntax error, please investigate the file itself and fix the error. Then restart nixos-manager. The error was: "
       )
-    <$> parseNixFile pkgsFile emptyPackagesFile
+    <$> parseNixFile fp emptyPackagesFile
 
-writePackages :: NixExpr -> IO ()
-writePackages e = do
-  pkgsFile <- locatePackagesFile
-  writeNixFile pkgsFile e
-
-readInstalledPackages :: IO (MaybeError [Text])
-readInstalledPackages = ifSuccessIO parsePackages $ \expr ->
+parsePackages :: FilePath -> IO (MaybeError [Text])
+parsePackages fp = ifSuccessIO (parsePackagesExpr fp) $ \expr ->
   case expr ^? packageLens of
     Just packages -> pure (Success (Text.drop 5 <$> evalSymbols packages))
     Nothing -> pure (Error "Couldn't find packages node in packages.nix file.")
+
+parseLocalPackages :: IO (MaybeError [Text])
+parseLocalPackages = locateLocalPackagesFile >>= parsePackages
+
+parseLocalPackagesExpr :: IO (MaybeError NixExpr)
+parseLocalPackagesExpr = locateLocalPackagesFile >>= parsePackagesExpr
+
+writeLocalPackages :: NixExpr -> IO ()
+writeLocalPackages e = do
+  pkgsFile <- locateLocalPackagesFile
+  writeNixFile pkgsFile e
+
+packagesOrEmpty :: IO FilePath -> IO (MaybeError [Text])
+packagesOrEmpty fp' = do
+  fp       <- fp'
+  fpExists <- doesFileExist fp
+  if fpExists then parsePackages fp else pure (Success [])
+
+readInstalledPackages :: IO (MaybeError [Text])
+readInstalledPackages = packagesOrEmpty locateRootPackagesFile
+
+readPendingPackages :: IO (MaybeError [Text])
+readPendingPackages =
+  ifSuccessIO (packagesOrEmpty locateLocalPackagesFile) $ \local ->
+    ifSuccessIO (packagesOrEmpty locateRootPackagesFile)
+      $ \root -> pure (Success (local \\ root))
+
+readPendingUninstallPackages :: IO (MaybeError [Text])
+readPendingUninstallPackages =
+  ifSuccessIO (packagesOrEmpty locateLocalPackagesFile) $ \local ->
+    ifSuccessIO (packagesOrEmpty locateRootPackagesFile)
+      $ \root -> pure (Success (root \\ local))
 
 packagePrefix :: Text
 packagePrefix = "pkgs."
 
 installPackage :: Text -> IO (MaybeError ())
-installPackage p = ifSuccessIO parsePackages $ \expr -> do
-  writePackages
+installPackage p = ifSuccessIO parseLocalPackagesExpr $ \expr -> do
+  writeLocalPackages
     (expr & packageLens . _NixList <>~ [NixSymbol (packagePrefix <> p)])
   pure (Success ())
 
 uninstallPackage :: Text -> IO (MaybeError ())
-uninstallPackage p = ifSuccessIO parsePackages $ \expr -> do
-  writePackages
+uninstallPackage p = ifSuccessIO parseLocalPackagesExpr $ \expr -> do
+  writeLocalPackages
     (expr & packageLens . _NixList %~ filter
       (hasn't (_NixSymbol . only (packagePrefix <> p)))
     )
   pure (Success ())
 
-readCache :: IO (MaybeError [NixPackage])
-readCache = ifSuccessIO (searchPackages "") $ \cache ->
+evaluateStatus name installedPackages pendingPackages pendingUninstallPackages
+  | name `elem` pendingUninstallPackages = NixPackagePendingUninstall
+  | name `elem` pendingPackages          = NixPackagePendingInstall
+  | name `elem` installedPackages        = NixPackageInstalled
+  | otherwise                            = NixPackageNothing
+
+readPackageCache :: IO (MaybeError [NixPackage])
+readPackageCache = ifSuccessIO (searchPackages "") $ \cache ->
   ifSuccessIO readInstalledPackages $ \installedPackages ->
-    pure
-      $   Success
-      $   (\ip -> ip & npInstalled .~ ((ip ^. npName) `elem` installedPackages))
-      <$> cache
+    ifSuccessIO readPendingPackages $ \pendingPackages ->
+      ifSuccessIO readPendingUninstallPackages $ \pendingUninstallPackages ->
+        pure
+          $   Success
+          $   (\ip ->
+                ip
+                  &  npStatus
+                  .~ evaluateStatus (ip ^. npName)
+                                    installedPackages
+                                    pendingPackages
+                                    pendingUninstallPackages
+              )
+          <$> cache
 

@@ -1,5 +1,7 @@
 module NixManager.Packages.Event
   ( Event(..)
+  , CompletionType(..)
+  , InstallationType(..)
   )
 where
 
@@ -10,17 +12,22 @@ import           NixManager.Process             ( ProcessData
                                                 , ProcessOutput
                                                 )
 
+data CompletionType = CompletionReload | CompletionPass
+
+data InstallationType = Cancelled | Uncancelled
 
 data Event = EventSearchChanged Text
            | EventPackageSelected (Maybe Int)
-           | EventInstall
-           | EventInstallCompleted [NixPackage]
-           | EventUninstallCompleted [NixPackage]
-           | EventUninstall
+           | EventInstall InstallationType
+           | EventInstallCompleted [NixPackage] InstallationType
+           | EventUninstallCompleted [NixPackage] InstallationType
+           | EventUninstall InstallationType
            | EventTryInstall
            | EventTryInstallStarted NixPackage ProcessData
            | EventTryInstallFailed Message
            | EventTryInstallSuccess
            | EventTryInstallCancel
            | EventTryInstallWatch ProcessData ProcessOutput
-           | EventShowMessage Message
+           | EventOperationCompleted Message CompletionType
+           | EventReload
+           | EventReloadFinished [NixPackage]

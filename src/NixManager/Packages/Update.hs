@@ -37,6 +37,7 @@ import           Control.Lens                   ( (^.)
 import           NixManager.ManagerState        ( ManagerState(..)
                                                 , msPackagesState
                                                 )
+import qualified NixManager.Admin.Event        as AdminEvent
 import           NixManager.Packages.State      ( psInstallingPackage
                                                 , isProcessData
                                                 , psSelectedPackage
@@ -53,6 +54,8 @@ import           NixManager.Packages.State      ( psInstallingPackage
 import           NixManager.Packages.Event      ( Event
                                                   ( EventSearchChanged
                                                   , EventPackageSelected
+                                                  , EventReload
+                                                  , EventReloadFinished
                                                   , EventTryInstallWatch
                                                   , EventTryInstallStarted
                                                   , EventInstall
@@ -63,7 +66,15 @@ import           NixManager.Packages.Event      ( Event
                                                   , EventTryInstallCancel
                                                   , EventTryInstall
                                                   , EventTryInstallFailed
-                                                  , EventShowMessage
+                                                  , EventOperationCompleted
+                                                  )
+                                                , CompletionType
+                                                  ( CompletionReload
+                                                  , CompletionPass
+                                                  )
+                                                , InstallationType
+                                                  ( Cancelled
+                                                  , Uncancelled
                                                   )
                                                 )
 import           NixManager.Util                ( MaybeError(Success, Error)
@@ -74,10 +85,15 @@ import           NixManager.Util                ( MaybeError(Success, Error)
                                                 )
 import           NixManager.Message             ( errorMessage
                                                 , infoMessage
+                                                , Message
                                                 )
-import           NixManager.ManagerEvent        ( ManagerEvent(..) )
-import           NixManager.PackageSearch       ( installPackage
-                                                , readCache
+import           NixManager.ManagerEvent        ( ManagerEvent
+                                                , pureTransition
+                                                , packagesEvent
+                                                , adminEvent
+                                                )
+import           NixManager.NixPackages         ( installPackage
+                                                , readPackageCache
                                                 , dryInstall
                                                 , startProgram
                                                 , uninstallPackage
@@ -89,47 +105,71 @@ import           Prelude                 hiding ( length
                                                 , putStrLn
                                                 )
 
-packagesEvent :: Event -> Maybe ManagerEvent
-packagesEvent = Just . ManagerEventPackages
+installCompletedMessage :: InstallationType -> Message
+installCompletedMessage Uncancelled = infoMessage
+  "Marked for installation! Head to the Admin tab to apply the changes."
+installCompletedMessage Cancelled = infoMessage "Uninstall cancelled!"
 
-pureTransition :: ManagerState -> Transition ManagerState ManagerEvent
-pureTransition x = Transition x (pure Nothing)
-
-
+uninstallCompletedMessage :: InstallationType -> Message
+uninstallCompletedMessage Uncancelled = infoMessage
+  "Marked for uninstall! Head to the Admin tab to apply the changes."
+uninstallCompletedMessage Cancelled = infoMessage "Installation cancelled!"
 
 updateEvent :: ManagerState -> Event -> Transition ManagerState ManagerEvent
-updateEvent s (EventShowMessage e) =
-  pureTransition (s & msPackagesState . psLatestMessage ?~ e)
-updateEvent s (EventInstallCompleted cache) = Transition
+updateEvent s (EventOperationCompleted e completionType) =
+  Transition (s & msPackagesState . psLatestMessage ?~ e)
+    $ case completionType of
+        CompletionReload -> pure (adminEvent AdminEvent.EventReload)
+        CompletionPass   -> pure Nothing
+updateEvent s (EventInstallCompleted cache installationType) = Transition
   (s & msPackagesState . psPackageCache .~ cache)
-  (pure (packagesEvent (EventShowMessage (infoMessage "Install completed!"))))
-updateEvent s (EventUninstallCompleted cache) = Transition
+  (pure
+    (packagesEvent
+      (EventOperationCompleted (installCompletedMessage installationType)
+                               CompletionReload
+      )
+    )
+  )
+updateEvent s (EventUninstallCompleted cache installationType) = Transition
   (s & msPackagesState . psPackageCache .~ cache)
-  (pure (packagesEvent (EventShowMessage (infoMessage "Uninstall completed!"))))
-updateEvent s EventInstall = case s ^. msPackagesState . psSelectedPackage of
-  Nothing       -> pureTransition s
-  Just selected -> Transition s $ do
-    installResult <- installPackage (selected ^. npName)
-    cacheResult   <- readCache
-    case installResult >>= const cacheResult of
-      Success newCache -> pure (packagesEvent (EventInstallCompleted newCache))
-      Error e ->
-        pure
+  (pure
+    (packagesEvent
+      (EventOperationCompleted (uninstallCompletedMessage installationType)
+                               CompletionReload
+      )
+    )
+  )
+updateEvent s (EventInstall installationType) =
+  case s ^. msPackagesState . psSelectedPackage of
+    Nothing       -> pureTransition s
+    Just selected -> Transition s $ do
+      installResult <- installPackage (selected ^. npName)
+      cacheResult   <- readPackageCache
+      case installResult >>= const cacheResult of
+        Success newCache ->
+          pure (packagesEvent (EventInstallCompleted newCache installationType))
+        Error e -> pure
           (packagesEvent
-            (EventShowMessage (errorMessage ("Install failed: " <> e)))
+            (EventOperationCompleted (errorMessage ("Install failed: " <> e))
+                                     CompletionReload
+            )
           )
-updateEvent s EventUninstall = case s ^. msPackagesState . psSelectedPackage of
-  Nothing       -> pureTransition s
-  Just selected -> Transition s $ do
-    uninstallResult <- uninstallPackage (selected ^. npName)
-    cacheResult     <- readCache
-    case uninstallResult >>= const cacheResult of
-      Success newCache ->
-        pure (packagesEvent (EventUninstallCompleted newCache))
-      Error e -> pure
-        (packagesEvent
-          (EventShowMessage (errorMessage ("Uninstall failed: " <> e)))
-        )
+updateEvent s (EventUninstall installationType) =
+  case s ^. msPackagesState . psSelectedPackage of
+    Nothing       -> pureTransition s
+    Just selected -> Transition s $ do
+      uninstallResult <- uninstallPackage (selected ^. npName)
+      cacheResult     <- readPackageCache
+      case uninstallResult >>= const cacheResult of
+        Success newCache -> pure
+          (packagesEvent (EventUninstallCompleted newCache installationType))
+        Error e -> pure
+          (packagesEvent
+            (EventOperationCompleted
+              (errorMessage ("Uninstall failed: " <> e))
+              CompletionReload
+            )
+          )
 updateEvent s EventTryInstallCancel =
   Transition (s & msPackagesState . psInstallingPackage .~ Nothing) $ do
     for_
@@ -230,3 +270,16 @@ updateEvent s (EventSearchChanged t) = pureTransition
   .  psSelectedIdx
   .~ Nothing
   )
+updateEvent s EventReload = Transition s $ do
+  cacheResult <- readPackageCache
+  case cacheResult of
+    Success newCache -> pure (packagesEvent (EventReloadFinished newCache))
+    Error   e        -> pure
+      (packagesEvent
+        (EventOperationCompleted
+          (errorMessage ("Couldn't reload packages cache: " <> e))
+          CompletionPass
+        )
+      )
+updateEvent s (EventReloadFinished newCache) =
+  pureTransition (s & msPackagesState . psPackageCache .~ newCache)

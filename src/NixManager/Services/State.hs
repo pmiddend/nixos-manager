@@ -27,7 +27,7 @@ import           NixManager.NixServiceOption    ( readOptionsFile
                                                 , locateOptionsFile
                                                 )
 import           NixManager.NixService          ( makeServices
-                                                , readServices
+                                                , readLocalServiceFile
                                                 )
 import           NixManager.Util                ( MaybeError(Success, Error) )
 
@@ -56,7 +56,7 @@ initState = do
       case options' of
         Error   e       -> pure (StateInvalidOptions (Just e))
         Success options -> do
-          services' <- readServices
+          services' <- readLocalServiceFile
           case services' of
             Error   e        -> pure (StateInvalidExpr e)
             Success services -> pure $ StateDone

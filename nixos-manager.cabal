@@ -13,7 +13,10 @@ executable nix-manager
   main-is:             Main.hs
   other-modules:       NixManager.ManagerMain
                      , NixManager.ManagerState
-                     , NixManager.UpdateHandler
+                     , NixManager.Update
+                     , NixManager.NixPackageMeta
+                     , NixManager.NixRebuildMode
+                     , NixManager.Changes
                      , NixManager.BashDsl
                      , NixManager.ManagerEvent
                      , NixManager.Services.Download
@@ -37,18 +40,20 @@ executable nix-manager
                      , NixManager.View.IconName
                      , NixManager.NixServiceOption
                      , NixManager.NixServiceOptionLocation
+                     , NixManager.NixPackages
+                     , NixManager.NixPackageStatus
                      , NixManager.Docbook
                      , NixManager.NixPackage
                      , NixManager.Constants
                      , NixManager.Process
                      , NixManager.NixService
-                     , NixManager.Rebuild
+                     , NixManager.NixRebuild
                      , NixManager.NixServiceOptionType
                      , NixManager.Admin.View
                      , NixManager.Admin.Event
                      , NixManager.Admin.State
                      , NixManager.Admin.Update
-                     , NixManager.PackageSearch
+                     , NixManager.Admin.ValidRebuildTypes
                      , NixManager.Message
                      , NixManager.NixExpr
                      , NixManager.Util

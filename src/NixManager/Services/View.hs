@@ -11,7 +11,6 @@ where
 import           NixManager.View.GtkUtil        ( paddedAround
                                                 , expandAndFill
                                                 )
-import           Data.Foldable                  ( toList )
 import           Data.List.NonEmpty             ( NonEmpty((:|)) )
 import           NixManager.NixServiceOptionLocation
                                                 ( NixServiceOptionLocation
@@ -58,7 +57,6 @@ import           NixManager.View.ComboBox       ( comboBox
                                                 )
 import qualified Data.Vector                   as Vector
 import           Data.Text                      ( isInfixOf
-                                                , intercalate
                                                 , Text
                                                 )
 import           NixManager.Util                ( showText

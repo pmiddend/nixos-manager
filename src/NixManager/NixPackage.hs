@@ -6,8 +6,8 @@ module NixManager.NixPackage
   , npPath
   , npVersion
   , npDescription
-  , npInstalled
-  , readPackages
+  , npStatus
+  , readPackagesJson
   )
 where
 
@@ -18,43 +18,33 @@ import           Data.ByteString.Lazy           ( ByteString )
 import           Data.Map.Strict                ( Map
                                                 , toList
                                                 )
-import           Control.Monad                  ( mzero )
 import           Data.Text                      ( Text )
 import           Control.Lens                   ( makeLenses
                                                 , (^.)
                                                 )
-import           Data.Aeson                     ( FromJSON
-                                                , eitherDecode
-                                                , Value(Object)
-                                                , parseJSON
-                                                , (.:)
+import           Data.Aeson                     ( eitherDecode )
+import           NixManager.NixPackageMeta      ( NixPackageMeta
+                                                , npmName
+                                                , npmVersion
+                                                , npmDescription
                                                 )
-
-data NixPackageMeta = NixPackageMeta {
-    _npmName :: Text
-  , _npmVersion :: Text
-  , _npmDescription :: Text
-  } deriving(Eq,Show)
-
-makeLenses ''NixPackageMeta
+import           NixManager.NixPackageStatus    ( NixPackageStatus
+                                                  ( NixPackageNothing
+                                                  )
+                                                )
 
 data NixPackage = NixPackage {
     _npName :: Text
   , _npPath :: Text
   , _npVersion :: Text
   , _npDescription :: Text
-  , _npInstalled :: Bool
+  , _npStatus :: NixPackageStatus
   } deriving(Eq,Show)
 
 makeLenses ''NixPackage
 
-instance FromJSON NixPackageMeta where
-  parseJSON (Object v) =
-    NixPackageMeta <$> v .: "pkgName" <*> v .: "version" <*> v .: "description"
-  parseJSON _ = mzero
-
-readPackages :: ByteString -> MaybeError [NixPackage]
-readPackages = (packagesFromMap <$>) . fromEither . eitherDecode
+readPackagesJson :: ByteString -> MaybeError [NixPackage]
+readPackagesJson = (packagesFromMap <$>) . fromEither . eitherDecode
 
 packagesFromMap :: Map Text NixPackageMeta -> [NixPackage]
 packagesFromMap m =
@@ -62,6 +52,6 @@ packagesFromMap m =
                                path
                                (meta ^. npmVersion)
                                (meta ^. npmDescription)
-                               False
+                               NixPackageNothing
     )
     <$> toList m

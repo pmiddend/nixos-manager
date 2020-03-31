@@ -100,8 +100,9 @@ makePrisms ''NixExpr
 makeLenses ''NixFunction
 
 evalSymbols :: NixExpr -> [Text]
-evalSymbols (NixSymbol r) = [r]
-evalSymbols _             = []
+evalSymbols (NixSymbol r ) = [r]
+evalSymbols (NixList   rs) = concatMap evalSymbols rs
+evalSymbols _              = []
 
 prettyPrintSingleLine :: NixExpr -> Text
 prettyPrintSingleLine = replace "\n" "" . prettyPrint

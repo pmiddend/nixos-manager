@@ -9,11 +9,8 @@ module NixManager.Admin.View
   )
 where
 
-import           System.Exit                    ( ExitCode
-                                                  ( ExitFailure
-                                                  , ExitSuccess
-                                                  )
-                                                )
+import           NixManager.Util                ( showText )
+import           System.Exit                    ( ExitCode(ExitSuccess) )
 import qualified NixManager.View.IconName      as IconName
 import           NixManager.View.GtkUtil        ( expandAndFill
                                                 , fillNoExpand
@@ -30,7 +27,6 @@ import           NixManager.View.ComboBox       ( comboBox
                                                   ( ComboBoxChangeEvent
                                                   )
                                                 )
-import           Data.Text                      ( Text )
 import           Data.Text.Encoding             ( decodeUtf8 )
 import           NixManager.Process             ( poStdout
                                                 , poStderr
@@ -53,10 +49,11 @@ import           NixManager.ManagerEvent        ( ManagerEvent
                                                   ( ManagerEventAdmin
                                                   )
                                                 )
+import           NixManager.Changes             ( ChangeType(Changes) )
 import           NixManager.Admin.Event         ( Event
                                                   ( EventRebuild
                                                   , EventRebuildCancel
-                                                  , EventBuildTypeChanged
+                                                  , EventRebuildModeChanged
                                                   , EventChangeDetails
                                                   )
                                                 )
@@ -64,12 +61,9 @@ import           NixManager.ManagerState        ( ManagerState
                                                 , msAdminState
                                                 )
 import           GI.Gtk.Declarative.Widget      ( Widget )
-import           NixManager.Admin.State         ( asActiveBuildType
-                                                , DetailsState
-                                                  ( DetailsExpanded
-                                                  , DetailsContracted
-                                                  )
+import           NixManager.Admin.State         ( asActiveRebuildMode
                                                 , asProcessOutput
+                                                , asChanges
                                                 , absCounter
                                                 , asBuildState
                                                 , asDetailsState
@@ -86,6 +80,10 @@ import           Control.Lens                   ( (^.)
                                                 , ix
                                                 )
 import           Data.Monoid                    ( getFirst )
+import           NixManager.Admin.ValidRebuildTypes
+                                                ( rebuildTypes
+                                                , descriptionForRebuildType
+                                                )
 
 adminBox :: ManagerState -> Widget ManagerEvent
 adminBox s = container
@@ -95,40 +93,23 @@ adminBox s = container
              (adminBox' s)
   ]
 
-rebuildTypesWithDescription :: [(Text, Text)]
-rebuildTypesWithDescription =
-  [ ( "switch"
-    , "Build and activate the changes immediately. You can go back to previous configurations by rebooting and selecting an older generation."
-    )
-  , ( "boot"
-    , "Build the new configuration and make it the boot default, but do not activate it. That is, the system continues to run the previous configuration until the next reboot."
-    )
-  , ( "test"
-    , "Build and activate the new configuration, but do not add it to the GRUB boot menu. Thus, if you reboot the system (or if it crashes), you will automatically revert to the default configuration (i.e. the configuration resulting from the last rebuild)."
-    )
-  , ( "dry-build"
-    , "Show what store paths would be built or downloaded by any of the operations above, but otherwise do nothing."
-    )
-  , ( "dry-activate"
-    , "Build the new configuration, but instead of activating it, show what changes would be performed by the activation. For instance, this command will print which systemd units would be restarted. The list of changes is not guaranteed to be complete."
-    )
-  ]
-
-rebuildTypes :: [Text]
-rebuildTypes = fst <$> rebuildTypesWithDescription
-
 rebuildRow as =
   let changeCallback :: ComboBoxChangeEvent -> ManagerEvent
       changeCallback (ComboBoxChangeEvent (Just idx)) = ManagerEventAdmin
-        (EventBuildTypeChanged (rebuildTypes ^?! ix (fromIntegral idx)))
+        (EventRebuildModeChanged
+          (rebuildTypes ^?! ix (fromIntegral idx) . to showText)
+        )
+      changes = (as ^. asChanges) == Changes
   in  [ BoxChild defaultBoxChildProperties $ container
           Gtk.Box
           [#orientation := Gtk.OrientationHorizontal, #spacing := 8]
           [ BoxChild fillNoExpand $ imageButton
-            [ #label := "Apply Changes"
+            [ #label
+              := (if changes then "Apply Changes" else "No changes to apply")
             , on #clicked (ManagerEventAdmin EventRebuild)
             , #valign := Gtk.AlignCenter
             , #alwaysShowImage := True
+            , #sensitive := changes
             ]
             IconName.ViewRefresh
           , BoxChild fillNoExpand $ widget
@@ -137,17 +118,16 @@ rebuildRow as =
           , BoxChild fillNoExpand $ changeCallback <$> comboBox
             [#valign := Gtk.AlignCenter]
             (ComboBoxProperties
-              rebuildTypes
+              (showText <$> rebuildTypes)
               (   fromIntegral
-              <$> ((as ^. asActiveBuildType) `elemIndex` rebuildTypes)
+              <$> ((as ^. asActiveRebuildMode) `elemIndex` rebuildTypes)
               )
             )
           , BoxChild fillNoExpand $ widget
             Gtk.Label
             [ #label
-              := (   rebuildTypesWithDescription
-                 ^?! to (lookup (as ^. asActiveBuildType))
-                 .   folded
+              := (   descriptionForRebuildType (as ^. asActiveRebuildMode)
+                 ^?! folded
                  )
             , #wrap := True
             , classes ["nixos-manager-italic"]
@@ -218,7 +198,6 @@ adminBox' ms =
           _ -> []
     processExpanded w = do
       expandedState <- Gtk.getExpanderExpanded w
-      putStrLn ("expanded: " <> show expandedState)
       pure
         ( ManagerEventAdmin
         . EventChangeDetails
@@ -233,13 +212,6 @@ adminBox' ms =
               [ #label := "Build details"
               , #expanded := (ms ^. msAdminState . asDetailsState . detailsBool)
               , onM #activate processExpanded
-                -- ( (( ManagerEventAdmin
-                --    . EventChangeDetails
-                --    . transformExpandedState
-                --    ) <$>
-                --   )
-                -- . Gtk.getExpanderExpanded
-                -- )
               ]
           $ container
               Gtk.Box

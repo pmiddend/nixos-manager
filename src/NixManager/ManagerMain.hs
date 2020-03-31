@@ -4,7 +4,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.ManagerMain where
 
-import           NixManager.UpdateHandler       ( update' )
+import qualified NixManager.Update             as GlobalUpdate
 import qualified NixManager.Admin.State        as AdminState
 import qualified NixManager.Services.State     as ServicesState
 import qualified NixManager.Packages.State     as PackagesState
@@ -31,9 +31,10 @@ import           Prelude                 hiding ( length
 initState :: IO (MaybeError ManagerState)
 initState = ifSuccessIO PackagesState.initState $ \packagesState -> do
   serviceState <- ServicesState.initState
+  adminState   <- AdminState.initState
   pure $ Success $ ManagerState { _msPackagesState = packagesState
                                 , _msServiceState  = serviceState
-                                , _msAdminState    = AdminState.initState
+                                , _msAdminState    = adminState
                                 }
 
 nixMain :: IO ()
@@ -42,10 +43,9 @@ nixMain = do
   initCss
   initialState' <- initState
   case initialState' of
-    Error e -> runErrorDialog e
-    Success s ->
-      void $ run App { view         = view'
-                     , update       = update'
-                     , inputs       = []
-                     , initialState = s
-                     }
+    Error   e -> runErrorDialog e
+    Success s -> void $ run App { view         = view'
+                                , update       = GlobalUpdate.update
+                                , inputs       = []
+                                , initialState = s
+                                }

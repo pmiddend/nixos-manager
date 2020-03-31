@@ -136,3 +136,6 @@ fromStrictBS = to BSL.fromStrict
 replaceHtmlEntities :: Text -> Text
 replaceHtmlEntities =
   replace "<" "&lt;" . replace ">" "&gt;" . replace "&" "&amp;"
+
+filesEqual :: FilePath -> FilePath -> IO Bool
+filesEqual a b = (==) <$> BSL.readFile a <*> BSL.readFile b

@@ -3,6 +3,10 @@ module NixManager.Services.Update
   )
 where
 
+import           NixManager.ManagerEvent        ( servicesEvent
+                                                , pureTransition
+                                                , ManagerEvent
+                                                )
 import           NixManager.Services.StateData  ( sdExpression
                                                 , sdSelectedIdx
                                                 , sdSearchString
@@ -33,7 +37,7 @@ import           Control.Lens                   ( over
 import           NixManager.ManagerState        ( ManagerState(..)
                                                 , msServiceState
                                                 )
-import           NixManager.NixService          ( writeServiceFile )
+import           NixManager.NixService          ( writeLocalServiceFile )
 import           NixManager.Services.Event      ( Event
                                                   ( EventDownloadStart
                                                   , EventSettingChanged
@@ -50,18 +54,11 @@ import           NixManager.Services.Event      ( Event
 import           NixManager.Util                ( MaybeError(Success, Error)
                                                 , threadDelayMillis
                                                 )
-import           NixManager.ManagerEvent        ( ManagerEvent(..) )
 import           GI.Gtk.Declarative.App.Simple  ( Transition(Transition) )
 import           Prelude                 hiding ( length
                                                 , putStrLn
                                                 )
 
-
-servicesEvent :: Event -> Maybe ManagerEvent
-servicesEvent = Just . ManagerEventServices
-
-pureTransition :: ManagerState -> Transition ManagerState ManagerEvent
-pureTransition x = Transition x (pure Nothing)
 
 updateEvent :: ManagerState -> Event -> Transition ManagerState ManagerEvent
 updateEvent s EventDownloadStart =
@@ -82,7 +79,7 @@ updateEvent s (EventSearchChanged t) = pureTransition
 updateEvent s (EventSettingChanged setter) =
   let newState = over (msServiceState . _StateDone . sdExpression) setter s
   in  Transition newState $ do
-        writeServiceFile
+        writeLocalServiceFile
           (newState ^?! msServiceState . _StateDone . sdExpression)
         pure Nothing
 updateEvent s EventDownloadCancel = Transition s $ do
