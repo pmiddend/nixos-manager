@@ -27,6 +27,7 @@ import           NixManager.Process             ( updateProcess
                                                 )
 import           NixManager.Admin.State         ( State
                                                 , asBuildState
+                                                , asUpdate
                                                 , asProcessOutput
                                                 , asChanges
                                                 , asActiveRebuildMode
@@ -57,6 +58,7 @@ import           NixManager.Admin.Event         ( Event
                                                   , EventRebuildCancel
                                                   , EventChangeDetails
                                                   , EventRebuildFinished
+                                                  , EventUpdateChanged
                                                   , EventRebuildModeChanged
                                                   , EventAskPassWatch
                                                   )
@@ -95,6 +97,7 @@ updateEvent ms _ (EventAskPassWatch po pd) = Transition ms $ do
       pure (adminEvent (EventAskPassWatch totalPo pd))
     Just ExitSuccess -> do
       rebuildPo <- rebuild (ms ^. msAdminState . asActiveRebuildMode)
+                           (ms ^. msAdminState . asUpdate)
                            (totalPo ^. poStdout . to decodeUtf8)
       pure (adminEvent (EventRebuildStarted rebuildPo))
     Just (ExitFailure _) -> pure Nothing
@@ -153,3 +156,5 @@ updateEvent ms _ EventReload =
   Transition ms $ adminEvent . EventReloadFinished <$> determineChanges
 updateEvent ms _ (EventReloadFinished newChanges) =
   pureTransition (ms & msAdminState . asChanges .~ newChanges)
+updateEvent ms _ (EventUpdateChanged newUpdate) =
+  pureTransition (ms & msAdminState . asUpdate .~ newUpdate)

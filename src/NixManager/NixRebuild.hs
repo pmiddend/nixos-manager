@@ -11,7 +11,9 @@ where
 import           NixManager.Constants           ( rootManagerPath )
 import           Data.Text                      ( Text )
 import           Data.Text.Encoding             ( encodeUtf8 )
-import           NixManager.Util                ( showText )
+import           NixManager.Util                ( showText
+                                                , mwhen
+                                                )
 import           NixManager.BashDsl             ( mkdir
                                                 , Expr
                                                   ( And
@@ -38,11 +40,13 @@ import           NixManager.Process             ( runProcess
 import           System.FilePath                ( (-<.>) )
 import           NixManager.NixRebuildMode      ( NixRebuildMode )
 
-nixosRebuild :: NixRebuildMode -> Expr
-nixosRebuild mode = Command "nixos-rebuild" [LiteralArg (showText mode)]
+nixosRebuild :: NixRebuildMode -> Bool -> Expr
+nixosRebuild mode withUpdates = Command
+  "nixos-rebuild"
+  ([LiteralArg (showText mode)] <> mwhen withUpdates ["--upgrade"])
 
-installExpr :: NixRebuildMode -> IO Expr
-installExpr rebuildMode = do
+installExpr :: NixRebuildMode -> Bool -> IO Expr
+installExpr rebuildMode withUpdates = do
   localPackagesFile <- locateLocalPackagesFileMaybeCreate
   rootPackagesFile  <- locateRootPackagesFile
   localServicesFile <- locateLocalServicesFileMaybeCreate
@@ -55,7 +59,7 @@ installExpr rebuildMode = do
     `And` copyToOld rootPackagesFile
     `And` cp localPackagesFile rootPackagesFile
     `And` cp localServicesFile rootServicesFile
-    `And` nixosRebuild rebuildMode
+    `And` nixosRebuild rebuildMode withUpdates
     `Or`  Subshell
             (moveFromOld rootServicesFile `And` moveFromOld localServicesFile)
 
@@ -71,7 +75,9 @@ askPassExpr description =
 askPass :: IO ProcessData
 askPass = runProcess noStdin (askPassExpr "NixOS system rebuild")
 
-rebuild :: NixRebuildMode -> Text -> IO ProcessData
-rebuild rebuildMode password =
-  installExpr rebuildMode >>= runProcess (Just (encodeUtf8 password)) . sudoExpr
+rebuild :: NixRebuildMode -> Bool -> Text -> IO ProcessData
+rebuild rebuildMode withUpdates password =
+  installExpr rebuildMode withUpdates
+    >>= runProcess (Just (encodeUtf8 password))
+    .   sudoExpr
 

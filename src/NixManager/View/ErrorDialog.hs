@@ -12,7 +12,9 @@ import           Text.Wrap                      ( wrapText
                                                 )
 import           Data.Text                      ( Text )
 import           Control.Monad                  ( void )
-import           NixManager.View.GtkUtil        ( paddedAround )
+import           NixManager.View.GtkUtil        ( paddedAround
+                                                , expandAndFill
+                                                )
 import           GI.Gtk.Declarative.App.Simple  ( App(App)
                                                 , view
                                                 , update
@@ -23,7 +25,6 @@ import           GI.Gtk.Declarative.App.Simple  ( App(App)
                                                 , run
                                                 )
 import           GI.Gtk.Declarative             ( bin
-                                                , defaultBoxChildProperties
                                                 , on
                                                 , expand
                                                 , container
@@ -56,9 +57,7 @@ errorDialog e _ =
         $ container
             Gtk.Box
             [#orientation := Gtk.OrientationVertical]
-            [ BoxChild
-              defaultBoxChildProperties { expand = True, fill = True }
-              (paddedAround 20 msgLabel)
+            [ BoxChild expandAndFill (paddedAround 20 msgLabel)
             , paddedAround 5 $ container
               Gtk.Box
               [#halign := Gtk.AlignEnd, #spacing := 5]

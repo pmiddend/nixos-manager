@@ -17,6 +17,7 @@ data Event = EventRebuild
            | EventRebuildWatch ProcessOutput ProcessData
            | EventRebuildFinished ProcessOutput ExitCode
            | EventRebuildModeChanged Text
+           | EventUpdateChanged Bool
            | EventRebuildCancel
            | EventChangeDetails DetailsState
            | EventReload

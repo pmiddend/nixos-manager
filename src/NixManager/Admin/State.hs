@@ -7,6 +7,7 @@ module NixManager.Admin.State
   , asProcessOutput
   , asActiveRebuildMode
   , absCounter
+  , asUpdate
   , absProcessData
   , asChanges
   , initState
@@ -54,6 +55,7 @@ data State = State {
   , _asBuildState :: Maybe BuildState
   , _asActiveRebuildMode :: NixRebuildMode
   , _asDetailsState :: DetailsState
+  , _asUpdate :: Bool
   , _asChanges :: ChangeType
   }
 
@@ -61,4 +63,5 @@ makeLenses ''State
 
 initState :: IO State
 initState =
-  State mempty Nothing NixRebuildSwitch DetailsContracted <$> determineChanges
+  State mempty Nothing NixRebuildSwitch DetailsContracted False
+    <$> determineChanges

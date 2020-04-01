@@ -18,9 +18,9 @@ import           GI.Gtk.Declarative             ( Attribute((:=))
                                                 , page
                                                 , pageWithTab
                                                 , BoxChild(BoxChild)
-                                                , defaultBoxChildProperties
                                                 , widget
                                                 )
+import           Data.Default                   ( def )
 import           NixManager.View.Icon           ( icon )
 import qualified NixManager.View.IconName      as IconName
 import           GI.Gtk.Declarative.App.Simple  ( AppView )
@@ -43,9 +43,8 @@ windowAttributes =
 imagedLabel iconName text = container
   Gtk.Box
   [#orientation := Gtk.OrientationHorizontal, #spacing := 5]
-  [ BoxChild defaultBoxChildProperties (icon [] iconName)
-  , BoxChild defaultBoxChildProperties
-             (widget Gtk.Label [#label := text, #valign := Gtk.AlignCenter])
+  [ BoxChild def (icon [] iconName)
+  , BoxChild def (widget Gtk.Label [#label := text, #valign := Gtk.AlignCenter])
   ]
 
 view' :: ManagerState -> AppView Gtk.Window ManagerEvent

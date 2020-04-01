@@ -76,10 +76,10 @@ import           Data.Text                      ( length
                                                 )
 import           GI.Gtk.Declarative.Container.Class
                                                 ( Children )
+import           Data.Default                   ( def )
 import           GI.Gtk.Declarative             ( bin
                                                 , Widget
                                                 , padding
-                                                , defaultBoxChildProperties
                                                 , expand
                                                 , Container
                                                 , fill
@@ -158,7 +158,7 @@ searchBox s =
         [#orientation := Gtk.OrientationHorizontal, #spacing := 10]
         [ BoxChild expandAndFill searchLabel
         , BoxChild expandAndFill searchField
-        , BoxChild defaultBoxChildProperties $ changeCallback <$> comboBox
+        , BoxChild def $ changeCallback <$> comboBox
           []
           (ComboBoxProperties (categoryToText <$> packageCategories)
                               (s ^. psCategoryIdx . to (Just . fromIntegral))
@@ -244,7 +244,7 @@ packagesBox s =
       has (currentPackageStatus . _NixPackagePendingUninstall) s
     tryInstallCell = case s ^. msPackagesState . psInstallingPackage of
       Nothing -> BoxChild
-        (defaultBoxChildProperties { expand = True, fill = True })
+        expandAndFill
         (imageButton
           [ #label := "Try without installing"
           , #sensitive
@@ -258,28 +258,25 @@ packagesBox s =
           ]
           IconName.SystemRun
         )
-      Just is ->
-        BoxChild (defaultBoxChildProperties { expand = True, fill = True })
-          $ container
-              Gtk.Box
-              [#orientation := Gtk.OrientationHorizontal, #spacing := 5]
-              [ BoxChild defaultBoxChildProperties $ imageButton
-                [ #alwaysShowImage := True
-                , on #clicked (ManagerEventPackages EventTryInstallCancel)
-                , #label := "Cancel"
-                ]
-                IconName.ProcessStop
-              , BoxChild
-                  (defaultBoxChildProperties { fill = True, expand = True })
-                $ progressBar [#showText := True, #text := "Downloading..."]
-                              (is ^. isCounter)
-              ]
+      Just is -> BoxChild expandAndFill $ container
+        Gtk.Box
+        [#orientation := Gtk.OrientationHorizontal, #spacing := 5]
+        [ BoxChild def $ imageButton
+          [ #alwaysShowImage := True
+          , on #clicked (ManagerEventPackages EventTryInstallCancel)
+          , #label := "Cancel"
+          ]
+          IconName.ProcessStop
+        , BoxChild expandAndFill $ progressBar
+          [#showText := True, #text := "Downloading..."]
+          (is ^. isCounter)
+        ]
     packageButtonRow = container
       Gtk.Box
       [#orientation := Gtk.OrientationHorizontal, #spacing := 10]
       [ tryInstallCell
       , BoxChild
-        (defaultBoxChildProperties { expand = True, fill = True })
+        expandAndFill
         (imageButton
           [ #label
             := (if currentPackagePendingUninstall
@@ -305,7 +302,7 @@ packagesBox s =
           IconName.SystemSoftwareInstall
         )
       , BoxChild
-        (defaultBoxChildProperties { expand = True, fill = True })
+        expandAndFill
         (imageButton
           [ #label
             := (if currentPackageInstalled
@@ -348,14 +345,13 @@ packagesBox s =
     paddedAround 10 $ container
       Gtk.Box
       [#orientation := Gtk.OrientationVertical, #spacing := 10]
-      (  [ BoxChild (defaultBoxChildProperties { padding = 5 })
-                    (searchBox (s ^. msPackagesState))
+      (  [ BoxChild (def { padding = 5 }) (searchBox (s ^. msPackagesState))
          , widget Gtk.HSeparator []
          ]
       <> foldMap
            (\e ->
              [ BoxChild
-                 defaultBoxChildProperties
+                 def
                  (widget
                    Gtk.Label
                    [ #label := (e ^. messageText)
@@ -373,9 +369,7 @@ packagesBox s =
 
       <> [ packageButtonRow
          , widget Gtk.HSeparator []
-         , BoxChild
-           (defaultBoxChildProperties { expand = True, fill = True })
-           resultBox
+         , BoxChild expandAndFill resultBox
          ]
       )
 
