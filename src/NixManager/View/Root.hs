@@ -15,13 +15,14 @@ import           GI.Gtk.Declarative             ( Attribute((:=))
                                                 , bin
                                                 , notebook
                                                 , container
-                                                , page
                                                 , pageWithTab
                                                 , BoxChild(BoxChild)
                                                 , widget
                                                 )
 import           Data.Default                   ( def )
-import           NixManager.View.Icon           ( icon )
+import           NixManager.View.Icon           ( icon
+                                                , IconProps(IconProps)
+                                                )
 import qualified NixManager.View.IconName      as IconName
 import           GI.Gtk.Declarative.App.Simple  ( AppView )
 import qualified GI.Gtk                        as Gtk
@@ -40,22 +41,33 @@ windowAttributes =
   , #heightRequest := 768
   ]
 
-imagedLabel iconName text = container
+imagedLabel iconProps text = container
   Gtk.Box
   [#orientation := Gtk.OrientationHorizontal, #spacing := 5]
-  [ BoxChild def (icon [] iconName)
+  [ BoxChild def (icon [] iconProps)
   , BoxChild def (widget Gtk.Label [#label := text, #valign := Gtk.AlignCenter])
   ]
 
 view' :: ManagerState -> AppView Gtk.Window ManagerEvent
 view' s =
-  let windowContents = notebook
-        []
-        [ pageWithTab (imagedLabel IconName.ApplicationsSystem "Admin")
-                      (AdminView.adminBox s)
-        , pageWithTab (imagedLabel IconName.PackageXGeneric "Packages")
-                      (PackagesView.packagesBox s)
-        , pageWithTab (imagedLabel IconName.PreferencesOther "Services")
-                      (ServicesView.servicesBox s)
-        ]
+  let
+    windowContents = notebook
+      []
+      [ pageWithTab
+        (imagedLabel
+          (IconProps Gtk.IconSizeButton IconName.ApplicationsSystem)
+          "Admin"
+        )
+        (AdminView.adminBox s)
+      , pageWithTab
+        (imagedLabel (IconProps Gtk.IconSizeButton IconName.PackageXGeneric)
+                     "Packages"
+        )
+        (PackagesView.packagesBox s)
+      , pageWithTab
+        (imagedLabel (IconProps Gtk.IconSizeButton IconName.PreferencesOther)
+                     "Services"
+        )
+        (ServicesView.servicesBox s)
+      ]
   in  bin Gtk.Window windowAttributes windowContents

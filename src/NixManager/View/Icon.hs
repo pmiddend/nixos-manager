@@ -1,14 +1,19 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.View.Icon
   ( icon
+  , IconProps(IconProps)
   )
 where
 
+import           Control.Lens                   ( makeLenses
+                                                , (^.)
+                                                )
 import           GI.Gtk.Declarative.Attributes.Internal
                                                 ( addSignalHandler )
 import           Data.Vector                    ( Vector )
@@ -31,7 +36,14 @@ import           NixManager.View.IconName       ( IconName
                                                 , nameToGtk
                                                 )
 
-icon :: Vector (Attribute Gtk.Image e) -> IconName -> Widget e
+data IconProps = IconProps {
+    _ipIconSize :: Gtk.IconSize
+  , _ipIconName :: IconName
+  } deriving(Eq)
+
+makeLenses ''IconProps
+
+icon :: Vector (Attribute Gtk.Image e) -> IconProps -> Widget e
 icon customAttributes customParams = Widget
   (CustomWidget { customWidget
                 , customCreate
@@ -43,11 +55,12 @@ icon customAttributes customParams = Widget
   )
  where
   customWidget = Gtk.Image
-  customCreate :: IconName -> IO (Gtk.Image, ())
-  customCreate iconName = do
+  customCreate :: IconProps -> IO (Gtk.Image, ())
+  customCreate iconProps = do
     -- Taken from https://hackage.haskell.org/package/gi-gtk-3.0.32/docs/src/GI.Gtk.Enums.html#IconSize
-    w <- Gtk.imageNewFromIconName (Just (nameToGtk iconName))
-                                  (fromIntegral (fromEnum Gtk.IconSizeButton))
+    w <- Gtk.imageNewFromIconName
+      (Just (nameToGtk (iconProps ^. ipIconName)))
+      (fromIntegral (fromEnum (iconProps ^. ipIconSize)))
     pure (w, ())
   customSubscribe _params _currentImage widget cb =
     foldMap (addSignalHandler cb widget) customAttributes
@@ -55,7 +68,7 @@ icon customAttributes customParams = Widget
     | before == after = CustomKeep
     | otherwise = CustomModify $ \w -> do
       Gtk.imageSetFromIconName w
-                               (Just (nameToGtk after))
-                               (fromIntegral (fromEnum Gtk.IconSizeButton))
+                               (Just (nameToGtk (after ^. ipIconName)))
+                               (fromIntegral (fromEnum (after ^. ipIconSize)))
       pure ()
 

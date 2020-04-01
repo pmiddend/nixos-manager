@@ -12,6 +12,9 @@ where
 import           NixManager.Util                ( showText )
 import           System.Exit                    ( ExitCode(ExitSuccess) )
 import qualified NixManager.View.IconName      as IconName
+import           NixManager.View.Icon           ( icon
+                                                , IconProps(IconProps)
+                                                )
 import           NixManager.View.GtkUtil        ( expandAndFill
                                                 , fillNoExpand
                                                 , paddedAround
@@ -102,11 +105,12 @@ rebuildGrid as =
   let
     changes     = (as ^. asChanges) == Changes
     applyButton = imageButton
-      [ #label := (if changes then "Apply Changes" else "No changes to apply")
+      [ #label
+        := (if changes then "Apply Changes" else "No changes to apply (rebuild)"
+           )
       , on #clicked (ManagerEventAdmin EventRebuild)
       , #valign := Gtk.AlignCenter
       , #alwaysShowImage := True
-      , #sensitive := changes
       ]
       IconName.ViewRefresh
     lastLine = maybe applyButton buildingBox (as ^. asBuildState)
@@ -127,11 +131,13 @@ rebuildGrid as =
         (fromIntegral <$> ((as ^. asActiveRebuildMode) `elemIndex` rebuildTypes)
         )
       )
-    buildTypeDescription = widget
+    buildTypeDescription = inBox def $ widget
       Gtk.Label
       [ #label
         := (descriptionForRebuildType (as ^. asActiveRebuildMode) ^?! folded)
       , #wrap := True
+      , #hexpand := True
+      , #halign := Gtk.AlignFill
       , classes ["nixos-manager-italic"]
       ]
     buildTypeRow = 0
@@ -139,15 +145,21 @@ rebuildGrid as =
     updateLabel  = widget
       Gtk.Label
       [#label := "Download updates:", #valign := Gtk.AlignCenter]
-    inBox w = container Gtk.Box [] [BoxChild def w]
-    updateSwitch = inBox $ widget
+    inBox props w = container Gtk.Box [] [BoxChild props w]
+    updateSwitch = inBox def $ widget
       Gtk.Switch
-      [#active := (as ^. asUpdate), on #stateSet changeUpdate]
-    updateDescription = inBox $ widget
+      [ #active := (as ^. asUpdate)
+      , on #stateSet changeUpdate
+      , #valign := Gtk.AlignCenter
+      , #vexpand := False
+      ]
+    updateDescription = inBox def $ widget
       Gtk.Label
       [ #label
         := "Whether to apply changes to the system (if any) and also update to the latest NixOS version"
       , #wrap := True
+      , #hexpand := True
+      , #halign := Gtk.AlignFill
       , classes ["nixos-manager-italic"]
       ]
     applyRow = 3
@@ -237,11 +249,19 @@ rebuildBox as =
                   ]
               ]
       ]
+    frameMargin = 60
   in
-    bin Gtk.Frame [#label := "Applying changes"] $ paddedAround 10 $ container
-      Gtk.Box
-      [#orientation := Gtk.OrientationVertical, #spacing := 5]
-      ([BoxChild def (rebuildGrid as)] <> lastStatusRow <> rebuildDetails)
+    bin
+      Gtk.Frame
+      [ #label := "Applying changes"
+      , #marginLeft := frameMargin
+      , #marginRight := frameMargin
+      ]
+    $ paddedAround 10
+    $ container
+        Gtk.Box
+        [#orientation := Gtk.OrientationVertical, #spacing := 5]
+        ([BoxChild def (rebuildGrid as)] <> lastStatusRow <> rebuildDetails)
 
 buildingBox buildState = container
   Gtk.Box
@@ -266,12 +286,23 @@ adminBox' ms =
         [ #label := "Welcome to NixOS-Manager"
         , classes ["nixos-manager-headline"]
         ]
-      , BoxChild fillNoExpand $ widget
-        Gtk.Label
-        [ #label
-          := "Select the “Packages” and “Services” tabs above to make changes to your system.\nOnce you're done with that, apply the changes using the form below."
-        , #wrap := True
-        , classes ["nixos-manager-italic"]
+      , BoxChild def $ bin Gtk.Frame [#halign := Gtk.AlignCenter] $ container
+        Gtk.Box
+        [ #orientation := Gtk.OrientationHorizontal
+        , #spacing := 10
+        , #halign := Gtk.AlignCenter
+        , classes ["info-message"]
+        ]
+        [ BoxChild def
+          $ icon [] (IconProps Gtk.IconSizeDialog IconName.EmblemImportant)
+        , BoxChild def $ widget
+          Gtk.Label
+          [ #label
+            := "Select the “Packages” and “Services” tabs above to make changes to your system.\nOnce you're done with that, apply the changes using the form below."
+          , #wrap := True
+          , #halign := Gtk.AlignCenter
+          , classes ["nixos-manager-italic"]
+          ]
         ]
       ]
   in  container

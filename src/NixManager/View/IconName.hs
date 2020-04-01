@@ -13,6 +13,8 @@ data IconName = SystemRun
               | SystemSoftwareInstall
               | PreferencesOther
               | PackageXGeneric
+              | EmblemImportant
+              | DialogQuestion
               | ApplicationsSystem
               | EditDelete
               | EditClear
