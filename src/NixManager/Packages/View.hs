@@ -7,10 +7,26 @@ module NixManager.Packages.View
   )
 where
 
+import           NixManager.Packages.PackageCategory
+                                                ( packageCategories
+                                                , categoryToText
+                                                , PackageCategory
+                                                  ( PackageCategoryAll
+                                                  )
+                                                )
+import           NixManager.View.ComboBox       ( comboBox
+                                                , ComboBoxProperties
+                                                  ( ComboBoxProperties
+                                                  )
+                                                , ComboBoxChangeEvent
+                                                  ( ComboBoxChangeEvent
+                                                  )
+                                                )
 import           NixManager.View.ProgressBar    ( progressBar )
 import qualified NixManager.View.IconName      as IconName
 import           NixManager.Packages.Event      ( Event
                                                   ( EventSearchChanged
+                                                  , EventCategoryChanged
                                                   , EventPackageSelected
                                                   , EventTryInstall
                                                   , EventInstall
@@ -44,6 +60,7 @@ import           NixManager.NixPackage          ( NixPackage
                                                 )
 import           Data.Maybe                     ( isJust
                                                 , fromMaybe
+                                                , fromJust
                                                 )
 import           Prelude                 hiding ( length )
 import           Data.Text                      ( length
@@ -82,14 +99,19 @@ import           NixManager.ManagerState        ( ManagerState
                                                 , msPackagesState
                                                 )
 import           NixManager.Packages.State      ( psSearchString
+                                                , psCategoryIdx
                                                 , isCounter
                                                 , psSearchResult
                                                 , psSelectedPackage
                                                 , psLatestMessage
                                                 , psInstallingPackage
+                                                , State
+                                                , psCategory
                                                 )
 import           NixManager.Util                ( replaceHtmlEntities )
-import           NixManager.View.GtkUtil        ( paddedAround )
+import           NixManager.View.GtkUtil        ( paddedAround
+                                                , expandAndFill
+                                                )
 import           NixManager.View.ImageButton    ( imageButton )
 import           NixManager.Message             ( messageText
                                                 , messageType
@@ -118,15 +140,21 @@ searchField = widget
   , #halign := Gtk.AlignFill
   ]
 
-searchBox :: Widget ManagerEvent
-searchBox = container
-  Gtk.Box
-  [#orientation := Gtk.OrientationHorizontal, #spacing := 10]
-  [ BoxChild (defaultBoxChildProperties { expand = True, fill = True })
-             searchLabel
-  , BoxChild (defaultBoxChildProperties { expand = True, fill = True })
-             searchField
-  ]
+searchBox :: State -> Widget ManagerEvent
+searchBox s =
+  let changeCallback (ComboBoxChangeEvent idx) = ManagerEventPackages
+        (EventCategoryChanged (fromIntegral (fromJust idx)))
+  in  container
+        Gtk.Box
+        [#orientation := Gtk.OrientationHorizontal, #spacing := 10]
+        [ BoxChild expandAndFill searchLabel
+        , BoxChild expandAndFill searchField
+        , BoxChild defaultBoxChildProperties $ changeCallback <$> comboBox
+          []
+          (ComboBoxProperties (categoryToText <$> packageCategories)
+                              (s ^. psCategoryIdx . to (Just . fromIntegral))
+          )
+        ]
 
 stripPrefixSafe :: Text -> Text -> Text
 stripPrefixSafe prefix t = fromMaybe t (stripPrefix prefix t)
@@ -182,8 +210,11 @@ packagesBox
   -> target ManagerEvent
 packagesBox s =
   let
-    searchValid = (s ^. msPackagesState . psSearchString . to length) >= 2
-    resultRows  = Vector.fromList
+    searchValid =
+      ((s ^. msPackagesState . psCategory) /= PackageCategoryAll)
+        || (s ^. msPackagesState . psSearchString . to length)
+        >= 2
+    resultRows = Vector.fromList
       (zipWith buildResultRow
                [0 ..]
                (s ^.. msPackagesState . psSearchResult . folded)
@@ -303,7 +334,8 @@ packagesBox s =
     paddedAround 10 $ container
       Gtk.Box
       [#orientation := Gtk.OrientationVertical, #spacing := 10]
-      (  [ BoxChild (defaultBoxChildProperties { padding = 5 }) searchBox
+      (  [ BoxChild (defaultBoxChildProperties { padding = 5 })
+                    (searchBox (s ^. msPackagesState))
          , widget Gtk.HSeparator []
          ]
       <> foldMap

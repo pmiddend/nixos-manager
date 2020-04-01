@@ -5,6 +5,8 @@ module NixManager.Packages.Event
   )
 where
 
+import           NixManager.Packages.PackageCategory
+                                                ( PackageCategory )
 import           NixManager.NixPackage          ( NixPackage )
 import           Data.Text                      ( Text )
 import           NixManager.Message             ( Message )
@@ -29,5 +31,6 @@ data Event = EventSearchChanged Text
            | EventTryInstallCancel
            | EventTryInstallWatch ProcessData ProcessOutput
            | EventOperationCompleted Message CompletionType
+           | EventCategoryChanged Int
            | EventReload
            | EventReloadFinished [NixPackage]

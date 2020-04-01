@@ -7,7 +7,9 @@ module NixManager.Packages.State
   , psLatestMessage
   , psInstallingPackage
   , psPackageCache
+  , psCategory
   , psSelectedIdx
+  , psCategoryIdx
   , initState
   , isProcessData
   , InstallingState(InstallingState)
@@ -21,13 +23,22 @@ import           NixManager.NixPackages         ( readPackageCache )
 import           NixManager.Util                ( MaybeError(Success)
                                                 , ifSuccessIO
                                                 )
+import           NixManager.NixPackageStatus    ( NixPackageStatus
+                                                  ( NixPackageInstalled
+                                                  , NixPackagePendingInstall
+                                                  , NixPackagePendingUninstall
+                                                  )
+                                                )
 import           NixManager.NixPackage          ( NixPackage
                                                 , npName
+                                                , npStatus
                                                 )
 import           NixManager.Message
 import           Control.Lens                   ( makeLenses
                                                 , folded
                                                 , filtered
+                                                , Lens'
+                                                , from
                                                 , (^.)
                                                 , (^..)
                                                 , ix
@@ -38,6 +49,15 @@ import           Control.Lens                   ( makeLenses
 import           Data.Text                      ( Text
                                                 , toLower
                                                 , isInfixOf
+                                                )
+import           NixManager.Packages.PackageCategory
+                                                ( PackageCategory
+                                                  ( PackageCategoryAll
+                                                  , PackageCategoryInstalled
+                                                  , PackageCategoryPendingInstall
+                                                  , PackageCategoryPendingUninstall
+                                                  )
+                                                , categoryIdx
                                                 )
 
 data InstallingState = InstallingState {
@@ -54,17 +74,34 @@ data State = State {
   , _psSelectedIdx :: Maybe Int
   , _psInstallingPackage :: Maybe InstallingState
   , _psLatestMessage :: Maybe Message
+  , _psCategoryIdx :: Int
   }
 
 makeLenses ''State
 
+psCategory :: Lens' State PackageCategory
+psCategory = psCategoryIdx . from categoryIdx
+
 packageMatches :: Text -> NixPackage -> Bool
 packageMatches t p = toLower t `isInfixOf` (p ^. npName . to toLower)
 
+packageMatchesCategory :: PackageCategory -> NixPackage -> Bool
+packageMatchesCategory PackageCategoryAll _ = True
+packageMatchesCategory PackageCategoryInstalled pkg =
+  (pkg ^. npStatus) == NixPackageInstalled
+packageMatchesCategory PackageCategoryPendingInstall pkg =
+  (pkg ^. npStatus) == NixPackagePendingInstall
+packageMatchesCategory PackageCategoryPendingUninstall pkg =
+  (pkg ^. npStatus) == NixPackagePendingUninstall
+
 psSearchResult :: Getter State [NixPackage]
 psSearchResult = to
-  (\s -> s ^.. psPackageCache . folded . filtered
-    (packageMatches (s ^. psSearchString))
+  (\s ->
+    s
+      ^.. psPackageCache
+      .   folded
+      .   filtered (packageMatches (s ^. psSearchString))
+      .   filtered (packageMatchesCategory (s ^. psCategory))
   )
 
 psSelectedPackage :: Getter State (Maybe NixPackage)
@@ -81,4 +118,5 @@ initState = ifSuccessIO readPackageCache $ \cache -> pure $ Success $ State
   , _psSelectedIdx       = Nothing
   , _psInstallingPackage = Nothing
   , _psLatestMessage     = Nothing
+  , _psCategoryIdx       = 0
   }

@@ -41,6 +41,7 @@ import qualified NixManager.Admin.Event        as AdminEvent
 import           NixManager.Packages.State      ( psInstallingPackage
                                                 , isProcessData
                                                 , psSelectedPackage
+                                                , psCategoryIdx
                                                 , psLatestMessage
                                                 , psPackageCache
                                                 , psSelectedIdx
@@ -57,6 +58,7 @@ import           NixManager.Packages.Event      ( Event
                                                   , EventReload
                                                   , EventReloadFinished
                                                   , EventTryInstallWatch
+                                                  , EventCategoryChanged
                                                   , EventTryInstallStarted
                                                   , EventInstall
                                                   , EventInstallCompleted
@@ -116,6 +118,8 @@ uninstallCompletedMessage Uncancelled = infoMessage
 uninstallCompletedMessage Cancelled = infoMessage "Installation cancelled!"
 
 updateEvent :: ManagerState -> Event -> Transition ManagerState ManagerEvent
+updateEvent s (EventCategoryChanged newCategory) =
+  pureTransition (s & msPackagesState . psCategoryIdx .~ newCategory)
 updateEvent s (EventOperationCompleted e completionType) =
   Transition (s & msPackagesState . psLatestMessage ?~ e)
     $ case completionType of

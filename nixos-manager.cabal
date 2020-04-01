@@ -30,6 +30,7 @@ executable nix-manager
                      , NixManager.Packages.Update
                      , NixManager.Packages.State
                      , NixManager.Packages.View
+                     , NixManager.Packages.PackageCategory
                      , NixManager.View.GtkUtil
                      , NixManager.View.Root
                      , NixManager.View.ComboBox
