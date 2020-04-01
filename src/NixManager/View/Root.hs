@@ -27,7 +27,7 @@ import           Data.Vector                    ( Vector )
 
 windowAttributes :: Vector (Attribute Gtk.Window ManagerEvent)
 windowAttributes =
-  [ #title := "nix-manager 1.0"
+  [ #title := "nixos-manager 1.0"
   , on #deleteEvent (const (True, ManagerEventClosed))
   , #widthRequest := 1024
   , #heightRequest := 768

@@ -64,9 +64,13 @@ import           Data.Maybe                     ( isJust
                                                 )
 import           Prelude                 hiding ( length
                                                 , null
+                                                , unlines
+                                                , init
                                                 )
 import           Data.Text                      ( length
                                                 , Text
+                                                , init
+                                                , unlines
                                                 , null
                                                 , stripPrefix
                                                 )
@@ -111,7 +115,9 @@ import           NixManager.Packages.State      ( psSearchString
                                                 , State
                                                 , psCategory
                                                 )
-import           NixManager.Util                ( replaceHtmlEntities )
+import           NixManager.Util                ( replaceHtmlEntities
+                                                , surroundSimple
+                                                )
 import           NixManager.View.GtkUtil        ( paddedAround
                                                 , expandAndFill
                                                 )
@@ -168,19 +174,23 @@ formatPkgLabel pkg =
     path = stripPrefixSafe "nixpkgs." (pkg ^. npPath)
     name = pkg ^. npName
     firstLine =
-      if path == name then name else name <> (" (<tt>" <> path <> "</tt>)")
+      if path == name then name else name <> " " <> surroundSimple "tt" path
     description
       | null (pkg ^. npDescription)
-      = ""
+      = []
       | otherwise
-      = "\n<i>" <> (pkg ^. npDescription . to replaceHtmlEntities) <> "</i>"
-    formatStatus NixPackageNothing        = ""
-    formatStatus NixPackageInstalled      = "\n<b>Installed</b>"
-    formatStatus NixPackagePendingInstall = "\n<b>Marked for installation</b>"
-    formatStatus NixPackagePendingUninstall =
-      "\n<b>Marked for uninstallation</b>"
+      = [pkg ^. npDescription . to (surroundSimple "i" . replaceHtmlEntities)]
+    formatStatus NixPackageNothing          = []
+    formatStatus NixPackageInstalled        = ["Installed"]
+    formatStatus NixPackagePendingInstall   = ["Marked for installation"]
+    formatStatus NixPackagePendingUninstall = ["Marked for uninstallation"]
   in
-    firstLine <> description <> formatStatus (pkg ^. npStatus)
+    init
+    . unlines
+    $ (  [firstLine]
+      <> description
+      <> (surroundSimple "b" <$> formatStatus (pkg ^. npStatus))
+      )
 
 
 buildResultRow
