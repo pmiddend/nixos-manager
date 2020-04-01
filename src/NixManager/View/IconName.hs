@@ -1,20 +1,24 @@
 module NixManager.View.IconName
   ( IconName(..)
+  , nameToGtk
   )
 where
 
+import           Data.Text                      ( Text )
+import           NixManager.Util                ( showText
+                                                , kebapize
+                                                )
+
 data IconName = SystemRun
               | SystemSoftwareInstall
+              | PreferencesOther
+              | PackageXGeneric
+              | ApplicationsSystem
               | EditDelete
               | EditClear
               | ProcessStop
               | ViewRefresh
-              deriving(Eq)
+              deriving(Eq, Show)
 
-instance Show IconName where
-  show SystemRun             = "system-run"
-  show SystemSoftwareInstall = "system-software-install"
-  show EditDelete            = "edit-delete"
-  show ProcessStop           = "process-stop"
-  show ViewRefresh           = "view-refresh"
-  show EditClear             = "edit-clear"
+nameToGtk :: IconName -> Text
+nameToGtk = kebapize . showText

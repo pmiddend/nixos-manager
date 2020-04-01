@@ -3,6 +3,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.Util where
 
+import           Data.Char                      ( isUpper
+                                                , toLower
+                                                )
 import           Data.ByteString                ( ByteString )
 import qualified Data.ByteString.Lazy          as BSL
 import           Control.Concurrent             ( threadDelay )
@@ -14,9 +17,16 @@ import           Data.Text                      ( Text
                                                 , pack
                                                 , unpack
                                                 , replace
+                                                , singleton
+                                                , snoc
+                                                , null
+                                                , foldl
                                                 )
 import           Data.List                      ( unfoldr )
-import           Prelude                 hiding ( putStrLn )
+import           Prelude                 hiding ( putStrLn
+                                                , foldl
+                                                , null
+                                                )
 import           Control.Lens                   ( Getter
                                                 , to
                                                 )
@@ -111,6 +121,14 @@ openTag :: (IsString s, Semigroup s) => s -> s
 openTag t = "<" <> t <> ">"
 closeTag :: (IsString s, Semigroup s) => s -> s
 closeTag t = "</" <> t <> ">"
+
+kebapize :: Text -> Text
+kebapize = foldl
+  (\prior c -> if null prior
+    then singleton (toLower c)
+    else if isUpper c then prior <> snoc "-" (toLower c) else snoc prior c
+  )
+  mempty
 
 surroundSimple :: (IsString s, Semigroup s) => s -> s -> s
 surroundSimple tag content = openTag tag <> content <> closeTag tag

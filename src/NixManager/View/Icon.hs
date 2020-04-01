@@ -4,8 +4,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
-module NixManager.View.ImageButton
-  ( imageButton
+module NixManager.View.Icon
+  ( icon
   )
 where
 
@@ -31,8 +31,8 @@ import           NixManager.View.IconName       ( IconName
                                                 , nameToGtk
                                                 )
 
-imageButton :: Vector (Attribute Gtk.Button e) -> IconName -> Widget e
-imageButton customAttributes customParams = Widget
+icon :: Vector (Attribute Gtk.Image e) -> IconName -> Widget e
+icon customAttributes customParams = Widget
   (CustomWidget { customWidget
                 , customCreate
                 , customPatch
@@ -42,25 +42,20 @@ imageButton customAttributes customParams = Widget
                 }
   )
  where
-  customWidget = Gtk.Button
-  customCreate :: IconName -> IO (Gtk.Button, Gtk.Image)
+  customWidget = Gtk.Image
+  customCreate :: IconName -> IO (Gtk.Image, ())
   customCreate iconName = do
-    w     <- Gtk.new Gtk.Button []
     -- Taken from https://hackage.haskell.org/package/gi-gtk-3.0.32/docs/src/GI.Gtk.Enums.html#IconSize
-    image <- Gtk.imageNewFromIconName
-      (Just (nameToGtk iconName))
-      (fromIntegral (fromEnum Gtk.IconSizeButton))
-    Gtk.buttonSetImage w (Just image)
-    pure (w, image)
+    w <- Gtk.imageNewFromIconName (Just (nameToGtk iconName))
+                                  (fromIntegral (fromEnum Gtk.IconSizeButton))
+    pure (w, ())
   customSubscribe _params _currentImage widget cb =
     foldMap (addSignalHandler cb widget) customAttributes
-  customPatch before after currentImage
+  customPatch before after _internalState
     | before == after = CustomKeep
     | otherwise = CustomModify $ \w -> do
-      Gtk.widgetDestroy currentImage
-      newImage <- Gtk.imageNewFromIconName
-        (Just (nameToGtk after))
-        (fromIntegral (fromEnum Gtk.IconSizeButton))
-      Gtk.buttonSetImage w (Just newImage)
-      pure newImage
+      Gtk.imageSetFromIconName w
+                               (Just (nameToGtk after))
+                               (fromIntegral (fromEnum Gtk.IconSizeButton))
+      pure ()
 

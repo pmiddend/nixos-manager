@@ -9,7 +9,7 @@ version:             1.0
 license-file:        LICENSE
 build-type:          Simple
 
-executable nix-manager
+executable nixos-manager
   main-is:             Main.hs
   other-modules:       NixManager.ManagerMain
                      , NixManager.ManagerState
@@ -34,6 +34,7 @@ executable nix-manager
                      , NixManager.View.GtkUtil
                      , NixManager.View.Root
                      , NixManager.View.ComboBox
+                     , NixManager.View.Icon
                      , NixManager.View.Css
                      , NixManager.View.ErrorDialog
                      , NixManager.View.ProgressBar
