@@ -62,9 +62,12 @@ import           Data.Maybe                     ( isJust
                                                 , fromMaybe
                                                 , fromJust
                                                 )
-import           Prelude                 hiding ( length )
+import           Prelude                 hiding ( length
+                                                , null
+                                                )
 import           Data.Text                      ( length
                                                 , Text
+                                                , null
                                                 , stripPrefix
                                                 )
 import           GI.Gtk.Declarative.Container.Class
@@ -166,17 +169,18 @@ formatPkgLabel pkg =
     name = pkg ^. npName
     firstLine =
       if path == name then name else name <> (" (<tt>" <> path <> "</tt>)")
+    description
+      | null (pkg ^. npDescription)
+      = ""
+      | otherwise
+      = "\n<i>" <> (pkg ^. npDescription . to replaceHtmlEntities) <> "</i>"
     formatStatus NixPackageNothing        = ""
     formatStatus NixPackageInstalled      = "\n<b>Installed</b>"
     formatStatus NixPackagePendingInstall = "\n<b>Marked for installation</b>"
     formatStatus NixPackagePendingUninstall =
       "\n<b>Marked for uninstallation</b>"
   in
-    firstLine
-    <> "\n<i>"
-    <> (pkg ^. npDescription . to replaceHtmlEntities)
-    <> "</i>"
-    <> formatStatus (pkg ^. npStatus)
+    firstLine <> description <> formatStatus (pkg ^. npStatus)
 
 
 buildResultRow
