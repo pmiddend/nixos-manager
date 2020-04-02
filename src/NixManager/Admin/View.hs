@@ -62,26 +62,28 @@ import           NixManager.ManagerEvent        ( ManagerEvent
 import           NixManager.Changes             ( ChangeType(Changes) )
 import           NixManager.Admin.Event         ( Event
                                                   ( EventRebuild
-                                                  , EventDoUpdateChanged
-                                                  , EventDoRollbackChanged
+                                                  , EventGarbage
+                                                  , EventRebuildDoUpdateChanged
+                                                  , EventGarbageChangeDetails
+                                                  , EventGarbageOlderGenerationsChanged
+                                                  , EventRebuildDoRollbackChanged
                                                   , EventRebuildCancel
                                                   , EventRebuildModeChanged
-                                                  , EventChangeDetails
+                                                  , EventRebuildChangeDetails
                                                   )
                                                 )
 import           NixManager.ManagerState        ( ManagerState
                                                 , msAdminState
                                                 )
 import           GI.Gtk.Declarative.Widget      ( Widget )
-import           NixManager.Admin.State         ( asActiveRebuildMode
-                                                , asProcessOutput
-                                                , asChanges
-                                                , absCounter
-                                                , asBuildState
-                                                , asDetailsState
-                                                , asDoUpdate
-                                                , asDoRollback
-                                                , detailsBool
+import           NixManager.Admin.State         ( asChanges
+                                                , asRebuildData
+                                                , asGarbageData
+                                                )
+import           NixManager.Admin.GarbageData   ( gdDetailsState
+                                                , gdBuildState
+                                                , gdProcessOutput
+                                                , gdOlderGenerations
                                                 )
 import           Control.Lens                   ( (^.)
                                                 , has
@@ -99,6 +101,15 @@ import           NixManager.Admin.ValidRebuildTypes
                                                 , descriptionForRebuildType
                                                 )
 import           Data.Default                   ( def )
+import           NixManager.Admin.DetailsState  ( detailsBool )
+import           NixManager.Admin.RebuildData   ( rdBuildState
+                                                , rdActiveRebuildMode
+                                                , rdDoRollback
+                                                , rdDoUpdate
+                                                , rdDetailsState
+                                                , rdProcessOutput
+                                                )
+import           NixManager.Admin.BuildState    ( bsCounter )
 
 adminBox :: ManagerState -> Widget ManagerEvent
 adminBox s = container Gtk.Box [] [BoxChild expandAndFill (adminBox' s)]
@@ -115,26 +126,33 @@ rebuildGrid as =
       , #alwaysShowImage := True
       ]
       IconName.ViewRefresh
-    lastLine = maybe applyButton buildingBox (as ^. asBuildState)
+    lastLine =
+      maybe applyButton buildingBox (as ^. asRebuildData . rdBuildState)
     changeBuildType :: ComboBoxChangeEvent -> ManagerEvent
     changeBuildType (ComboBoxChangeEvent (Just idx)) = ManagerEventAdmin
       (EventRebuildModeChanged
         (rebuildTypes ^?! ix (fromIntegral idx) . to showText)
       )
-    gridProperties = [#rowSpacing := 5, #columnSpacing := 5]
+    gridProperties = [#rowSpacing := 10, #columnSpacing := 10]
     buildTypeLabel =
       widget Gtk.Label [#label := "Build type: ", #valign := Gtk.AlignCenter]
     buildTypeCombo = changeBuildType <$> comboBox
       [#valign := Gtk.AlignCenter]
       (ComboBoxProperties
         (showText <$> rebuildTypes)
-        (fromIntegral <$> ((as ^. asActiveRebuildMode) `elemIndex` rebuildTypes)
+        (   fromIntegral
+        <$> (           (as ^. asRebuildData . rdActiveRebuildMode)
+            `elemIndex` rebuildTypes
+            )
         )
       )
     buildTypeDescription = inBox def $ widget
       Gtk.Label
       [ #label
-        := (descriptionForRebuildType (as ^. asActiveRebuildMode) ^?! folded)
+        := (   descriptionForRebuildType
+               (as ^. asRebuildData . rdActiveRebuildMode)
+           ^?! folded
+           )
       , #wrap := True
       , #hexpand := True
       , #halign := Gtk.AlignFill
@@ -148,8 +166,9 @@ rebuildGrid as =
       [#label := "Download updates:", #valign := Gtk.AlignCenter]
     updateRadio = inBox def $ widget
       Gtk.Switch
-      [ #active := (as ^. asDoUpdate)
-      , on #stateSet (\b -> (False, ManagerEventAdmin (EventDoUpdateChanged b)))
+      [ #active := (as ^. asRebuildData . rdDoUpdate)
+      , on #stateSet
+           (\b -> (False, ManagerEventAdmin (EventRebuildDoUpdateChanged b)))
       , #valign := Gtk.AlignCenter
       , #vexpand := False
       ]
@@ -167,9 +186,10 @@ rebuildGrid as =
       widget Gtk.Label [#label := "Rollback:", #valign := Gtk.AlignCenter]
     rollbackRadio = inBox def $ widget
       Gtk.Switch
-      [ #active := (as ^. asDoRollback)
-      , on #stateSet
-           (\b -> (False, ManagerEventAdmin (EventDoRollbackChanged b)))
+      [ #active := (as ^. asRebuildData . rdDoRollback)
+      , on
+        #stateSet
+        (\b -> (False, ManagerEventAdmin (EventRebuildDoRollbackChanged b)))
       , #valign := Gtk.AlignCenter
       , #vexpand := False
       ]
@@ -205,88 +225,169 @@ rebuildGrid as =
       , GridChild (def { width = 3, topAttach = applyRow }) lastLine
       ]
 
-rebuildBox as =
+garbageGrid as =
   let
-    statusLabel ExitSuccess = widget
-      Gtk.Label
-      [ #label := "Build finished successfully!"
-      , #useMarkup := True
-      , classes ["info-message"]
+    applyButton = imageButton
+      [ #label := "Collect Garbage"
+      , on #clicked (ManagerEventAdmin EventGarbage)
+      , #valign := Gtk.AlignCenter
+      , #alwaysShowImage := True
       ]
-    statusLabel _ = widget
+      IconName.UserTrash
+    lastLine =
+      maybe applyButton buildingBox (as ^. asGarbageData . gdBuildState)
+    gridProperties = [#rowSpacing := 10, #columnSpacing := 10]
+    inBox props w = container Gtk.Box [] [BoxChild props w]
+    olderGenerationsRow   = 0
+    olderGenerationsLabel = widget
+      Gtk.Label
+      [#label := "Remove old generations:", #valign := Gtk.AlignCenter]
+    olderGenerationsRadio = inBox def $ widget
+      Gtk.Switch
+      [ #active := (as ^. asGarbageData . gdOlderGenerations)
+      , on
+        #stateSet
+        (\b ->
+          (False, ManagerEventAdmin (EventGarbageOlderGenerationsChanged b))
+        )
+      , #valign := Gtk.AlignCenter
+      , #vexpand := False
+      ]
+    olderGenerationsDescription = inBox def $ widget
       Gtk.Label
       [ #label
-        := "Build failed! Please check the build details below to find out what's wrong."
-      , #useMarkup := True
-      , classes ["error-message"]
+        := "Whether to delete old NixOS generations (think of every change you applied in the form above); this makes rolling back to a previous state impossible, so use with care."
+      , #wrap := True
+      , #hexpand := True
+      , #halign := Gtk.AlignFill
+      , classes ["nixos-manager-italic"]
       ]
-    processExpanded w = do
-      expandedState <- Gtk.getExpanderExpanded w
-      pure
-        ( ManagerEventAdmin
-        . EventChangeDetails
-        . view (from detailsBool)
-        . not
-        $ expandedState
-        )
-    lastStatusRow =
-      case
-          ( has (asBuildState . _Nothing) as
-          , as ^. asProcessOutput . poResult . to getFirst
-          )
-        of
-          (True, Just v) -> [BoxChild def (paddedAround 5 (statusLabel v))]
-          _              -> []
-    rebuildDetails =
-      [ BoxChild expandAndFill
-          $ bin
-              Gtk.Expander
-              [ #label := "Build details"
-              , #expanded := (as ^. asDetailsState . detailsBool)
-              , onM #activate processExpanded
-              ]
-          $ container
-              Gtk.Box
-              [#orientation := Gtk.OrientationVertical]
-              [ BoxChild fillNoExpand $ widget Gtk.Separator []
-              , BoxChild def
-                $ widget Gtk.Label [#label := "Build command standard output:"]
-              , BoxChild expandAndFill
-              $ bin Gtk.ScrolledWindow
-                    [classes ["nixos-manager-grey-background"]]
-              $ widget
-                  Gtk.Label
-                  [ #label := (as ^. asProcessOutput . poStdout . to decodeUtf8)
-                  , classes ["nixos-manager-monospace"]
-                  , #valign := Gtk.AlignStart
-                  ]
-              , BoxChild def
-                $ widget Gtk.Label [#label := "Build command standard error:"]
-              , BoxChild expandAndFill
-              $ bin Gtk.ScrolledWindow
-                    [classes ["nixos-manager-grey-background"]]
-              $ widget
-                  Gtk.Label
-                  [ #label := (as ^. asProcessOutput . poStderr . to decodeUtf8)
-                  , #wrap := True
-                  , #valign := Gtk.AlignStart
-                  , classes ["nixos-manager-monospace"]
-                  ]
-              ]
-      ]
-    frameMargin = 60
+    applyRow = 1
   in
-    bin
-      Gtk.Frame
-      [ #label := "Applying changes"
-      , #marginLeft := frameMargin
-      , #marginRight := frameMargin
+    container
+      Gtk.Grid
+      gridProperties
+      [ GridChild (def { leftAttach = 0, topAttach = olderGenerationsRow })
+                  olderGenerationsLabel
+      , GridChild (def { leftAttach = 1, topAttach = olderGenerationsRow })
+                  olderGenerationsRadio
+      , GridChild (def { leftAttach = 2, topAttach = olderGenerationsRow })
+                  olderGenerationsDescription
+      , GridChild (def { width = 3, topAttach = applyRow }) lastLine
       ]
-    $ paddedAround 10
-    $ container
-        Gtk.Box
-        [#orientation := Gtk.OrientationVertical, #spacing := 5]
-        ([BoxChild def (rebuildGrid as)] <> lastStatusRow <> rebuildDetails)
+
+
+statusLabel ExitSuccess = widget
+  Gtk.Label
+  [ #label := "Build finished successfully!"
+  , #useMarkup := True
+  , classes ["info-message"]
+  ]
+statusLabel _ = widget
+  Gtk.Label
+  [ #label
+    := "Build failed! Please check the build details below to find out what's wrong."
+  , #useMarkup := True
+  , classes ["error-message"]
+  ]
+
+detailsBox detailsState processOutput eventF =
+  let processExpanded w = do
+        expandedState <- Gtk.getExpanderExpanded w
+        pure
+          ( ManagerEventAdmin
+          . eventF
+          . view (from detailsBool)
+          . not
+          $ expandedState
+          )
+  in
+    [ BoxChild expandAndFill
+      $ bin
+          Gtk.Expander
+          [ #label := "Build details"
+          , #expanded := (detailsState ^. detailsBool)
+          , onM #activate processExpanded
+          ]
+      $ container
+          Gtk.Box
+          [#orientation := Gtk.OrientationVertical]
+          [ BoxChild fillNoExpand $ widget Gtk.Separator []
+          , BoxChild def
+            $ widget Gtk.Label [#label := "Build command standard output:"]
+          , BoxChild expandAndFill
+          $ bin Gtk.ScrolledWindow [classes ["nixos-manager-grey-background"]]
+          $ widget
+              Gtk.Label
+              [ #label := (processOutput ^. poStdout . to decodeUtf8)
+              , classes ["nixos-manager-monospace"]
+              , #valign := Gtk.AlignStart
+              ]
+          , BoxChild def
+            $ widget Gtk.Label [#label := "Build command standard error:"]
+          , BoxChild expandAndFill
+          $ bin Gtk.ScrolledWindow [classes ["nixos-manager-grey-background"]]
+          $ widget
+              Gtk.Label
+              [ #label := (processOutput ^. poStderr . to decodeUtf8)
+              , #wrap := True
+              , #valign := Gtk.AlignStart
+              , classes ["nixos-manager-monospace"]
+              ]
+          ]
+    ]
+
+
+rebuildBox as =
+  let lastStatusRow =
+          case
+              ( has (asRebuildData . rdBuildState . _Nothing) as
+              , as ^. asRebuildData . rdProcessOutput . poResult . to getFirst
+              )
+            of
+              (True, Just v) -> [BoxChild def (paddedAround 5 (statusLabel v))]
+              _              -> []
+      rebuildDetails = detailsBox (as ^. asRebuildData . rdDetailsState)
+                                  (as ^. asRebuildData . rdProcessOutput)
+                                  EventRebuildChangeDetails
+      frameMargin = 60
+  in  bin
+          Gtk.Frame
+          [ #label := "Applying changes"
+          , #marginLeft := frameMargin
+          , #marginRight := frameMargin
+          ]
+        $ paddedAround 10
+        $ container
+            Gtk.Box
+            [#orientation := Gtk.OrientationVertical, #spacing := 5]
+            ([BoxChild def (rebuildGrid as)] <> lastStatusRow <> rebuildDetails)
+
+garbageBox as =
+  let lastStatusRow =
+          case
+              ( has (asGarbageData . gdBuildState . _Nothing) as
+              , as ^. asGarbageData . gdProcessOutput . poResult . to getFirst
+              )
+            of
+              (True, Just v) -> [BoxChild def (paddedAround 5 (statusLabel v))]
+              _              -> []
+      details = detailsBox (as ^. asGarbageData . gdDetailsState)
+                           (as ^. asGarbageData . gdProcessOutput)
+                           EventGarbageChangeDetails
+      frameMargin = 60
+  in  bin
+          Gtk.Frame
+          [ #label := "Collecting garbage "
+          , #marginLeft := frameMargin
+          , #marginRight := frameMargin
+          ]
+        $ paddedAround 10
+        $ container
+            Gtk.Box
+            [#orientation := Gtk.OrientationVertical, #spacing := 5]
+            ([BoxChild def (garbageGrid as)] <> lastStatusRow <> details)
+
 
 buildingBox buildState = container
   Gtk.Box
@@ -300,43 +401,51 @@ buildingBox buildState = container
     IconName.ProcessStop
   , BoxChild expandAndFill $ progressBar
     [#showText := True, #text := "Rebuilding..."]
-    (buildState ^. absCounter)
+    (buildState ^. bsCounter)
   ]
 
 adminBox' ms =
   let
+    informationBox iconName message = container
+      Gtk.Box
+      [ #orientation := Gtk.OrientationHorizontal
+      , #spacing := 15
+      , #halign := Gtk.AlignCenter
+      ]
+      [ BoxChild def $ icon [] (IconProps Gtk.IconSizeDialog iconName)
+      , BoxChild def $ widget
+        Gtk.Label
+        [ #label := message
+        , #wrap := True
+        , #halign := Gtk.AlignCenter
+        , classes ["nixos-manager-italic"]
+        ]
+      ]
     headlineItems =
       [ BoxChild fillNoExpand $ widget
         Gtk.Label
         [ #label := "Welcome to NixOS-Manager"
         , classes ["nixos-manager-headline"]
         ]
-      , BoxChild def $ container
-        Gtk.Box
-        [ #orientation := Gtk.OrientationHorizontal
-        , #spacing := 10
-        , #halign := Gtk.AlignCenter
-        ]
-        [ BoxChild def
-          $ icon [] (IconProps Gtk.IconSizeDialog IconName.DialogInformation)
-        , BoxChild def $ widget
-          Gtk.Label
-          [ #label
-            := "Select the “Packages” and “Services” tabs above to make changes to your system.\nOnce you're done with that, apply the changes using the form below."
-          , #wrap := True
-          , #halign := Gtk.AlignCenter
-          , classes ["nixos-manager-italic"]
-          ]
-        ]
+      , BoxChild def $ informationBox
+        IconName.DialogInformation
+        "Select the “Packages” and “Services” tabs above to make changes to your system.\nOnce you're done with that, apply the changes using the form below."
       ]
-  in  container
-          Gtk.Box
-          [ #orientation := Gtk.OrientationVertical
-          , #spacing := 3
-          , #marginLeft := 5
-          , #marginRight := 5
-          , #marginTop := 5
-          , #marginBottom := 5
-          ]
-        $  headlineItems
-        <> [rebuildBox (ms ^. msAdminState)]
+  in
+    bin Gtk.ScrolledWindow []
+    $  container
+         Gtk.Box
+         [ #orientation := Gtk.OrientationVertical
+         , #spacing := 20
+         , #marginLeft := 5
+         , #marginRight := 5
+         , #marginTop := 5
+         , #marginBottom := 5
+         ]
+    $  headlineItems
+    <> [rebuildBox (ms ^. msAdminState)]
+    <> [ BoxChild def $ informationBox
+           IconName.UserTrash
+           "NixOS doesn't explicitly delete anything once it has been downloaded.\nThis makes reinstalling things faster, but your disk drive will dwindle over time.\nThat’s why you should collect all the garbage regularly using this form."
+       ]
+    <> [garbageBox (ms ^. msAdminState)]

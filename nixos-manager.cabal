@@ -12,6 +12,15 @@ build-type:          Simple
 executable nixos-manager
   main-is:             Main.hs
   other-modules:       NixManager.BashDsl
+                     , NixManager.Admin.BuildState
+                     , NixManager.Admin.DetailsState
+                     , NixManager.Admin.GarbageData
+                     , NixManager.Admin.Event
+                     , NixManager.Admin.RebuildData
+                     , NixManager.Admin.State
+                     , NixManager.Admin.Update
+                     , NixManager.Admin.ValidRebuildTypes
+                     , NixManager.Admin.View
                      , NixManager.Changes
                      , NixManager.Constants
                      , NixManager.Docbook
@@ -20,6 +29,7 @@ executable nixos-manager
                      , NixManager.ManagerState
                      , NixManager.Message
                      , NixManager.NixExpr
+                     , NixManager.NixGarbage
                      , NixManager.NixPackage
                      , NixManager.NixPackageMeta
                      , NixManager.NixPackageStatus
@@ -37,6 +47,7 @@ executable nixos-manager
                      , NixManager.Packages.Update
                      , NixManager.Packages.View
                      , NixManager.Process
+                     , NixManager.AskPass
                      , NixManager.Services.Download
                      , NixManager.Services.Event
                      , NixManager.Services.ServiceCategory

@@ -16,6 +16,7 @@ data IconName = SystemRun
               | EmblemImportant
               | DialogQuestion
               | DialogInformation
+              | UserTrash
               | ApplicationsSystem
               | EditDelete
               | EditClear

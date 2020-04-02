@@ -6,21 +6,30 @@ where
 import           NixManager.Process             ( ProcessData
                                                 , ProcessOutput
                                                 )
-import           NixManager.Admin.State         ( DetailsState )
+import           NixManager.Admin.DetailsState  ( DetailsState )
 import           System.Exit                    ( ExitCode )
 import           NixManager.Changes             ( ChangeType )
 import           Data.Text                      ( Text )
 
 
 data Event = EventRebuild
-           | EventAskPassWatch ProcessOutput ProcessData
+           | EventRebuildWithPassword Text
+           | EventAskPassWatch (Text -> Event) ProcessOutput ProcessData
            | EventRebuildStarted ProcessData
            | EventRebuildWatch ProcessOutput ProcessData
            | EventRebuildFinished ProcessOutput ExitCode
            | EventRebuildModeChanged Text
-           | EventDoUpdateChanged Bool
-           | EventDoRollbackChanged Bool
+           | EventRebuildDoUpdateChanged Bool
+           | EventRebuildDoRollbackChanged Bool
            | EventRebuildCancel
-           | EventChangeDetails DetailsState
+           | EventRebuildChangeDetails DetailsState
+           | EventGarbageChangeDetails DetailsState
+           | EventGarbage
+           | EventGarbageWithPassword Text
+           | EventGarbageStarted ProcessData
+           | EventGarbageWatch ProcessOutput ProcessData
+           | EventGarbageFinished ProcessOutput ExitCode
+           | EventGarbageOlderGenerationsChanged Bool
+           | EventGarbageCancel
            | EventReload
            | EventReloadFinished ChangeType

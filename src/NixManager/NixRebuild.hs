@@ -2,13 +2,13 @@
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module NixManager.NixRebuild
-  ( askPass
-  , rebuild
+  ( rebuild
   , rootManagerPath
   , NixRebuildUpdateMode(..)
   )
 where
 
+import           NixManager.AskPass             ( sudoExpr )
 import           NixManager.Constants           ( rootManagerPath )
 import           Data.Text                      ( Text )
 import           Data.Text.Encoding             ( encodeUtf8 )
@@ -23,7 +23,6 @@ import           NixManager.BashDsl             ( mkdir
                                                   , Subshell
                                                   )
                                                 , Arg(LiteralArg)
-                                                , evalExpr
                                                 , cp
                                                 , mv
                                                 )
@@ -35,7 +34,6 @@ import           NixManager.NixService          ( locateLocalServicesFileMaybeCr
                                                 , locateRootServicesFile
                                                 )
 import           NixManager.Process             ( runProcess
-                                                , noStdin
                                                 , ProcessData
                                                 )
 import           System.FilePath                ( (-<.>) )
@@ -73,18 +71,6 @@ installExpr rebuildMode updateMode = do
     `And` nixosRebuild rebuildMode updateMode
     `Or`  Subshell
             (moveFromOld rootServicesFile `And` moveFromOld localServicesFile)
-
-sudoExpr :: Expr -> Expr
-sudoExpr e = Command
-  "sudo"
-  ["-H", "-S", "-u", "root", "--", "sh", "-c", LiteralArg (evalExpr e)]
-
-askPassExpr :: Text -> Expr
-askPassExpr description =
-  Command "gksudo" ["--description", LiteralArg description, "--print-pass"]
-
-askPass :: IO ProcessData
-askPass = runProcess noStdin (askPassExpr "NixOS system rebuild")
 
 rebuild :: NixRebuildMode -> NixRebuildUpdateMode -> Text -> IO ProcessData
 rebuild rebuildMode updateMode password =
