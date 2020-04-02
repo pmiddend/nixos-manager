@@ -286,15 +286,14 @@ adminBox' ms =
         [ #label := "Welcome to NixOS-Manager"
         , classes ["nixos-manager-headline"]
         ]
-      , BoxChild def $ bin Gtk.Frame [#halign := Gtk.AlignCenter] $ container
+      , BoxChild def $ container
         Gtk.Box
         [ #orientation := Gtk.OrientationHorizontal
         , #spacing := 10
         , #halign := Gtk.AlignCenter
-        , classes ["info-message"]
         ]
         [ BoxChild def
-          $ icon [] (IconProps Gtk.IconSizeDialog IconName.EmblemImportant)
+          $ icon [] (IconProps Gtk.IconSizeDialog IconName.DialogInformation)
         , BoxChild def $ widget
           Gtk.Label
           [ #label

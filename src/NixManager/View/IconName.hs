@@ -15,6 +15,7 @@ data IconName = SystemRun
               | PackageXGeneric
               | EmblemImportant
               | DialogQuestion
+              | DialogInformation
               | ApplicationsSystem
               | EditDelete
               | EditClear
