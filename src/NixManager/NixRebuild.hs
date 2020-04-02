@@ -5,6 +5,7 @@ module NixManager.NixRebuild
   ( askPass
   , rebuild
   , rootManagerPath
+  , NixRebuildUpdateMode(..)
   )
 where
 
@@ -39,14 +40,24 @@ import           NixManager.Process             ( runProcess
                                                 )
 import           System.FilePath                ( (-<.>) )
 import           NixManager.NixRebuildMode      ( NixRebuildMode )
+import           NixManager.NixRebuildUpdateMode
+                                                ( NixRebuildUpdateMode
+                                                  ( NixRebuildUpdateUpdate
+                                                  , NixRebuildUpdateRollback
+                                                  )
+                                                )
 
-nixosRebuild :: NixRebuildMode -> Bool -> Expr
-nixosRebuild mode withUpdates = Command
+
+nixosRebuild :: NixRebuildMode -> NixRebuildUpdateMode -> Expr
+nixosRebuild mode updateMode = Command
   "nixos-rebuild"
-  ([LiteralArg (showText mode)] <> mwhen withUpdates ["--upgrade"])
+  (  [LiteralArg (showText mode)]
+  <> mwhen (updateMode == NixRebuildUpdateUpdate)   ["--upgrade"]
+  <> mwhen (updateMode == NixRebuildUpdateRollback) ["--rollback"]
+  )
 
-installExpr :: NixRebuildMode -> Bool -> IO Expr
-installExpr rebuildMode withUpdates = do
+installExpr :: NixRebuildMode -> NixRebuildUpdateMode -> IO Expr
+installExpr rebuildMode updateMode = do
   localPackagesFile <- locateLocalPackagesFileMaybeCreate
   rootPackagesFile  <- locateRootPackagesFile
   localServicesFile <- locateLocalServicesFileMaybeCreate
@@ -59,7 +70,7 @@ installExpr rebuildMode withUpdates = do
     `And` copyToOld rootPackagesFile
     `And` cp localPackagesFile rootPackagesFile
     `And` cp localServicesFile rootServicesFile
-    `And` nixosRebuild rebuildMode withUpdates
+    `And` nixosRebuild rebuildMode updateMode
     `Or`  Subshell
             (moveFromOld rootServicesFile `And` moveFromOld localServicesFile)
 
@@ -75,9 +86,9 @@ askPassExpr description =
 askPass :: IO ProcessData
 askPass = runProcess noStdin (askPassExpr "NixOS system rebuild")
 
-rebuild :: NixRebuildMode -> Bool -> Text -> IO ProcessData
-rebuild rebuildMode withUpdates password =
-  installExpr rebuildMode withUpdates
+rebuild :: NixRebuildMode -> NixRebuildUpdateMode -> Text -> IO ProcessData
+rebuild rebuildMode updateMode password =
+  installExpr rebuildMode updateMode
     >>= runProcess (Just (encodeUtf8 password))
     .   sudoExpr
 

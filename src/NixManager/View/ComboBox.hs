@@ -82,7 +82,7 @@ comboBox customAttributes customParams = Widget
     forM_ (props ^. cbpValues) $ Gtk.comboBoxTextInsert box (-1) Nothing
     Gtk.comboBoxSetActive box (props ^. cbpActive . to toActive)
     pure (box, ())
-  customSubscribe _params _ widget cb = do
+  customSubscribe _params _internalState widget cb = do
     h <-
       Gtk.on widget #changed
       $   cb

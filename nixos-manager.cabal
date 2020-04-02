@@ -11,54 +11,50 @@ build-type:          Simple
 
 executable nixos-manager
   main-is:             Main.hs
-  other-modules:       NixManager.ManagerMain
-                     , NixManager.ManagerState
-                     , NixManager.Update
-                     , NixManager.NixPackageMeta
-                     , NixManager.NixRebuildMode
+  other-modules:       NixManager.BashDsl
                      , NixManager.Changes
-                     , NixManager.BashDsl
-                     , NixManager.ManagerEvent
-                     , NixManager.Services.Download
-                     , NixManager.Services.State
-                     , NixManager.Services.StateData
-                     , NixManager.Services.Event
-                     , NixManager.Services.Update
-                     , NixManager.Services.View
-                     , NixManager.Services.ServiceCategory
-                     , NixManager.Packages.Event
-                     , NixManager.Packages.Update
-                     , NixManager.Packages.State
-                     , NixManager.Packages.View
-                     , NixManager.Packages.PackageCategory
-                     , NixManager.View.GtkUtil
-                     , NixManager.View.Root
-                     , NixManager.View.ComboBox
-                     , NixManager.View.Icon
-                     , NixManager.View.Css
-                     , NixManager.View.ErrorDialog
-                     , NixManager.View.ProgressBar
-                     , NixManager.View.ImageButton
-                     , NixManager.View.IconName
-                     , NixManager.NixServiceOption
-                     , NixManager.NixServiceOptionLocation
-                     , NixManager.NixPackages
-                     , NixManager.NixPackageStatus
-                     , NixManager.Docbook
-                     , NixManager.NixPackage
                      , NixManager.Constants
-                     , NixManager.Process
-                     , NixManager.NixService
-                     , NixManager.NixRebuild
-                     , NixManager.NixServiceOptionType
-                     , NixManager.Admin.View
-                     , NixManager.Admin.Event
-                     , NixManager.Admin.State
-                     , NixManager.Admin.Update
-                     , NixManager.Admin.ValidRebuildTypes
+                     , NixManager.Docbook
+                     , NixManager.ManagerEvent
+                     , NixManager.ManagerMain
+                     , NixManager.ManagerState
                      , NixManager.Message
                      , NixManager.NixExpr
+                     , NixManager.NixPackage
+                     , NixManager.NixPackageMeta
+                     , NixManager.NixPackageStatus
+                     , NixManager.NixPackages
+                     , NixManager.NixRebuild
+                     , NixManager.NixRebuildMode
+                     , NixManager.NixRebuildUpdateMode
+                     , NixManager.NixService
+                     , NixManager.NixServiceOption
+                     , NixManager.NixServiceOptionLocation
+                     , NixManager.NixServiceOptionType
+                     , NixManager.Packages.Event
+                     , NixManager.Packages.PackageCategory
+                     , NixManager.Packages.State
+                     , NixManager.Packages.Update
+                     , NixManager.Packages.View
+                     , NixManager.Process
+                     , NixManager.Services.Download
+                     , NixManager.Services.Event
+                     , NixManager.Services.ServiceCategory
+                     , NixManager.Services.State
+                     , NixManager.Services.StateData
+                     , NixManager.Services.Update
+                     , NixManager.Services.View
+                     , NixManager.Update
                      , NixManager.Util
+                     , NixManager.View.ComboBox
+                     , NixManager.View.Css
+                     , NixManager.View.ErrorDialog
+                     , NixManager.View.GtkUtil
+                     , NixManager.View.Icon
+                     , NixManager.View.IconName
+                     , NixManager.View.ImageButton
+                     , NixManager.View.ProgressBar
+                     , NixManager.View.Root
   build-depends:       base
                      , containers
                      , gi-gdk

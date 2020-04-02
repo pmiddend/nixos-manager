@@ -27,7 +27,8 @@ import           NixManager.Process             ( updateProcess
                                                 )
 import           NixManager.Admin.State         ( State
                                                 , asBuildState
-                                                , asUpdate
+                                                , asDoUpdate
+                                                , asDoRollback
                                                 , asProcessOutput
                                                 , asChanges
                                                 , asActiveRebuildMode
@@ -58,7 +59,8 @@ import           NixManager.Admin.Event         ( Event
                                                   , EventRebuildCancel
                                                   , EventChangeDetails
                                                   , EventRebuildFinished
-                                                  , EventUpdateChanged
+                                                  , EventDoUpdateChanged
+                                                  , EventDoRollbackChanged
                                                   , EventRebuildModeChanged
                                                   , EventAskPassWatch
                                                   )
@@ -78,7 +80,18 @@ import           GI.Gtk.Declarative.App.Simple  ( Transition(Transition) )
 import           Prelude                 hiding ( length
                                                 , putStrLn
                                                 )
+import           NixManager.NixRebuildUpdateMode
+                                                ( NixRebuildUpdateMode
+                                                  ( NixRebuildUpdateUpdate
+                                                  , NixRebuildUpdateRollback
+                                                  , NixRebuildUpdateNone
+                                                  )
+                                                )
 
+calculateRebuildUpdateMode :: Bool -> Bool -> NixRebuildUpdateMode
+calculateRebuildUpdateMode _update@True _ = NixRebuildUpdateUpdate
+calculateRebuildUpdateMode _ _rollback@True = NixRebuildUpdateRollback
+calculateRebuildUpdateMode _ _ = NixRebuildUpdateNone
 
 updateEvent
   :: ManagerState -> State -> Event -> Transition ManagerState ManagerEvent
@@ -96,9 +109,12 @@ updateEvent ms _ (EventAskPassWatch po pd) = Transition ms $ do
       threadDelayMillis 500
       pure (adminEvent (EventAskPassWatch totalPo pd))
     Just ExitSuccess -> do
-      rebuildPo <- rebuild (ms ^. msAdminState . asActiveRebuildMode)
-                           (ms ^. msAdminState . asUpdate)
-                           (totalPo ^. poStdout . to decodeUtf8)
+      rebuildPo <- rebuild
+        (ms ^. msAdminState . asActiveRebuildMode)
+        (calculateRebuildUpdateMode (ms ^. msAdminState . asDoUpdate)
+                                    (ms ^. msAdminState . asDoRollback)
+        )
+        (totalPo ^. poStdout . to decodeUtf8)
       pure (adminEvent (EventRebuildStarted rebuildPo))
     Just (ExitFailure _) -> pure Nothing
 updateEvent ms _ (EventRebuildStarted pd) =
@@ -156,5 +172,21 @@ updateEvent ms _ EventReload =
   Transition ms $ adminEvent . EventReloadFinished <$> determineChanges
 updateEvent ms _ (EventReloadFinished newChanges) =
   pureTransition (ms & msAdminState . asChanges .~ newChanges)
-updateEvent ms _ (EventUpdateChanged newUpdate) =
-  pureTransition (ms & msAdminState . asUpdate .~ newUpdate)
+updateEvent ms _ (EventDoUpdateChanged newUpdate) = pureTransition
+  (  ms
+  &  msAdminState
+  .  asDoUpdate
+  .~ newUpdate
+  &  msAdminState
+  .  asDoRollback
+  .~ False
+  )
+updateEvent ms _ (EventDoRollbackChanged newRollback) = pureTransition
+  (  ms
+  &  msAdminState
+  .  asDoUpdate
+  .~ False
+  &  msAdminState
+  .  asDoRollback
+  .~ newRollback
+  )

@@ -62,7 +62,8 @@ import           NixManager.ManagerEvent        ( ManagerEvent
 import           NixManager.Changes             ( ChangeType(Changes) )
 import           NixManager.Admin.Event         ( Event
                                                   ( EventRebuild
-                                                  , EventUpdateChanged
+                                                  , EventDoUpdateChanged
+                                                  , EventDoRollbackChanged
                                                   , EventRebuildCancel
                                                   , EventRebuildModeChanged
                                                   , EventChangeDetails
@@ -78,7 +79,8 @@ import           NixManager.Admin.State         ( asActiveRebuildMode
                                                 , absCounter
                                                 , asBuildState
                                                 , asDetailsState
-                                                , asUpdate
+                                                , asDoUpdate
+                                                , asDoRollback
                                                 , detailsBool
                                                 )
 import           Control.Lens                   ( (^.)
@@ -119,8 +121,6 @@ rebuildGrid as =
       (EventRebuildModeChanged
         (rebuildTypes ^?! ix (fromIntegral idx) . to showText)
       )
-    changeUpdate newValue =
-      (False, ManagerEventAdmin (EventUpdateChanged newValue))
     gridProperties = [#rowSpacing := 5, #columnSpacing := 5]
     buildTypeLabel =
       widget Gtk.Label [#label := "Build type: ", #valign := Gtk.AlignCenter]
@@ -141,15 +141,15 @@ rebuildGrid as =
       , classes ["nixos-manager-italic"]
       ]
     buildTypeRow = 0
-    updateRow    = 1
-    updateLabel  = widget
+    inBox props w = container Gtk.Box [] [BoxChild props w]
+    updateRow   = 1
+    updateLabel = widget
       Gtk.Label
       [#label := "Download updates:", #valign := Gtk.AlignCenter]
-    inBox props w = container Gtk.Box [] [BoxChild props w]
-    updateSwitch = inBox def $ widget
+    updateRadio = inBox def $ widget
       Gtk.Switch
-      [ #active := (as ^. asUpdate)
-      , on #stateSet changeUpdate
+      [ #active := (as ^. asDoUpdate)
+      , on #stateSet (\b -> (False, ManagerEventAdmin (EventDoUpdateChanged b)))
       , #valign := Gtk.AlignCenter
       , #vexpand := False
       ]
@@ -157,6 +157,25 @@ rebuildGrid as =
       Gtk.Label
       [ #label
         := "Whether to apply changes to the system (if any) and also update to the latest NixOS version"
+      , #wrap := True
+      , #hexpand := True
+      , #halign := Gtk.AlignFill
+      , classes ["nixos-manager-italic"]
+      ]
+    rollbackRow = 2
+    rollbackLabel =
+      widget Gtk.Label [#label := "Rollback:", #valign := Gtk.AlignCenter]
+    rollbackRadio = inBox def $ widget
+      Gtk.Switch
+      [ #active := (as ^. asDoRollback)
+      , on #stateSet
+           (\b -> (False, ManagerEventAdmin (EventDoRollbackChanged b)))
+      , #valign := Gtk.AlignCenter
+      , #vexpand := False
+      ]
+    rollbackDescription = inBox def $ widget
+      Gtk.Label
+      [ #label := "Whether to rollback to the previous NixOS version"
       , #wrap := True
       , #hexpand := True
       , #halign := Gtk.AlignFill
@@ -174,9 +193,15 @@ rebuildGrid as =
       , GridChild (def { leftAttach = 2, topAttach = buildTypeRow })
                   buildTypeDescription
       , GridChild (def { leftAttach = 0, topAttach = updateRow }) updateLabel
-      , GridChild (def { leftAttach = 1, topAttach = updateRow }) updateSwitch
+      , GridChild (def { leftAttach = 1, topAttach = updateRow }) updateRadio
       , GridChild (def { leftAttach = 2, topAttach = updateRow })
                   updateDescription
+      , GridChild (def { leftAttach = 0, topAttach = rollbackRow })
+                  rollbackLabel
+      , GridChild (def { leftAttach = 1, topAttach = rollbackRow })
+                  rollbackRadio
+      , GridChild (def { leftAttach = 2, topAttach = rollbackRow })
+                  rollbackDescription
       , GridChild (def { width = 3, topAttach = applyRow }) lastLine
       ]
 
