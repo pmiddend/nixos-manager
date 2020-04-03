@@ -9,7 +9,9 @@ module NixManager.Admin.View
   )
 where
 
-import           NixManager.Util                ( showText )
+import           NixManager.NixRebuildMode      ( rebuildModeToText
+                                                , rebuildModeIdx
+                                                )
 import           System.Exit                    ( ExitCode(ExitSuccess) )
 import qualified NixManager.View.IconName      as IconName
 import           NixManager.View.Icon           ( icon
@@ -21,7 +23,6 @@ import           NixManager.View.GtkUtil        ( expandAndFill
                                                 )
 import           NixManager.View.ImageButton    ( imageButton )
 import           NixManager.View.ProgressBar    ( progressBar )
-import           Data.List                      ( elemIndex )
 import           NixManager.View.ComboBox       ( comboBox
                                                 , ComboBoxProperties
                                                   ( ComboBoxProperties
@@ -39,8 +40,6 @@ import           GI.Gtk.Declarative             ( bin
                                                 , on
                                                 , classes
                                                 , onM
-                                                , fill
-                                                , expand
                                                 , BoxChild(BoxChild)
                                                 , widget
                                                 , Attribute((:=))
@@ -68,7 +67,7 @@ import           NixManager.Admin.Event         ( Event
                                                   , EventGarbageOlderGenerationsChanged
                                                   , EventRebuildDoRollbackChanged
                                                   , EventRebuildCancel
-                                                  , EventRebuildModeChanged
+                                                  , EventRebuildModeIdxChanged
                                                   , EventRebuildChangeDetails
                                                   )
                                                 )
@@ -93,7 +92,6 @@ import           Control.Lens                   ( (^.)
                                                 , folded
                                                 , to
                                                 , (^?!)
-                                                , ix
                                                 )
 import           Data.Monoid                    ( getFirst )
 import           NixManager.Admin.ValidRebuildTypes
@@ -103,7 +101,7 @@ import           NixManager.Admin.ValidRebuildTypes
 import           Data.Default                   ( def )
 import           NixManager.Admin.DetailsState  ( detailsBool )
 import           NixManager.Admin.RebuildData   ( rdBuildState
-                                                , rdActiveRebuildMode
+                                                , rdActiveRebuildModeIdx
                                                 , rdDoRollback
                                                 , rdDoUpdate
                                                 , rdDetailsState
@@ -129,28 +127,25 @@ rebuildGrid as =
     lastLine =
       maybe applyButton buildingBox (as ^. asRebuildData . rdBuildState)
     changeBuildType :: ComboBoxChangeEvent -> ManagerEvent
-    changeBuildType (ComboBoxChangeEvent (Just idx)) = ManagerEventAdmin
-      (EventRebuildModeChanged
-        (rebuildTypes ^?! ix (fromIntegral idx) . to showText)
-      )
+    changeBuildType (ComboBoxChangeEvent idx) =
+      ManagerEventAdmin (EventRebuildModeIdxChanged idx)
     gridProperties = [#rowSpacing := 10, #columnSpacing := 10]
     buildTypeLabel =
       widget Gtk.Label [#label := "Build type: ", #valign := Gtk.AlignCenter]
     buildTypeCombo = changeBuildType <$> comboBox
       [#valign := Gtk.AlignCenter]
-      (ComboBoxProperties
-        (showText <$> rebuildTypes)
-        (   fromIntegral
-        <$> (           (as ^. asRebuildData . rdActiveRebuildMode)
-            `elemIndex` rebuildTypes
-            )
-        )
+      (ComboBoxProperties (rebuildModeToText <$> rebuildTypes)
+                          (as ^. asRebuildData . rdActiveRebuildModeIdx)
       )
     buildTypeDescription = inBox def $ widget
       Gtk.Label
       [ #label
         := (   descriptionForRebuildType
-               (as ^. asRebuildData . rdActiveRebuildMode)
+               (  as
+               ^. asRebuildData
+               .  rdActiveRebuildModeIdx
+               .  from rebuildModeIdx
+               )
            ^?! folded
            )
       , #wrap := True

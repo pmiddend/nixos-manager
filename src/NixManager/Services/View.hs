@@ -25,6 +25,7 @@ import           NixManager.Services.ServiceCategory
                                                 , serviceCategories
                                                 , categoryToText
                                                 , categoryToNixPrefix
+                                                , serviceCategoryIdx
                                                 )
 import           Data.Maybe                     ( fromMaybe )
 import           NixManager.View.ProgressBar    ( progressBar )
@@ -47,7 +48,6 @@ import           NixManager.NixExpr             ( NixExpr
                                                 , _NixSymbol
                                                 )
 import           NixManager.View.ComboBox       ( comboBox
-                                                , ComboBoxIndexType
                                                 , ComboBoxChangeEvent
                                                   ( ComboBoxChangeEvent
                                                   )
@@ -68,7 +68,7 @@ import           NixManager.Services.StateData  ( StateData
                                                 , sdCache
                                                 , sdSelectedIdx
                                                 , sdSearchString
-                                                , sdCategory
+                                                , sdCategoryIdx
                                                 , sdExpression
                                                 )
 import           NixManager.NixServiceOption    ( optionType
@@ -97,6 +97,7 @@ import           GI.Gtk.Declarative             ( bin
 import           Data.Vector.Lens               ( toVectorOf )
 import qualified GI.Gtk                        as Gtk
 import           Control.Lens                   ( (^.)
+                                                , from
                                                 , non
                                                 , re
                                                 , Traversal'
@@ -117,7 +118,7 @@ import           Control.Lens                   ( (^.)
 import           NixManager.Services.Event      ( Event
                                                   ( EventSelected
                                                   , EventSettingChanged
-                                                  , EventCategoryChanged
+                                                  , EventCategoryIdxChanged
                                                   , EventSearchChanged
                                                   , EventDownloadStart
                                                   , EventStateReload
@@ -187,7 +188,7 @@ filterPredicate sd =
   (         (((sd ^. sdSearchString) `isInfixOf`) . flattenOptionLocation)
     `predAnd` ((not . ("<" `isInfixOf`)) . flattenOptionLocation)
     `predAnd` ((not . ("*" `isInfixOf`)) . flattenOptionLocation)
-    `predAnd` categoryMatches (sd ^. sdCategory)
+    `predAnd` categoryMatches (sd ^. sdCategoryIdx . from serviceCategoryIdx)
     )
     . view serviceLoc
 
@@ -212,14 +213,11 @@ servicesLeftPane sd _ =
                               [onM #rowSelected rowSelectionHandler]
                               (serviceRows sd)
       changeCallback :: ComboBoxChangeEvent -> ManagerEvent
-      changeCallback (ComboBoxChangeEvent Nothing) = ManagerEventDiscard
-      changeCallback (ComboBoxChangeEvent (Just i))
-        | i >= 0 = ManagerEventServices
-          (EventCategoryChanged (serviceCategories !! fromIntegral i))
-        | otherwise = ManagerEventDiscard
+      changeCallback (ComboBoxChangeEvent i) =
+          ManagerEventServices (EventCategoryIdxChanged i)
       categoryCombo = changeCallback <$> comboBox
         []
-        (ComboBoxProperties (categoryToText <$> serviceCategories) (Just 0))
+        (ComboBoxProperties (categoryToText <$> serviceCategories) 0)
   in  paddedAround 5 $ container
         Gtk.Box
         [#orientation := Gtk.OrientationVertical, #spacing := 3]
@@ -274,33 +272,27 @@ buildOptionValueCell serviceExpression serviceOption =
               , on #stateSet changeCallback
               ]
       Right (NixServiceOptionOneOfString values) ->
-        let
-          activeIndex :: Maybe ComboBoxIndexType
-          activeIndex =
-            optionValue
-              ^? folded
-              .  _NixString
-              .  to (`elemIndex` values)
-              .  folded
-              .  to fromIntegral
-          changeCallback :: ComboBoxChangeEvent -> ManagerEvent
-          changeCallback (ComboBoxChangeEvent Nothing) = ManagerEventServices
-            (EventSettingChanged $ set (optionLens' optionPath) Nothing)
-          changeCallback (ComboBoxChangeEvent (Just 0)) = ManagerEventServices
-            (EventSettingChanged $ set (optionLens' optionPath) Nothing)
-          changeCallback (ComboBoxChangeEvent (Just idx)) =
-            ManagerEventServices
+        let activeIndex :: Maybe Int
+            activeIndex =
+                optionValue
+                  ^? folded
+                  .  _NixString
+                  .  to (`elemIndex` values)
+                  .  folded
+            changeCallback :: ComboBoxChangeEvent -> ManagerEvent
+            changeCallback (ComboBoxChangeEvent 0) = ManagerEventServices
+              (EventSettingChanged $ set (optionLens' optionPath) Nothing)
+            changeCallback (ComboBoxChangeEvent idx) = ManagerEventServices
               (EventSettingChanged
                 (set (optionLens' optionPath)
                      (Just (values ^?! ix (fromIntegral idx) . re _NixString))
                 )
               )
-        in
-          changeCallback <$> comboBox
-            []
-            (ComboBoxProperties ("<no value>" : values)
-                                (Just (fromMaybe 0 activeIndex))
-            )
+        in  changeCallback <$> comboBox
+              []
+              (ComboBoxProperties ("<no value>" : values)
+                                  (fromMaybe 0 activeIndex)
+              )
       Right NixServiceOptionPackage   -> textLikeEntry NixSymbol _NixSymbol
       Right NixServiceOptionSubmodule -> textLikeEntry NixSymbol _NixSymbol
       Right NixServiceOptionPath      -> textLikeEntry NixSymbol _NixSymbol

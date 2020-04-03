@@ -60,7 +60,6 @@ import           NixManager.NixPackage          ( NixPackage
                                                 )
 import           Data.Maybe                     ( isJust
                                                 , fromMaybe
-                                                , fromJust
                                                 )
 import           Prelude                 hiding ( length
                                                 , null
@@ -80,9 +79,7 @@ import           Data.Default                   ( def )
 import           GI.Gtk.Declarative             ( bin
                                                 , Widget
                                                 , padding
-                                                , expand
                                                 , Container
-                                                , fill
                                                 , FromWidget
                                                 , Bin
                                                 , widget
@@ -151,8 +148,8 @@ searchField = widget
 
 searchBox :: State -> Widget ManagerEvent
 searchBox s =
-  let changeCallback (ComboBoxChangeEvent idx) = ManagerEventPackages
-        (EventCategoryChanged (fromIntegral (fromJust idx)))
+  let changeCallback (ComboBoxChangeEvent idx) =
+          ManagerEventPackages (EventCategoryChanged (fromIntegral idx))
   in  container
         Gtk.Box
         [#orientation := Gtk.OrientationHorizontal, #spacing := 10]
@@ -161,7 +158,7 @@ searchBox s =
         , BoxChild def $ changeCallback <$> comboBox
           []
           (ComboBoxProperties (categoryToText <$> packageCategories)
-                              (s ^. psCategoryIdx . to (Just . fromIntegral))
+                              (s ^. psCategoryIdx)
           )
         ]
 

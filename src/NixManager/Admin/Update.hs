@@ -8,6 +8,7 @@ module NixManager.Admin.Update
   )
 where
 
+import           NixManager.Password            ( Password(Password) )
 import           NixManager.NixGarbage          ( collectGarbage )
 import           NixManager.ManagerEvent        ( adminEvent
                                                 , ManagerEvent
@@ -38,6 +39,7 @@ import           NixManager.Admin.GarbageData   ( gdOlderGenerations
                                                 )
 import           Data.Monoid                    ( getFirst )
 import           Control.Lens                   ( (^.)
+                                                , from
                                                 , folded
                                                 , traversed
                                                 , (<>~)
@@ -68,7 +70,7 @@ import           NixManager.Admin.Event         ( Event
                                                   , EventGarbageWithPassword
                                                   , EventGarbageStarted
                                                   , EventRebuildDoRollbackChanged
-                                                  , EventRebuildModeChanged
+                                                  , EventRebuildModeIdxChanged
                                                   , EventAskPassWatch
                                                   )
                                                 )
@@ -79,9 +81,10 @@ import           NixManager.Util                ( threadDelayMillis )
 import           NixManager.Changes             ( determineChanges
                                                 , ChangeType(NoChanges)
                                                 )
-import           NixManager.NixRebuildMode      ( parseRebuildMode )
 import           NixManager.AskPass             ( askPass )
-import           NixManager.NixRebuild          ( rebuild )
+import           NixManager.NixRebuild          ( rebuild
+                                                , rollbackRebuild
+                                                )
 import           GI.Gtk.Declarative.App.Simple  ( Transition(Transition) )
 import           Prelude                 hiding ( length
                                                 , putStrLn
@@ -95,7 +98,7 @@ import           NixManager.NixRebuildUpdateMode
                                                 )
 import           NixManager.Admin.RebuildData   ( rdBuildState
                                                 , rdProcessOutput
-                                                , rdActiveRebuildMode
+                                                , rdActiveRebuildModeIdx
                                                 , rdDoUpdate
                                                 , rdDoRollback
                                                 , rdDetailsState
@@ -104,6 +107,7 @@ import           NixManager.Admin.BuildState    ( bsProcessData
                                                 , bsCounter
                                                 , BuildState(BuildState)
                                                 )
+import           NixManager.NixRebuildMode      ( rebuildModeIdx )
 
 calculateRebuildUpdateMode :: Bool -> Bool -> NixRebuildUpdateMode
 calculateRebuildUpdateMode _update@True _ = NixRebuildUpdateUpdate
@@ -128,6 +132,7 @@ updateEvent ms _ EventRebuildCancel =
       .   folded
       .   bsProcessData
       )
+
     pure Nothing
 updateEvent ms _ EventGarbageCancel =
   Transition (ms & msAdminState . asGarbageData . gdBuildState .~ Nothing) $ do
@@ -147,13 +152,18 @@ updateEvent ms _ (EventGarbageWithPassword password) = Transition ms $ do
   pure (adminEvent (EventGarbageStarted garbagePo))
 updateEvent ms _ (EventRebuildWithPassword password) = Transition ms $ do
   rebuildPo <- rebuild
-    (ms ^. msAdminState . asRebuildData . rdActiveRebuildMode)
+    (  ms
+    ^. msAdminState
+    .  asRebuildData
+    .  rdActiveRebuildModeIdx
+    .  from rebuildModeIdx
+    )
     (calculateRebuildUpdateMode
       (ms ^. msAdminState . asRebuildData . rdDoUpdate)
       (ms ^. msAdminState . asRebuildData . rdDoRollback)
     )
     password
-  pure (adminEvent (EventRebuildStarted rebuildPo))
+  pure (adminEvent (EventRebuildStarted rebuildPo password))
 updateEvent ms _ (EventAskPassWatch andThen po pd) = Transition ms $ do
   newpo <- updateProcess pd
   let totalPo = po <> newpo
@@ -162,9 +172,10 @@ updateEvent ms _ (EventAskPassWatch andThen po pd) = Transition ms $ do
       threadDelayMillis 500
       pure (adminEvent (EventAskPassWatch andThen totalPo pd))
     Just ExitSuccess ->
-      pure (adminEvent (andThen (totalPo ^. poStdout . to decodeUtf8)))
+      pure
+        (adminEvent (andThen (Password (totalPo ^. poStdout . to decodeUtf8))))
     Just (ExitFailure _) -> pure Nothing
-updateEvent ms _ (EventRebuildStarted pd) =
+updateEvent ms _ (EventRebuildStarted pd password) =
   Transition
       (  ms
       &  msAdminState
@@ -176,7 +187,7 @@ updateEvent ms _ (EventRebuildStarted pd) =
       .  rdProcessOutput
       .~ mempty
       )
-    $ pure (adminEvent (EventRebuildWatch mempty pd))
+    $ pure (adminEvent (EventRebuildWatch password mempty pd))
 updateEvent ms _ (EventGarbageStarted pd) =
   Transition
       (  ms
@@ -212,7 +223,7 @@ updateEvent ms _ (EventGarbageWatch priorOutput pd) =
             threadDelayMillis 500
             pure (adminEvent (EventGarbageWatch newOutput pd))
           Just code -> pure (adminEvent (EventGarbageFinished newOutput code))
-updateEvent ms _ (EventRebuildWatch priorOutput pd) =
+updateEvent ms _ (EventRebuildWatch password priorOutput pd) =
   Transition
       (  ms
       &  msAdminState
@@ -232,8 +243,12 @@ updateEvent ms _ (EventRebuildWatch priorOutput pd) =
         case updates ^. poResult . to getFirst of
           Nothing -> do
             threadDelayMillis 500
-            pure (adminEvent (EventRebuildWatch newOutput pd))
-          Just code -> pure (adminEvent (EventRebuildFinished newOutput code))
+            pure (adminEvent (EventRebuildWatch password newOutput pd))
+          Just code@ExitSuccess ->
+            pure (adminEvent (EventRebuildFinished newOutput code))
+          Just code@(ExitFailure _) -> do
+            rollbackRebuild password
+            pure (adminEvent (EventRebuildFinished newOutput code))
 updateEvent ms _ (EventGarbageFinished totalOutput _exitCode) = pureTransition
   (  ms
   &  msAdminState
@@ -261,11 +276,13 @@ updateEvent ms _ (EventRebuildFinished totalOutput _exitCode) =
       .~ NoChanges
       )
     $ pure (packagesEvent PackagesEvent.EventReload)
-updateEvent ms _ (EventRebuildModeChanged newType) =
-  pureTransition $ case parseRebuildMode newType of
-    Nothing -> ms
-    Just newType' ->
-      ms & msAdminState . asRebuildData . rdActiveRebuildMode .~ newType'
+updateEvent ms _ (EventRebuildModeIdxChanged newIdx) =
+  pureTransition
+    $  ms
+    &  msAdminState
+    .  asRebuildData
+    .  rdActiveRebuildModeIdx
+    .~ newIdx
 updateEvent ms _ (EventRebuildChangeDetails newDetails) = pureTransition
   (ms & msAdminState . asRebuildData . rdDetailsState .~ newDetails)
 updateEvent ms _ (EventGarbageChangeDetails newDetails) = pureTransition

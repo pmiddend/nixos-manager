@@ -16,6 +16,8 @@ import qualified Data.Text.Lazy.Encoding       as TLE
 import           Data.Text                      ( Text
                                                 , pack
                                                 , unpack
+                                                , drop
+                                                , length
                                                 , replace
                                                 , singleton
                                                 , snoc
@@ -26,6 +28,8 @@ import           Data.List                      ( unfoldr )
 import           Prelude                 hiding ( putStrLn
                                                 , foldl
                                                 , null
+                                                , drop
+                                                , length
                                                 )
 import           Control.Lens                   ( Getter
                                                 , to
@@ -122,13 +126,15 @@ openTag t = "<" <> t <> ">"
 closeTag :: (IsString s, Semigroup s) => s -> s
 closeTag t = "</" <> t <> ">"
 
-kebapize :: Text -> Text
-kebapize = foldl
-  (\prior c -> if null prior
-    then singleton (toLower c)
-    else if isUpper c then prior <> snoc "-" (toLower c) else snoc prior c
-  )
-  mempty
+kebapize :: Text -> Text -> Text
+kebapize prefix =
+  foldl
+      (\prior c -> if null prior
+        then singleton (toLower c)
+        else if isUpper c then prior <> snoc "-" (toLower c) else snoc prior c
+      )
+      mempty
+    . drop (length prefix)
 
 surroundSimple :: (IsString s, Semigroup s) => s -> s -> s
 surroundSimple tag content = openTag tag <> content <> closeTag tag

@@ -9,7 +9,6 @@ module NixManager.View.ComboBox
   ( comboBox
   , ComboBoxChangeEvent(ComboBoxChangeEvent)
   , ComboBoxProperties(ComboBoxProperties)
-  , ComboBoxIndexType
   )
 where
 
@@ -40,26 +39,15 @@ import           Control.Lens                   ( makeLenses
                                                 , (^.)
                                                 , to
                                                 )
-import           Data.Int                       ( Int32 )
-
-type ComboBoxIndexType = Int32
 
 data ComboBoxProperties = ComboBoxProperties {
     _cbpValues :: [Text]
-  , _cbpActive :: Maybe ComboBoxIndexType
+  , _cbpActive :: Int
   } deriving(Eq)
 
 makeLenses ''ComboBoxProperties
 
-fromActive :: ComboBoxIndexType -> Maybe ComboBoxIndexType
-fromActive x | x < 0     = Nothing
-             | otherwise = Just x
-
-toActive :: Maybe ComboBoxIndexType -> ComboBoxIndexType
-toActive Nothing  = -1
-toActive (Just x) = x
-
-newtype ComboBoxChangeEvent = ComboBoxChangeEvent (Maybe ComboBoxIndexType)
+newtype ComboBoxChangeEvent = ComboBoxChangeEvent Int
 
 comboBox
   :: Vector (Attribute Gtk.ComboBoxText ComboBoxChangeEvent)
@@ -80,14 +68,14 @@ comboBox customAttributes customParams = Widget
   customCreate props = do
     box <- Gtk.new Gtk.ComboBoxText []
     forM_ (props ^. cbpValues) $ Gtk.comboBoxTextInsert box (-1) Nothing
-    Gtk.comboBoxSetActive box (props ^. cbpActive . to toActive)
+    Gtk.comboBoxSetActive box (props ^. cbpActive . to fromIntegral)
     pure (box, ())
   customSubscribe _params _internalState widget cb = do
     h <-
       Gtk.on widget #changed
       $   cb
       .   ComboBoxChangeEvent
-      .   fromActive
+      .   fromIntegral
       =<< Gtk.comboBoxGetActive widget
     pure (fromCancellation (GI.signalHandlerDisconnect widget h))
   customPatch oldParams newParams _
@@ -97,6 +85,9 @@ comboBox customAttributes customParams = Widget
         Gtk.comboBoxTextRemoveAll widget
         forM_ (newParams ^. cbpValues)
           $ Gtk.comboBoxTextInsert widget (-1) Nothing
-      when ((oldParams ^. cbpActive) /= (newParams ^. cbpActive)) $ void
-        (Gtk.comboBoxSetActive widget (newParams ^. cbpActive . to toActive))
+      when ((oldParams ^. cbpActive) /= (newParams ^. cbpActive))
+        $ void
+            (Gtk.comboBoxSetActive widget
+                                   (newParams ^. cbpActive . to fromIntegral)
+            )
 

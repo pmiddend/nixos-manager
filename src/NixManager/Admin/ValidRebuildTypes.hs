@@ -24,12 +24,12 @@ rebuildTypesWithDescription =
   [ ( NixRebuildSwitch
     , "Build and activate the changes immediately. You can go back to previous configurations by rebooting and selecting an older generation."
     )
-  , ( NixRebuildBoot
-    , "Build the new configuration and make it the boot default, but do not activate it. That is, the system continues to run the previous configuration until the next reboot."
-    )
-  , ( NixRebuildTest
-    , "Build and activate the new configuration, but do not add it to the GRUB boot menu. Thus, if you reboot the system (or if it crashes), you will automatically revert to the default configuration (i.e. the configuration resulting from the last rebuild)."
-    )
+  -- , ( NixRebuildBoot
+  --   , "Build the new configuration and make it the boot default, but do not activate it. That is, the system continues to run the previous configuration until the next reboot."
+  --   )
+  -- , ( NixRebuildTest
+  --   , "Build and activate the new configuration, but do not add it to the GRUB boot menu. Thus, if you reboot the system (or if it crashes), you will automatically revert to the default configuration (i.e. the configuration resulting from the last rebuild)."
+  --   )
   , ( NixRebuildDryBuild
     , "Show what store paths would be built or downloaded by any of the operations above, but otherwise do nothing."
     )
@@ -40,4 +40,3 @@ rebuildTypesWithDescription =
 
 rebuildTypes :: [NixRebuildMode]
 rebuildTypes = fst <$> rebuildTypesWithDescription
-

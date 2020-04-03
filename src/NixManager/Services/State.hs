@@ -15,11 +15,6 @@ where
 import           Control.Lens                   ( makePrisms
                                                 , makeLenses
                                                 )
-import           NixManager.Services.ServiceCategory
-                                                ( ServiceCategory
-                                                  ( ServiceCategoryServices
-                                                  )
-                                                )
 import           NixManager.Services.StateData  ( StateData(StateData) )
 import           NixManager.Services.Download   ( DownloadState )
 import           Data.Text                      ( Text )
@@ -58,11 +53,7 @@ initState = do
         Success options -> do
           services' <- readLocalServiceFile
           case services' of
-            Error   e        -> pure (StateInvalidExpr e)
-            Success services -> pure $ StateDone
-              (StateData (makeServices options)
-                         Nothing
-                         services
-                         mempty
-                         ServiceCategoryServices
-              )
+            Error e -> pure (StateInvalidExpr e)
+            Success services ->
+              pure $ StateDone
+                (StateData (makeServices options) Nothing services mempty 0)

@@ -5,7 +5,6 @@ module NixManager.NixGarbage
 where
 
 import           NixManager.AskPass             ( sudoExpr )
-import           Data.Text                      ( Text )
 import           Data.Text.Encoding             ( encodeUtf8 )
 import           NixManager.Util                ( mwhen )
 import           NixManager.BashDsl             ( Expr(Command) )
@@ -13,13 +12,16 @@ import           Prelude                 hiding ( readFile )
 import           NixManager.Process             ( runProcess
                                                 , ProcessData
                                                 )
+import           NixManager.Password            ( Password
+                                                , getPassword
+                                                )
 
 collectGarbageExpr :: Bool -> Expr
 collectGarbageExpr olderGenerations =
   Command "nix-collect-garbage" (mwhen olderGenerations ["-d"])
 
-collectGarbage :: Bool -> Text -> IO ProcessData
+collectGarbage :: Bool -> Password -> IO ProcessData
 collectGarbage olderGenerations password = runProcess
-  (Just (encodeUtf8 password))
+  (Just (encodeUtf8 (getPassword password)))
   (sudoExpr (collectGarbageExpr olderGenerations))
 

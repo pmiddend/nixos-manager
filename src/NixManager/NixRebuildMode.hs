@@ -1,11 +1,22 @@
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.NixRebuildMode
   ( NixRebuildMode(..)
-  , parseRebuildMode
+  , isDry
+  , rebuildModes
+  , rebuildModeIdx
+  , rebuildModeToText
   )
 where
 
+import           NixManager.Util                ( showText
+                                                , kebapize
+                                                )
+import           Data.List                      ( elemIndex )
+import           Data.Maybe                     ( fromJust )
 import           Data.Text                      ( Text )
+import           Control.Lens                   ( iso
+                                                , Iso'
+                                                )
 
 data NixRebuildMode = NixRebuildSwitch
  | NixRebuildBoot
@@ -16,28 +27,20 @@ data NixRebuildMode = NixRebuildSwitch
  | NixRebuildEdit
  | NixRebuildBuildVm
  | NixRebuildBuildVmWithBootloader
- deriving(Eq, Ord, Bounded, Enum)
+ deriving(Eq, Ord, Bounded, Enum, Show)
 
-instance Show NixRebuildMode where
-  show NixRebuildSwitch                = "switch"
-  show NixRebuildBoot                  = "boot"
-  show NixRebuildTest                  = "test"
-  show NixRebuildBuild                 = "build"
-  show NixRebuildDryBuild              = "dry-build"
-  show NixRebuildDryActivate           = "dry-activate"
-  show NixRebuildEdit                  = "edit"
-  show NixRebuildBuildVm               = "build-vm"
-  show NixRebuildBuildVmWithBootloader = "build-vm-with-bootloader"
+rebuildModeToText :: NixRebuildMode -> Text
+rebuildModeToText = kebapize "NixRebuild" . showText
 
-parseRebuildMode :: Text -> Maybe NixRebuildMode
-parseRebuildMode "switch"       = Just NixRebuildSwitch
-parseRebuildMode "boot"         = Just NixRebuildBoot
-parseRebuildMode "test"         = Just NixRebuildTest
-parseRebuildMode "build"        = Just NixRebuildBuild
-parseRebuildMode "dry-build"    = Just NixRebuildDryBuild
-parseRebuildMode "dry-activate" = Just NixRebuildDryActivate
-parseRebuildMode "edit"         = Just NixRebuildEdit
-parseRebuildMode "build-vm"     = Just NixRebuildBuildVm
-parseRebuildMode "build-vm-with-bootloader" =
-  Just NixRebuildBuildVmWithBootloader
-parseRebuildMode _ = Nothing
+isDry :: NixRebuildMode -> Bool
+isDry NixRebuildDryBuild              = True
+isDry NixRebuildDryActivate           = True
+isDry NixRebuildBuildVm               = True
+isDry NixRebuildBuildVmWithBootloader = True
+isDry _                               = False
+
+rebuildModes :: [NixRebuildMode]
+rebuildModes = [minBound .. maxBound]
+
+rebuildModeIdx :: Iso' NixRebuildMode Int
+rebuildModeIdx = iso (fromJust . (`elemIndex` rebuildModes)) (rebuildModes !!)

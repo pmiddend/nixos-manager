@@ -2,7 +2,7 @@
 module NixManager.Admin.RebuildData
   ( RebuildData(..)
   , rdBuildState
-  , rdActiveRebuildMode
+  , rdActiveRebuildModeIdx
   , rdDoUpdate
   , rdDoRollback
   , rdProcessOutput
@@ -11,10 +11,6 @@ module NixManager.Admin.RebuildData
   )
 where
 
-import           NixManager.NixRebuildMode      ( NixRebuildMode
-                                                  ( NixRebuildSwitch
-                                                  )
-                                                )
 import           Control.Lens                   ( makeLenses )
 import           NixManager.Process             ( ProcessOutput )
 import           NixManager.Admin.BuildState    ( BuildState )
@@ -26,7 +22,7 @@ import           NixManager.Admin.DetailsState  ( DetailsState
 data RebuildData = RebuildData {
     _rdProcessOutput :: ProcessOutput
   , _rdBuildState :: Maybe BuildState
-  , _rdActiveRebuildMode :: NixRebuildMode
+  , _rdActiveRebuildModeIdx :: Int
   , _rdDetailsState :: DetailsState
   , _rdDoUpdate :: Bool
   , _rdDoRollback :: Bool
@@ -35,5 +31,4 @@ data RebuildData = RebuildData {
 makeLenses ''RebuildData
 
 initialRebuildData :: RebuildData
-initialRebuildData =
-  RebuildData mempty Nothing NixRebuildSwitch DetailsContracted False False
+initialRebuildData = RebuildData mempty Nothing 0 DetailsContracted False False

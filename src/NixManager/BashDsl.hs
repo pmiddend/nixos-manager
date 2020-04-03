@@ -36,6 +36,7 @@ instance IsString Arg where
 data Expr = Command Text [Arg]
           | And Expr Expr
           | Or Expr Expr
+          | Then Expr Expr
           | Subshell Expr
 
 surround :: Text -> Text -> Text
@@ -54,6 +55,7 @@ maybeSurround (LiteralArg t) | specialChar t = surround "\"" (escape t)
 
 evalExpr :: Expr -> Text
 evalExpr (And     l r     ) = evalExpr l <> " && " <> evalExpr r
+evalExpr (Then    l r     ) = evalExpr l <> " ; " <> evalExpr r
 evalExpr (Or      l r     ) = evalExpr l <> " || " <> evalExpr r
 evalExpr (Command c args  ) = c <> " " <> unwords (maybeSurround <$> args)
 evalExpr (Subshell subExpr) = "(" <> evalExpr subExpr <> ")"

@@ -9,23 +9,22 @@ import           NixManager.Process             ( ProcessData
 import           NixManager.Admin.DetailsState  ( DetailsState )
 import           System.Exit                    ( ExitCode )
 import           NixManager.Changes             ( ChangeType )
-import           Data.Text                      ( Text )
-
+import           NixManager.Password            ( Password )
 
 data Event = EventRebuild
-           | EventRebuildWithPassword Text
-           | EventAskPassWatch (Text -> Event) ProcessOutput ProcessData
-           | EventRebuildStarted ProcessData
-           | EventRebuildWatch ProcessOutput ProcessData
+           | EventRebuildWithPassword Password
+           | EventAskPassWatch (Password -> Event) ProcessOutput ProcessData
+           | EventRebuildStarted ProcessData Password
+           | EventRebuildWatch Password ProcessOutput ProcessData
            | EventRebuildFinished ProcessOutput ExitCode
-           | EventRebuildModeChanged Text
+           | EventRebuildModeIdxChanged Int
            | EventRebuildDoUpdateChanged Bool
            | EventRebuildDoRollbackChanged Bool
            | EventRebuildCancel
            | EventRebuildChangeDetails DetailsState
            | EventGarbageChangeDetails DetailsState
            | EventGarbage
-           | EventGarbageWithPassword Text
+           | EventGarbageWithPassword Password
            | EventGarbageStarted ProcessData
            | EventGarbageWatch ProcessOutput ProcessData
            | EventGarbageFinished ProcessOutput ExitCode

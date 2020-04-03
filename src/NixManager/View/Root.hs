@@ -50,24 +50,24 @@ imagedLabel iconProps text = container
 
 view' :: ManagerState -> AppView Gtk.Window ManagerEvent
 view' s =
-  let
-    windowContents = notebook
-      []
-      [ pageWithTab
-        (imagedLabel
-          (IconProps Gtk.IconSizeButton IconName.ApplicationsSystem)
-          "Admin"
-        )
-        (AdminView.adminBox s)
-      , pageWithTab
-        (imagedLabel (IconProps Gtk.IconSizeButton IconName.PackageXGeneric)
-                     "Packages"
-        )
-        (PackagesView.packagesBox s)
-      , pageWithTab
-        (imagedLabel (IconProps Gtk.IconSizeButton IconName.PreferencesOther)
-                     "Services"
-        )
-        (ServicesView.servicesBox s)
-      ]
+  let windowContents = notebook
+        []
+        [ pageWithTab
+          (imagedLabel
+            (IconProps Gtk.IconSizeButton IconName.ApplicationsSystem)
+            "Administration"
+          )
+          (AdminView.adminBox s)
+        , pageWithTab
+          (imagedLabel (IconProps Gtk.IconSizeButton IconName.PackageXGeneric)
+                       "Add/Remove Software"
+          )
+          (PackagesView.packagesBox s)
+        , pageWithTab
+          (imagedLabel
+            (IconProps Gtk.IconSizeButton IconName.PreferencesOther)
+            "Configure your system"
+          )
+          (ServicesView.servicesBox s)
+        ]
   in  bin Gtk.Window windowAttributes windowContents

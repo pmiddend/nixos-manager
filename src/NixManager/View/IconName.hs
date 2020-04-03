@@ -25,4 +25,4 @@ data IconName = SystemRun
               deriving(Eq, Show)
 
 nameToGtk :: IconName -> Text
-nameToGtk = kebapize . showText
+nameToGtk = kebapize mempty . showText

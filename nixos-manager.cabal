@@ -46,6 +46,7 @@ executable nixos-manager
                      , NixManager.Packages.State
                      , NixManager.Packages.Update
                      , NixManager.Packages.View
+                     , NixManager.Password
                      , NixManager.Process
                      , NixManager.AskPass
                      , NixManager.Services.Download
