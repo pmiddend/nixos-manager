@@ -30,7 +30,7 @@ import           System.Directory               ( doesFileExist
                                                 )
 import           NixManager.Util                ( showText
                                                 , fromEither
-                                                , MaybeError(Success)
+                                                , TextualError
                                                 )
 import           Data.Bifunctor                 ( first )
 import           Control.Monad                  ( void )
@@ -224,17 +224,17 @@ exprParser =
     <|> try intParser
     <|> symbolParser
 
-parseNixString :: Text -> MaybeError NixExpr
+parseNixString :: Text -> TextualError NixExpr
 parseNixString =
   fromEither . first errorBundlePretty . parse exprParser "string expression"
 
-parseNixFile :: FilePath -> NixExpr -> IO (MaybeError NixExpr)
+parseNixFile :: FilePath -> NixExpr -> IO (TextualError NixExpr)
 parseNixFile fn defExpr = do
   exists <- doesFileExist fn
   if exists
     then
       fromEither . first errorBundlePretty . parse exprParser fn <$> readFile fn
-    else pure (Success defExpr)
+    else pure (Right defExpr)
 
 writeNixFile :: FilePath -> NixExpr -> IO ()
 writeNixFile fp e = do

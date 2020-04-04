@@ -51,7 +51,7 @@ import           NixManager.Services.Event      ( Event
                                                   , EventCategoryIdxChanged
                                                   )
                                                 )
-import           NixManager.Util                ( MaybeError(Success, Error)
+import           NixManager.Util                ( TextualError
                                                 , threadDelayMillis
                                                 )
 import           GI.Gtk.Declarative.App.Simple  ( Transition(Transition) )
@@ -93,9 +93,9 @@ updateEvent s (EventDownloadCheck var) =
   Transition (s & msServiceState . _StateDownloading . sddCounter +~ 1) $ do
     downloadResult <- ServiceDownload.result var
     case downloadResult of
-      Just (Error e) ->
+      Just (Left e) ->
         pure (servicesEvent (EventStateResult (StateInvalidOptions (Just e))))
-      Just (Success _) -> pure (servicesEvent EventStateReload)
+      Just (Right _) -> pure (servicesEvent EventStateReload)
       Nothing ->
         threadDelayMillis 500 >> pure (servicesEvent (EventDownloadCheck var))
 updateEvent s (EventDownloadStarted var) =

@@ -25,7 +25,7 @@ import           System.Directory               ( getXdgDirectory
 import           Control.Monad                  ( mzero )
 import           Prelude                 hiding ( readFile )
 import           Data.Map.Strict                ( Map )
-import           NixManager.Util                ( MaybeError
+import           NixManager.Util                ( TextualError
                                                 , toEither
                                                 , addToError
                                                 , fromEither
@@ -69,7 +69,7 @@ instance FromJSON NixServiceOption where
   parseJSON _ = mzero
 
 
-decodeOptions :: ByteString -> MaybeError (Map Text NixServiceOption)
+decodeOptions :: ByteString -> TextualError (Map Text NixServiceOption)
 decodeOptions =
   ( addToError "Couldn't read the options JSON file. The error was: "
     . fromEither
@@ -89,6 +89,6 @@ locateOptionsFile = do
   defExists   <- doesFileExist optionsPath
   if defExists then pure (Just optionsPath) else pure Nothing
 
-readOptionsFile :: FilePath -> IO (MaybeError (Map Text NixServiceOption))
+readOptionsFile :: FilePath -> IO (TextualError (Map Text NixServiceOption))
 readOptionsFile fp = decodeOptions <$> readFile fp
 

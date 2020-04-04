@@ -54,7 +54,7 @@ import           Data.Text                      ( Text
                                                 , strip
                                                 , stripPrefix
                                                 )
-import           NixManager.Util                ( MaybeError(Success, Error)
+import           NixManager.Util                ( TextualError
                                                 , decodeUtf8
                                                 , fromStrictBS
                                                 , splitRepeat
@@ -120,7 +120,7 @@ import           NixManager.Process             ( runProcess
                                                 )
 import           Data.Monoid                    ( First(getFirst) )
 
-searchPackages :: Text -> IO (MaybeError [NixPackage])
+searchPackages :: Text -> IO (TextualError [NixPackage])
 searchPackages t = do
   pd <- runProcess Nothing (nixSearch t)
   po <- waitUntilFinished pd
@@ -132,7 +132,7 @@ searchPackages t = do
     ExitSuccess      -> pure processedResult
     ExitFailure 1    -> pure processedResult
     ExitFailure code -> pure
-      (Error
+      (Left
         (  "Error executing \"nix search\" command (exit code "
         <> showText code
         <> "): standard error output: "
@@ -202,7 +202,7 @@ locateLocalPackagesFileMaybeCreate = do
   unless exists (writeLocalPackages emptyPackagesFile)
   pure pkgsFile
 
-parsePackagesExpr :: FilePath -> IO (MaybeError NixExpr)
+parsePackagesExpr :: FilePath -> IO (TextualError NixExpr)
 parsePackagesExpr fp =
   addToError
       ("Error parsing the "
@@ -211,16 +211,16 @@ parsePackagesExpr fp =
       )
     <$> parseNixFile fp emptyPackagesFile
 
-parsePackages :: FilePath -> IO (MaybeError [Text])
+parsePackages :: FilePath -> IO (TextualError [Text])
 parsePackages fp = ifSuccessIO (parsePackagesExpr fp) $ \expr ->
   case expr ^? packageLens of
-    Just packages -> pure (Success (Text.drop 5 <$> evalSymbols packages))
-    Nothing -> pure (Error "Couldn't find packages node in packages.nix file.")
+    Just packages -> pure (Right (Text.drop 5 <$> evalSymbols packages))
+    Nothing -> pure (Left "Couldn't find packages node in packages.nix file.")
 
-parseLocalPackages :: IO (MaybeError [Text])
+parseLocalPackages :: IO (TextualError [Text])
 parseLocalPackages = locateLocalPackagesFile >>= parsePackages
 
-parseLocalPackagesExpr :: IO (MaybeError NixExpr)
+parseLocalPackagesExpr :: IO (TextualError NixExpr)
 parseLocalPackagesExpr = locateLocalPackagesFile >>= parsePackagesExpr
 
 writeLocalPackages :: NixExpr -> IO ()
@@ -228,57 +228,59 @@ writeLocalPackages e = do
   pkgsFile <- locateLocalPackagesFile
   writeNixFile pkgsFile e
 
-packagesOrEmpty :: IO FilePath -> IO (MaybeError [Text])
+packagesOrEmpty :: IO FilePath -> IO (TextualError [Text])
 packagesOrEmpty fp' = do
   fp       <- fp'
   fpExists <- doesFileExist fp
-  if fpExists then parsePackages fp else pure (Success [])
+  if fpExists then parsePackages fp else pure (Right [])
 
-readInstalledPackages :: IO (MaybeError [Text])
+readInstalledPackages :: IO (TextualError [Text])
 readInstalledPackages = packagesOrEmpty locateRootPackagesFile
 
-readPendingPackages :: IO (MaybeError [Text])
+readPendingPackages :: IO (TextualError [Text])
 readPendingPackages =
   ifSuccessIO (packagesOrEmpty locateLocalPackagesFile) $ \local ->
     ifSuccessIO (packagesOrEmpty locateRootPackagesFile)
-      $ \root -> pure (Success (local \\ root))
+      $ \root -> pure (Right (local \\ root))
 
-readPendingUninstallPackages :: IO (MaybeError [Text])
+readPendingUninstallPackages :: IO (TextualError [Text])
 readPendingUninstallPackages =
   ifSuccessIO (packagesOrEmpty locateLocalPackagesFile) $ \local ->
     ifSuccessIO (packagesOrEmpty locateRootPackagesFile)
-      $ \root -> pure (Success (root \\ local))
+      $ \root -> pure (Right (root \\ local))
 
 packagePrefix :: Text
 packagePrefix = "pkgs."
 
-installPackage :: Text -> IO (MaybeError ())
+installPackage :: Text -> IO (TextualError ())
 installPackage p = ifSuccessIO parseLocalPackagesExpr $ \expr -> do
   writeLocalPackages
     (expr & packageLens . _NixList <>~ [NixSymbol (packagePrefix <> p)])
-  pure (Success ())
+  pure (Right ())
 
-uninstallPackage :: Text -> IO (MaybeError ())
+uninstallPackage :: Text -> IO (TextualError ())
 uninstallPackage p = ifSuccessIO parseLocalPackagesExpr $ \expr -> do
   writeLocalPackages
     (expr & packageLens . _NixList %~ filter
       (hasn't (_NixSymbol . only (packagePrefix <> p)))
     )
-  pure (Success ())
+  pure (Right ())
 
+evaluateStatus :: (Eq a, Foldable t1, Foldable t2, Foldable t3) =>
+                    a -> t3 a -> t2 a -> t1 a -> NixPackageStatus
 evaluateStatus name installedPackages pendingPackages pendingUninstallPackages
   | name `elem` pendingUninstallPackages = NixPackagePendingUninstall
   | name `elem` pendingPackages          = NixPackagePendingInstall
   | name `elem` installedPackages        = NixPackageInstalled
   | otherwise                            = NixPackageNothing
 
-readPackageCache :: IO (MaybeError [NixPackage])
+readPackageCache :: IO (TextualError [NixPackage])
 readPackageCache = ifSuccessIO (searchPackages "") $ \cache ->
   ifSuccessIO readInstalledPackages $ \installedPackages ->
     ifSuccessIO readPendingPackages $ \pendingPackages ->
       ifSuccessIO readPendingUninstallPackages $ \pendingUninstallPackages ->
         pure
-          $   Success
+          $   Right
           $   (\ip ->
                 ip
                   &  npStatus

@@ -48,7 +48,7 @@ import           NixManager.NixExpr             ( NixExpr
                                                 , writeNixFile
                                                 )
 import           NixManager.Util                ( Endo
-                                                , MaybeError
+                                                , TextualError
                                                 , addToError
                                                 )
 import           NixManager.NixServiceOptionLocation
@@ -116,7 +116,7 @@ locateLocalServicesFileMaybeCreate = do
   pure pkgsFile
 
 
-readLocalServiceFile :: IO (MaybeError NixExpr)
+readLocalServiceFile :: IO (TextualError NixExpr)
 readLocalServiceFile = do
   svcsFile <- locateLocalServicesFile
   addToError

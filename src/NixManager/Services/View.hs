@@ -60,7 +60,7 @@ import           Data.Text                      ( isInfixOf
                                                 , Text
                                                 )
 import           NixManager.Util                ( showText
-                                                , MaybeError(Error, Success)
+                                                , TextualError
                                                 , predAnd
                                                 , surroundSimple
                                                 )
@@ -246,8 +246,8 @@ buildOptionValueCell serviceExpression serviceOption =
     rawChangeEvent "" = ManagerEventServices
       (EventSettingChanged (set (optionLens' optionPath) Nothing))
     rawChangeEvent v = case parseNixString v of
-      Error   _ -> ManagerEventDiscard
-      Success e -> ManagerEventServices
+      Left   _ -> ManagerEventDiscard
+      Right e -> ManagerEventServices
         (EventSettingChanged (set (optionLens' optionPath) (Just e)))
     changeEvent v = ManagerEventServices
       (EventSettingChanged (set (optionLens' optionPath) (Just v)))
@@ -318,8 +318,8 @@ buildOptionValueCell serviceExpression serviceOption =
 
 convertMarkup :: Text -> Text
 convertMarkup t = case parseDocbook t of
-  Error   e -> "error parsing description: " <> e
-  Success v -> docbookToPango v
+  Left   e -> "error parsing description: " <> e
+  Right v -> docbookToPango v
 
 buildOptionRows :: NixExpr -> NixServiceOption -> BoxChild ManagerEvent
 buildOptionRows serviceExpression serviceOption =

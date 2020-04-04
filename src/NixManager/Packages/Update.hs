@@ -79,7 +79,7 @@ import           NixManager.Packages.Event      ( Event
                                                   , Uncancelled
                                                   )
                                                 )
-import           NixManager.Util                ( MaybeError(Success, Error)
+import           NixManager.Util                ( TextualError
                                                 , replaceHtmlEntities
                                                 , decodeUtf8
                                                 , showText
@@ -150,9 +150,9 @@ updateEvent s (EventInstall installationType) =
       installResult <- installPackage (selected ^. npName)
       cacheResult   <- readPackageCache
       case installResult >>= const cacheResult of
-        Success newCache ->
+        Right newCache ->
           pure (packagesEvent (EventInstallCompleted newCache installationType))
-        Error e -> pure
+        Left e -> pure
           (packagesEvent
             (EventOperationCompleted (errorMessage ("Install failed: " <> e))
                                      CompletionReload
@@ -165,9 +165,9 @@ updateEvent s (EventUninstall installationType) =
       uninstallResult <- uninstallPackage (selected ^. npName)
       cacheResult     <- readPackageCache
       case uninstallResult >>= const cacheResult of
-        Success newCache -> pure
+        Right newCache -> pure
           (packagesEvent (EventUninstallCompleted newCache installationType))
-        Error e -> pure
+        Left e -> pure
           (packagesEvent
             (EventOperationCompleted
               (errorMessage ("Uninstall failed: " <> e))
@@ -277,8 +277,8 @@ updateEvent s (EventSearchChanged t) = pureTransition
 updateEvent s EventReload = Transition s $ do
   cacheResult <- readPackageCache
   case cacheResult of
-    Success newCache -> pure (packagesEvent (EventReloadFinished newCache))
-    Error   e        -> pure
+    Right newCache -> pure (packagesEvent (EventReloadFinished newCache))
+    Left   e        -> pure
       (packagesEvent
         (EventOperationCompleted
           (errorMessage ("Couldn't reload packages cache: " <> e))

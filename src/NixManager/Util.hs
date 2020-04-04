@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.Util where
 
@@ -36,39 +34,20 @@ import           Control.Lens                   ( Getter
                                                 )
 import qualified Data.Text.Encoding            as Encoding
 
-data MaybeError e = Error Text
-                  | Success e
-                  deriving(Functor, Foldable)
+type TextualError = Either Text
 
-instance Show e => Show (MaybeError e) where
-  show (Error   e) = "error: " <> unpack e
-  show (Success e) = "success: " <> show e
-
-fromShowableError :: Show ex => Either ex e -> MaybeError e
+fromShowableError :: Show ex => Either ex e -> TextualError e
 fromShowableError = fromEither . first show
 
+fromEither :: Either String e -> TextualError e
+fromEither = first pack
 
-fromEither :: Either String e -> MaybeError e
-fromEither (Left  e) = Error (pack e)
-fromEither (Right v) = Success v
+toEither :: TextualError e -> Either Text e
+toEither = id
 
-toEither :: MaybeError e -> Either Text e
-toEither (Error   e) = Left e
-toEither (Success e) = Right e
-
-errorFallback :: e -> MaybeError e -> e
-errorFallback v (Error   _) = v
-errorFallback _ (Success v) = v
-
-instance Applicative MaybeError where
-  pure = Success
-  (Error   v) <*> _           = Error v
-  (Success _) <*> (Error   v) = Error v
-  (Success f) <*> (Success v) = Success (f v)
-
-instance Monad MaybeError where
-  (Error   e) >>= _ = Error e
-  (Success v) >>= f = f v
+errorFallback :: e -> TextualError e -> e
+errorFallback v (Left   _) = v
+errorFallback _ (Right v) = v
 
 ifNothing :: Monoid p => Maybe a -> p -> p
 ifNothing v f = case v of
@@ -76,28 +55,11 @@ ifNothing v f = case v of
   _       -> mempty
 
 ifSuccessIO
-  :: Monad m => m (MaybeError t) -> (t -> m (MaybeError a)) -> m (MaybeError a)
-ifSuccessIO v f = do
-  v' <- v
-  ifSuccess v' f
+  :: Monad m => m (TextualError t) -> (t -> m (TextualError a)) -> m (TextualError a)
+ifSuccessIO v f = v >>= either (pure . Left) f
 
-addToError :: Text -> Endo (MaybeError a)
-addToError prefix (Error t) = Error (prefix <> t)
-addToError _      v         = v
-
-ifSuccess
-  :: Applicative f
-  => MaybeError t
-  -> (t -> f (MaybeError a))
-  -> f (MaybeError a)
-ifSuccess v f = case v of
-  Error   e  -> pure (Error e)
-  Success v' -> f v'
--- errorMessageFromString :: String -> ErrorMessage
--- errorMessageFromString = ErrorMessage . pack
-
--- printError :: ErrorMessage -> IO ()
--- printError (ErrorMessage e) = putStrLn e
+addToError :: Text -> Endo (TextualError a)
+addToError prefix = first (prefix <>)
 
 showText :: Show a => a -> Text
 showText = pack . show

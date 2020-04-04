@@ -11,7 +11,7 @@ import qualified NixManager.Packages.State     as PackagesState
 import           NixManager.View.ErrorDialog    ( runErrorDialog )
 import           NixManager.View.Css            ( initCss )
 import           NixManager.ManagerState        ( ManagerState(..) )
-import           NixManager.Util                ( MaybeError(Success, Error)
+import           NixManager.Util                ( TextualError
                                                 , ifSuccessIO
                                                 )
 import           NixManager.View.Root           ( view' )
@@ -28,11 +28,11 @@ import           Prelude                 hiding ( length
                                                 , putStrLn
                                                 )
 
-initState :: IO (MaybeError ManagerState)
+initState :: IO (TextualError ManagerState)
 initState = ifSuccessIO PackagesState.initState $ \packagesState -> do
   serviceState <- ServicesState.initState
   adminState   <- AdminState.initState
-  pure $ Success $ ManagerState { _msPackagesState = packagesState
+  pure $ Right $ ManagerState { _msPackagesState = packagesState
                                 , _msServiceState  = serviceState
                                 , _msAdminState    = adminState
                                 }
@@ -43,8 +43,8 @@ nixMain = do
   initCss
   initialState' <- initState
   case initialState' of
-    Error   e -> runErrorDialog e
-    Success s -> void $ run App { view         = view'
+    Left   e -> runErrorDialog e
+    Right s -> void $ run App { view         = view'
                                 , update       = GlobalUpdate.update
                                 , inputs       = []
                                 , initialState = s

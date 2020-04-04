@@ -30,7 +30,7 @@ import           Control.Concurrent             ( forkIO
                                                 , ThreadId
                                                 , killThread
                                                 )
-import           NixManager.Util                ( MaybeError(Success, Error)
+import           NixManager.Util                ( TextualError
                                                 , showText
                                                 )
 import           Control.Lens                   ( makeLenses
@@ -41,7 +41,7 @@ import           Data.ByteString.Lazy           ( ByteString
                                                 , writeFile
                                                 )
 
-type DownloadResult = MaybeError FilePath
+type DownloadResult = TextualError FilePath
 
 type DownloadVar = MVar DownloadResult
 
@@ -61,7 +61,7 @@ start = do
   resultThreadId <- forkIO $ do
     r' <- tryDownload
     case r' of
-      Left ex -> putMVar resultVar (Error ("I/O error: " <> showText ex))
+      Left ex -> putMVar resultVar (Left ("I/O error: " <> showText ex))
       Right response ->
         let sc = response ^. responseStatus . statusCode
         in  if sc == 200
@@ -69,10 +69,10 @@ start = do
                 optLoc <- desiredOptionsFileLocation
                 createDirectoryIfMissing True (dropFileName optLoc)
                 writeFile optLoc (response ^. responseBody)
-                putMVar resultVar (Success optLoc)
+                putMVar resultVar (Right optLoc)
               else putMVar
                 resultVar
-                (Error ("HTTP error, status code: " <> showText sc))
+                (Left ("HTTP error, status code: " <> showText sc))
   pure (DownloadState resultVar resultThreadId)
 
 cancel :: DownloadState -> IO ()

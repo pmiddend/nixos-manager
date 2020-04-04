@@ -20,7 +20,7 @@ import           Text.XML                       ( parseText
                                                   )
                                                 )
 import           Data.Default                   ( def )
-import           NixManager.Util                ( MaybeError
+import           NixManager.Util                ( TextualError
                                                 , Endo
                                                 , surroundSimple
                                                 , fromShowableError
@@ -41,7 +41,7 @@ import           Text.XML.Lens                  ( nodes
                                                 )
 import           Data.Text.Lazy                 ( fromStrict )
 
-parseDocbook :: Text -> MaybeError Document
+parseDocbook :: Text -> TextualError Document
 parseDocbook =
   addToError "error parsing documentation: "
     . fromShowableError

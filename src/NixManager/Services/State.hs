@@ -24,7 +24,7 @@ import           NixManager.NixServiceOption    ( readOptionsFile
 import           NixManager.NixService          ( makeServices
                                                 , readLocalServiceFile
                                                 )
-import           NixManager.Util                ( MaybeError(Success, Error) )
+import           NixManager.Util                ( TextualError )
 
 data StateDownloadingData = StateDownloadingData {
     _sddCounter :: Int
@@ -49,11 +49,11 @@ initState = do
     Just optionsFile -> do
       options' <- readOptionsFile optionsFile
       case options' of
-        Error   e       -> pure (StateInvalidOptions (Just e))
-        Success options -> do
+        Left   e       -> pure (StateInvalidOptions (Just e))
+        Right options -> do
           services' <- readLocalServiceFile
           case services' of
-            Error e -> pure (StateInvalidExpr e)
-            Success services ->
+            Left e -> pure (StateInvalidExpr e)
+            Right services ->
               pure $ StateDone
                 (StateData (makeServices options) Nothing services mempty 0)

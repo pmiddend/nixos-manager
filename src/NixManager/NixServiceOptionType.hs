@@ -166,7 +166,7 @@ serviceOptionTypeParser =
   in
     expressionParser
 
-parseNixServiceOptionType :: Text -> MaybeError NixServiceOptionType
+parseNixServiceOptionType :: Text -> TextualError NixServiceOptionType
 parseNixServiceOptionType t = fromEither
   ( first errorBundlePretty
   . parse serviceOptionTypeParser "NixOS type expression"

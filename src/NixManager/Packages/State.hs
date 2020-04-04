@@ -20,7 +20,7 @@ where
 
 import           NixManager.Process             ( ProcessData )
 import           NixManager.NixPackages         ( readPackageCache )
-import           NixManager.Util                ( MaybeError(Success)
+import           NixManager.Util                ( TextualError
                                                 , ifSuccessIO
                                                 )
 import           NixManager.NixPackageStatus    ( NixPackageStatus
@@ -111,8 +111,8 @@ psSelectedPackage = to f
     Nothing     -> Nothing
     Just pkgIdx -> s ^? psSearchResult . ix pkgIdx
 
-initState :: IO (MaybeError State)
-initState = ifSuccessIO readPackageCache $ \cache -> pure $ Success $ State
+initState :: IO (TextualError State)
+initState = ifSuccessIO readPackageCache $ \cache -> pure $ Right $ State
   { _psPackageCache      = cache
   , _psSearchString      = mempty
   , _psSelectedIdx       = Nothing

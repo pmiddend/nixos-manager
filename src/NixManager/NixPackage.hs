@@ -1,17 +1,17 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.NixPackage
-  ( NixPackage(..)
-  , npName
-  , npPath
-  , npVersion
-  , npDescription
-  , npStatus
-  , readPackagesJson
-  )
+        ( NixPackage(..)
+        , npName
+        , npPath
+        , npVersion
+        , npDescription
+        , npStatus
+        , readPackagesJson
+        )
 where
 
-import           NixManager.Util                ( MaybeError
+import           NixManager.Util                ( TextualError
                                                 , fromEither
                                                 )
 import           Data.ByteString.Lazy           ( ByteString )
@@ -29,8 +29,8 @@ import           NixManager.NixPackageMeta      ( NixPackageMeta
                                                 , npmDescription
                                                 )
 import           NixManager.NixPackageStatus    ( NixPackageStatus
-                                                  ( NixPackageNothing
-                                                  )
+                                                        ( NixPackageNothing
+                                                        )
                                                 )
 
 data NixPackage = NixPackage {
@@ -43,15 +43,15 @@ data NixPackage = NixPackage {
 
 makeLenses ''NixPackage
 
-readPackagesJson :: ByteString -> MaybeError [NixPackage]
+readPackagesJson :: ByteString -> TextualError [NixPackage]
 readPackagesJson = (packagesFromMap <$>) . fromEither . eitherDecode
 
 packagesFromMap :: Map Text NixPackageMeta -> [NixPackage]
 packagesFromMap m =
-  (\(path, meta) -> NixPackage (meta ^. npmName)
-                               path
-                               (meta ^. npmVersion)
-                               (meta ^. npmDescription)
-                               NixPackageNothing
-    )
-    <$> toList m
+        (\(path, meta) -> NixPackage (meta ^. npmName)
+                                     path
+                                     (meta ^. npmVersion)
+                                     (meta ^. npmDescription)
+                                     NixPackageNothing
+                )
+                <$> toList m
