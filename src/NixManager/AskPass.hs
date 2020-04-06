@@ -9,7 +9,7 @@ module NixManager.AskPass
 where
 
 import           Data.Text                      ( Text )
-import           NixManager.Bash             ( Expr(Command)
+import           NixManager.Bash                ( Expr(Command)
                                                 , Arg(LiteralArg)
                                                 , evalExpr
                                                 )

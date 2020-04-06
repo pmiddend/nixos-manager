@@ -1,17 +1,27 @@
 {-# LANGUAGE OverloadedStrings #-}
-module NixManager.PosixTools(mkdir, cp, mv, kill) where
+module NixManager.PosixTools
+  ( mkdir
+  , cp
+  , mv
+  , kill
+  )
+where
 
-import System.Process(Pid)
+import           System.Process                 ( Pid )
 import           Data.Foldable                  ( toList )
-import           NixManager.Util                ( mwhen, showText )
-import NixManager.Bash(Expr(Command), Arg(LiteralArg, RawArg))
+import           NixManager.Util                ( mwhen
+                                                , showText
+                                                )
+import           NixManager.Bash                ( Expr(Command)
+                                                , Arg(LiteralArg, RawArg)
+                                                )
 import           Data.Text                      ( Text
                                                 , unwords
                                                 , replace
                                                 , isInfixOf
                                                 , pack
                                                 )
-import Data.List.NonEmpty(NonEmpty)
+import           Data.List.NonEmpty             ( NonEmpty )
 
 mkdir :: Bool -> NonEmpty FilePath -> Expr
 mkdir recursive paths = Command

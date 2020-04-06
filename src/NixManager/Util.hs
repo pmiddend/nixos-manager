@@ -46,7 +46,7 @@ toEither :: TextualError e -> Either Text e
 toEither = id
 
 errorFallback :: e -> TextualError e -> e
-errorFallback v (Left   _) = v
+errorFallback v (Left  _) = v
 errorFallback _ (Right v) = v
 
 ifNothing :: Monoid p => Maybe a -> p -> p
@@ -55,7 +55,10 @@ ifNothing v f = case v of
   _       -> mempty
 
 ifSuccessIO
-  :: Monad m => m (TextualError t) -> (t -> m (TextualError a)) -> m (TextualError a)
+  :: Monad m
+  => m (TextualError t)
+  -> (t -> m (TextualError a))
+  -> m (TextualError a)
 ifSuccessIO v f = v >>= either (pure . Left) f
 
 addToError :: Text -> Endo (TextualError a)

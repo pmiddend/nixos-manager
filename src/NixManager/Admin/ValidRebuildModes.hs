@@ -7,9 +7,11 @@ module NixManager.Admin.ValidRebuildModes
   )
 where
 
-import Data.Maybe(fromJust)
-import Control.Lens(Iso', iso)
-import Data.List(elemIndex)
+import           Data.Maybe                     ( fromJust )
+import           Control.Lens                   ( Iso'
+                                                , iso
+                                                )
+import           Data.List                      ( elemIndex )
 import           NixManager.NixRebuildMode      ( NixRebuildMode
                                                   ( NixRebuildSwitch
                                                   , NixRebuildBoot
@@ -46,4 +48,5 @@ validRebuildModes :: [NixRebuildMode]
 validRebuildModes = fst <$> validRebuildModesWithDescription
 
 validRebuildModeIdx :: Iso' NixRebuildMode Int
-validRebuildModeIdx = iso (fromJust . (`elemIndex` validRebuildModes)) (validRebuildModes !!)
+validRebuildModeIdx =
+  iso (fromJust . (`elemIndex` validRebuildModes)) (validRebuildModes !!)

@@ -40,7 +40,7 @@ import           System.Process                 ( ProcessHandle
                                                 )
 import           System.IO                      ( Handle )
 import           System.Exit                    ( ExitCode )
-import           NixManager.Bash             ( Expr
+import           NixManager.Bash                ( Expr
                                                 , evalExpr
                                                 )
 import           Data.Text                      ( unpack )

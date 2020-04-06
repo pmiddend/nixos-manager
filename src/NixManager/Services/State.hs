@@ -49,7 +49,7 @@ initState = do
     Just optionsFile -> do
       options' <- readOptionsFile optionsFile
       case options' of
-        Left   e       -> pure (StateInvalidOptions (Just e))
+        Left  e       -> pure (StateInvalidOptions (Just e))
         Right options -> do
           services' <- readLocalServiceFile
           case services' of

@@ -278,7 +278,7 @@ updateEvent s EventReload = Transition s $ do
   cacheResult <- readPackageCache
   case cacheResult of
     Right newCache -> pure (packagesEvent (EventReloadFinished newCache))
-    Left   e        -> pure
+    Left  e        -> pure
       (packagesEvent
         (EventOperationCompleted
           (errorMessage ("Couldn't reload packages cache: " <> e))

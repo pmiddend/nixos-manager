@@ -8,11 +8,15 @@ module NixManager.Admin.Update
   )
 where
 
-import Control.Monad(void)
-import NixManager.PosixTools(kill)
-import qualified Data.ByteString.Char8 as BS
-import Debug.Trace(traceShowId)
-import           NixManager.Password            ( Password(Password, getPassword) )
+import           Control.Monad                  ( void )
+import           NixManager.PosixTools          ( kill )
+import qualified Data.ByteString.Char8         as BS
+import           Debug.Trace                    ( traceShowId )
+import           NixManager.Password            ( Password
+                                                  ( Password
+                                                  , getPassword
+                                                  )
+                                                )
 import           NixManager.NixGarbage          ( collectGarbage )
 import           NixManager.ManagerEvent        ( adminEvent
                                                 , ManagerEvent
@@ -20,7 +24,9 @@ import           NixManager.ManagerEvent        ( adminEvent
                                                 , packagesEvent
                                                 )
 import qualified NixManager.Packages.Event     as PackagesEvent
-import           Data.Text.Encoding             ( decodeUtf8, encodeUtf8 )
+import           Data.Text.Encoding             ( decodeUtf8
+                                                , encodeUtf8
+                                                )
 import           System.Exit                    ( ExitCode
                                                   ( ExitSuccess
                                                   , ExitFailure
@@ -86,11 +92,15 @@ import           NixManager.Admin.Event         ( Event
 import           NixManager.ManagerState        ( ManagerState(..)
                                                 , msAdminState
                                                 )
-import           NixManager.Util                ( threadDelayMillis, showText )
+import           NixManager.Util                ( threadDelayMillis
+                                                , showText
+                                                )
 import           NixManager.Changes             ( determineChanges
                                                 , ChangeType(NoChanges)
                                                 )
-import           NixManager.AskPass             ( askPass, sudoExpr )
+import           NixManager.AskPass             ( askPass
+                                                , sudoExpr
+                                                )
 import           NixManager.NixRebuild          ( rebuild
                                                 , rollbackRebuild
                                                 )
@@ -119,7 +129,8 @@ import           NixManager.Admin.BuildState    ( bsProcessData
                                                 , BuildState(BuildState)
                                                 )
 import           NixManager.NixRebuildMode      ( rebuildModeIdx )
-import           NixManager.Admin.ValidRebuildModes      ( validRebuildModeIdx )
+import           NixManager.Admin.ValidRebuildModes
+                                                ( validRebuildModeIdx )
 
 calculateRebuildUpdateMode :: Bool -> Bool -> NixRebuildUpdateMode
 calculateRebuildUpdateMode _update@True _ = NixRebuildUpdateUpdate
@@ -128,7 +139,7 @@ calculateRebuildUpdateMode _ _ = NixRebuildUpdateNone
 
 formatExitCode :: ExitCode -> BS.ByteString
 formatExitCode (ExitFailure code) = "error code " <> BS.pack (show code)
-formatExitCode ExitSuccess = "success"
+formatExitCode ExitSuccess        = "success"
 
 updateEvent
   :: ManagerState -> State -> Event -> Transition ManagerState ManagerEvent
@@ -139,19 +150,21 @@ updateEvent ms _ EventGarbage = Transition
   ms
   (adminEvent . EventAskPassWatch EventGarbageWithPassword mempty <$> askPass)
 updateEvent ms _ EventRebuildCancel =
-  Transition (ms & msAdminState . asRebuildData . rdBuildState .~ Nothing) $
-    case ms ^. msAdminState . asRebuildData . rdBuildState of
-      Nothing -> pure Nothing
-      Just bs -> do
-        pid' <- getProcessId (bs ^. bsProcessData)
-        case pid' of
-          Nothing -> pure Nothing
-          Just pid -> do
-            pd <- runProcess (Just (encodeUtf8 (getPassword (bs ^. bsPassword)))) (sudoExpr (kill pid))
-            po <- waitUntilFinished pd
-            BS.putStrLn ((po ^. poStderr <> po ^. poStdout))
-            pure Nothing
-            
+  Transition (ms & msAdminState . asRebuildData . rdBuildState .~ Nothing)
+    $ case ms ^. msAdminState . asRebuildData . rdBuildState of
+        Nothing -> pure Nothing
+        Just bs -> do
+          pid' <- getProcessId (bs ^. bsProcessData)
+          case pid' of
+            Nothing  -> pure Nothing
+            Just pid -> do
+              pd <- runProcess
+                (Just (encodeUtf8 (getPassword (bs ^. bsPassword))))
+                (sudoExpr (kill pid))
+              po <- waitUntilFinished pd
+              BS.putStrLn ((po ^. poStderr <> po ^. poStdout))
+              pure Nothing
+
 updateEvent ms _ EventGarbageCancel =
   Transition (ms & msAdminState . asGarbageData . gdBuildState .~ Nothing) $ do
     terminate
@@ -276,7 +289,10 @@ updateEvent ms _ (EventGarbageFinished totalOutput exitCode) = pureTransition
   &  msAdminState
   .  asGarbageData
   .  gdProcessOutput
-  .~ (totalOutput & poStdout <>~ ("\nFinished with " <> formatExitCode exitCode))
+  .~ (   totalOutput
+     &   poStdout
+     <>~ ("\nFinished with " <> formatExitCode exitCode)
+     )
   )
 updateEvent ms _ (EventRebuildFinished totalOutput exitCode) =
   Transition
@@ -288,7 +304,10 @@ updateEvent ms _ (EventRebuildFinished totalOutput exitCode) =
       &  msAdminState
       .  asRebuildData
       .  rdProcessOutput
-      .~ (totalOutput & poStdout <>~ ("\nFinished with " <> formatExitCode exitCode))
+      .~ (   totalOutput
+         &   poStdout
+         <>~ ("\nFinished with " <> formatExitCode exitCode)
+         )
       &  msAdminState
       .  asChanges
       .~ NoChanges

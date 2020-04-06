@@ -246,7 +246,7 @@ buildOptionValueCell serviceExpression serviceOption =
     rawChangeEvent "" = ManagerEventServices
       (EventSettingChanged (set (optionLens' optionPath) Nothing))
     rawChangeEvent v = case parseNixString v of
-      Left   _ -> ManagerEventDiscard
+      Left  _ -> ManagerEventDiscard
       Right e -> ManagerEventServices
         (EventSettingChanged (set (optionLens' optionPath) (Just e)))
     changeEvent v = ManagerEventServices
@@ -318,7 +318,7 @@ buildOptionValueCell serviceExpression serviceOption =
 
 convertMarkup :: Text -> Text
 convertMarkup t = case parseDocbook t of
-  Left   e -> "error parsing description: " <> e
+  Left  e -> "error parsing description: " <> e
   Right v -> docbookToPango v
 
 buildOptionRows :: NixExpr -> NixServiceOption -> BoxChild ManagerEvent

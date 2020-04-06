@@ -33,9 +33,9 @@ initState = ifSuccessIO PackagesState.initState $ \packagesState -> do
   serviceState <- ServicesState.initState
   adminState   <- AdminState.initState
   pure $ Right $ ManagerState { _msPackagesState = packagesState
-                                , _msServiceState  = serviceState
-                                , _msAdminState    = adminState
-                                }
+                              , _msServiceState  = serviceState
+                              , _msAdminState    = adminState
+                              }
 
 nixMain :: IO ()
 nixMain = do
@@ -43,9 +43,9 @@ nixMain = do
   initCss
   initialState' <- initState
   case initialState' of
-    Left   e -> runErrorDialog e
+    Left  e -> runErrorDialog e
     Right s -> void $ run App { view         = view'
-                                , update       = GlobalUpdate.update
-                                , inputs       = []
-                                , initialState = s
-                                }
+                              , update       = GlobalUpdate.update
+                              , inputs       = []
+                              , initialState = s
+                              }

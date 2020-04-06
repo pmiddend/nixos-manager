@@ -27,4 +27,4 @@ data GarbageData = GarbageData {
 makeLenses ''GarbageData
 
 initialGarbageData :: GarbageData
-initialGarbageData = GarbageData mempty Nothing DetailsContracted True
+initialGarbageData = GarbageData mempty Nothing DetailsContracted False

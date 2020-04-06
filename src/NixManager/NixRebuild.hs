@@ -19,9 +19,11 @@ import           Data.Text.Encoding             ( encodeUtf8 )
 import           NixManager.Util                ( showText
                                                 , mwhen
                                                 )
-import NixManager.PosixTools(mkdir, cp, mv)
-import           NixManager.Bash             ( 
-                                                Expr
+import           NixManager.PosixTools          ( mkdir
+                                                , cp
+                                                , mv
+                                                )
+import           NixManager.Bash                ( Expr
                                                   ( And
                                                   , Command
                                                   , Or
@@ -82,12 +84,15 @@ installExpr rebuildMode updateMode = do
   localServicesFile <- locateLocalServicesFileMaybeCreate
   rootServicesFile  <- locateRootServicesFile
   rollback          <- rollbackExpr
-  let copyOldFiles = devNullify (copyToOld rootServicesFile `Then` copyToOld rootPackagesFile)
-      copyToRoot = cp localPackagesFile rootPackagesFile `And`           cp localServicesFile rootServicesFile
+  let copyOldFiles = devNullify
+        (copyToOld rootServicesFile `Then` copyToOld rootPackagesFile)
+      copyToRoot =
+        cp localPackagesFile rootPackagesFile
+          `And` cp localServicesFile rootServicesFile
       finalOperator = if isDry rebuildMode then Then else Or
   pure
     $ ((mkdir True [rootManagerPath] `And` copyOldFiles) `Then` copyToRoot)
-    `And`           nixosRebuild rebuildMode updateMode
+    `And` nixosRebuild rebuildMode updateMode
     `finalOperator` Subshell (devNullify rollback)
 
 rollbackRebuild :: Password -> IO ()

@@ -57,9 +57,11 @@ evalExpr (Subshell subExpr) = "(" <> evalExpr subExpr <> ")"
 
 appendArgs :: [Arg] -> Expr -> Expr
 appendArgs newArgs (Command t args) = Command t (args <> newArgs)
-appendArgs newArgs (And l r) = And (appendArgs newArgs l) (appendArgs newArgs r)
+appendArgs newArgs (And l r) =
+  And (appendArgs newArgs l) (appendArgs newArgs r)
 appendArgs newArgs (Or l r) = Or (appendArgs newArgs l) (appendArgs newArgs r)
-appendArgs newArgs (Then l r) = Then (appendArgs newArgs l) (appendArgs newArgs r)
+appendArgs newArgs (Then l r) =
+  Then (appendArgs newArgs l) (appendArgs newArgs r)
 appendArgs newArgs (Subshell e) = Subshell (appendArgs newArgs e)
 
 devNullify :: Expr -> Expr

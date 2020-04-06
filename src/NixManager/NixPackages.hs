@@ -27,7 +27,7 @@ import           System.Exit                    ( ExitCode
                                                   , ExitFailure
                                                   )
                                                 )
-import           NixManager.Bash             ( Expr(Command)
+import           NixManager.Bash                ( Expr(Command)
                                                 , Arg(LiteralArg)
                                                 )
 import           Data.Map.Strict                ( singleton )
@@ -268,8 +268,13 @@ uninstallPackage p = ifSuccessIO parseLocalPackagesExpr $ \expr -> do
     )
   pure (Right ())
 
-evaluateStatus :: (Eq a, Foldable t1, Foldable t2, Foldable t3) =>
-                    a -> t3 a -> t2 a -> t1 a -> NixPackageStatus
+evaluateStatus
+  :: (Eq a, Foldable t1, Foldable t2, Foldable t3)
+  => a
+  -> t3 a
+  -> t2 a
+  -> t1 a
+  -> NixPackageStatus
 evaluateStatus name installedPackages pendingPackages pendingUninstallPackages
   | name `elem` pendingUninstallPackages = NixPackagePendingUninstall
   | name `elem` pendingPackages          = NixPackagePendingInstall

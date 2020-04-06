@@ -70,9 +70,8 @@ start = do
                 createDirectoryIfMissing True (dropFileName optLoc)
                 writeFile optLoc (response ^. responseBody)
                 putMVar resultVar (Right optLoc)
-              else putMVar
-                resultVar
-                (Left ("HTTP error, status code: " <> showText sc))
+              else putMVar resultVar
+                           (Left ("HTTP error, status code: " <> showText sc))
   pure (DownloadState resultVar resultThreadId)
 
 cancel :: DownloadState -> IO ()

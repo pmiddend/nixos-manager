@@ -1,14 +1,14 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.NixPackage
-        ( NixPackage(..)
-        , npName
-        , npPath
-        , npVersion
-        , npDescription
-        , npStatus
-        , readPackagesJson
-        )
+  ( NixPackage(..)
+  , npName
+  , npPath
+  , npVersion
+  , npDescription
+  , npStatus
+  , readPackagesJson
+  )
 where
 
 import           NixManager.Util                ( TextualError
@@ -29,8 +29,8 @@ import           NixManager.NixPackageMeta      ( NixPackageMeta
                                                 , npmDescription
                                                 )
 import           NixManager.NixPackageStatus    ( NixPackageStatus
-                                                        ( NixPackageNothing
-                                                        )
+                                                  ( NixPackageNothing
+                                                  )
                                                 )
 
 data NixPackage = NixPackage {
@@ -48,10 +48,10 @@ readPackagesJson = (packagesFromMap <$>) . fromEither . eitherDecode
 
 packagesFromMap :: Map Text NixPackageMeta -> [NixPackage]
 packagesFromMap m =
-        (\(path, meta) -> NixPackage (meta ^. npmName)
-                                     path
-                                     (meta ^. npmVersion)
-                                     (meta ^. npmDescription)
-                                     NixPackageNothing
-                )
-                <$> toList m
+  (\(path, meta) -> NixPackage (meta ^. npmName)
+                               path
+                               (meta ^. npmVersion)
+                               (meta ^. npmDescription)
+                               NixPackageNothing
+    )
+    <$> toList m
