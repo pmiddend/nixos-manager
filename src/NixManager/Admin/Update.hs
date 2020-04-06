@@ -8,6 +8,7 @@ module NixManager.Admin.Update
   )
 where
 
+import qualified Data.ByteString.Char8 as BS
 import Debug.Trace(traceShowId)
 import           NixManager.Password            ( Password(Password) )
 import           NixManager.NixGarbage          ( collectGarbage )
@@ -78,7 +79,7 @@ import           NixManager.Admin.Event         ( Event
 import           NixManager.ManagerState        ( ManagerState(..)
                                                 , msAdminState
                                                 )
-import           NixManager.Util                ( threadDelayMillis )
+import           NixManager.Util                ( threadDelayMillis, showText )
 import           NixManager.Changes             ( determineChanges
                                                 , ChangeType(NoChanges)
                                                 )
@@ -109,6 +110,7 @@ import           NixManager.Admin.BuildState    ( bsProcessData
                                                 , BuildState(BuildState)
                                                 )
 import           NixManager.NixRebuildMode      ( rebuildModeIdx )
+import           NixManager.Admin.ValidRebuildModes      ( validRebuildModeIdx )
 
 calculateRebuildUpdateMode :: Bool -> Bool -> NixRebuildUpdateMode
 calculateRebuildUpdateMode _update@True _ = NixRebuildUpdateUpdate
@@ -157,7 +159,7 @@ updateEvent ms _ (EventRebuildWithPassword password) = Transition ms $ do
     ^. msAdminState
     .  asRebuildData
     .  rdActiveRebuildModeIdx
-    .  from rebuildModeIdx
+    .  from validRebuildModeIdx
     )
     (calculateRebuildUpdateMode
       (ms ^. msAdminState . asRebuildData . rdDoUpdate)
@@ -250,7 +252,7 @@ updateEvent ms _ (EventRebuildWatch password priorOutput pd) =
           Just code@(ExitFailure _) -> do
             rollbackRebuild password
             pure (adminEvent (EventRebuildFinished newOutput code))
-updateEvent ms _ (EventGarbageFinished totalOutput _exitCode) = pureTransition
+updateEvent ms _ (EventGarbageFinished totalOutput exitCode) = pureTransition
   (  ms
   &  msAdminState
   .  asGarbageData
@@ -259,9 +261,9 @@ updateEvent ms _ (EventGarbageFinished totalOutput _exitCode) = pureTransition
   &  msAdminState
   .  asGarbageData
   .  gdProcessOutput
-  .~ (totalOutput & poStdout <>~ "\nFinished!")
+  .~ (totalOutput & poStdout <>~ ("\nFinished with " <> BS.pack (show exitCode)))
   )
-updateEvent ms _ (EventRebuildFinished totalOutput _exitCode) =
+updateEvent ms _ (EventRebuildFinished totalOutput exitCode) =
   Transition
       (  ms
       &  msAdminState
@@ -271,7 +273,7 @@ updateEvent ms _ (EventRebuildFinished totalOutput _exitCode) =
       &  msAdminState
       .  asRebuildData
       .  rdProcessOutput
-      .~ (totalOutput & poStdout <>~ "\nFinished!")
+      .~ (totalOutput & poStdout <>~ ("\nFinished with " <> BS.pack (show exitCode)))
       &  msAdminState
       .  asChanges
       .~ NoChanges

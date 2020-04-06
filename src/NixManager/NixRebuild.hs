@@ -45,6 +45,7 @@ import           NixManager.Process             ( runProcess
 import           System.FilePath                ( (-<.>) )
 import           NixManager.NixRebuildMode      ( NixRebuildMode
                                                 , isDry
+                                                , rebuildModeToText
                                                 )
 import           NixManager.NixRebuildUpdateMode
                                                 ( NixRebuildUpdateMode
@@ -57,7 +58,7 @@ import           NixManager.NixRebuildUpdateMode
 nixosRebuild :: NixRebuildMode -> NixRebuildUpdateMode -> Expr
 nixosRebuild mode updateMode = Command
   "nixos-rebuild"
-  (  [LiteralArg (showText mode)]
+  (  [LiteralArg (rebuildModeToText mode)]
   <> mwhen (updateMode == NixRebuildUpdateUpdate)   ["--upgrade"]
   <> mwhen (updateMode == NixRebuildUpdateRollback) ["--rollback"]
   )
