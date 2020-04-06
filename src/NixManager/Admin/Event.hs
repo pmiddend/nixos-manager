@@ -25,7 +25,7 @@ data Event = EventRebuild
            | EventGarbageChangeDetails DetailsState
            | EventGarbage
            | EventGarbageWithPassword Password
-           | EventGarbageStarted ProcessData
+           | EventGarbageStarted ProcessData Password
            | EventGarbageWatch ProcessOutput ProcessData
            | EventGarbageFinished ProcessOutput ExitCode
            | EventGarbageOlderGenerationsChanged Bool

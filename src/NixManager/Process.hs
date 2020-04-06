@@ -6,6 +6,7 @@ module NixManager.Process
   , runProcess
   , terminate
   , waitUntilFinished
+  , getProcessId
   , updateProcess
   , noStdin
   , poResult
@@ -28,10 +29,13 @@ import           Control.Lens                   ( makeLenses
 import           System.Process                 ( ProcessHandle
                                                 , getProcessExitCode
                                                 , createProcess
+                                                , Pid
+                                                , getPid
                                                 , CreateProcess(..)
                                                 , CmdSpec(ShellCommand)
                                                 , StdStream(CreatePipe)
                                                 , terminateProcess
+                                                , interruptProcessGroupOf
                                                 , waitForProcess
                                                 )
 import           System.IO                      ( Handle )
@@ -72,6 +76,9 @@ exprToCmdSpec x = ShellCommand (unpack (evalExpr x))
 
 noStdin :: Maybe ByteString
 noStdin = Nothing
+
+getProcessId :: ProcessData -> IO (Maybe Pid)
+getProcessId = getPid . view pdProcessHandle
 
 runProcess :: Maybe ByteString -> Expr -> IO ProcessData
 runProcess stdinString command = do

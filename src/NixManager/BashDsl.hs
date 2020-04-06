@@ -6,15 +6,17 @@ module NixManager.BashDsl
   , mkdir
   , cp
   , mv
+  , kill
   , appendArgs
   , devNullify
   , nixSearch
   )
 where
 
+import System.Process(Pid)
 import           Data.List.NonEmpty             ( NonEmpty )
 import           Data.Foldable                  ( toList )
-import           NixManager.Util                ( mwhen )
+import           NixManager.Util                ( mwhen, showText )
 import           Data.Text                      ( Text
                                                 , unwords
                                                 , replace
@@ -85,3 +87,6 @@ appendArgs newArgs (Subshell e) = Subshell (appendArgs newArgs e)
 
 devNullify :: Expr -> Expr
 devNullify = appendArgs [RawArg ">/dev/null", RawArg "2>&1"]
+
+kill :: Pid -> Expr
+kill pid = Command "kill" ["-9", RawArg (showText pid)]

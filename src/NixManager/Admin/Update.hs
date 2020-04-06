@@ -8,9 +8,11 @@ module NixManager.Admin.Update
   )
 where
 
+import Control.Monad(void)
+import NixManager.BashDsl(kill)
 import qualified Data.ByteString.Char8 as BS
 import Debug.Trace(traceShowId)
-import           NixManager.Password            ( Password(Password) )
+import           NixManager.Password            ( Password(Password, getPassword) )
 import           NixManager.NixGarbage          ( collectGarbage )
 import           NixManager.ManagerEvent        ( adminEvent
                                                 , ManagerEvent
@@ -18,15 +20,19 @@ import           NixManager.ManagerEvent        ( adminEvent
                                                 , packagesEvent
                                                 )
 import qualified NixManager.Packages.Event     as PackagesEvent
-import           Data.Text.Encoding             ( decodeUtf8 )
+import           Data.Text.Encoding             ( decodeUtf8, encodeUtf8 )
 import           System.Exit                    ( ExitCode
                                                   ( ExitSuccess
                                                   , ExitFailure
                                                   )
                                                 )
 import           NixManager.Process             ( updateProcess
+                                                , runProcess
                                                 , poResult
+                                                , waitUntilFinished
                                                 , poStdout
+                                                , poStderr
+                                                , getProcessId
                                                 , terminate
                                                 )
 import           NixManager.Admin.State         ( State
@@ -43,6 +49,7 @@ import           Data.Monoid                    ( getFirst )
 import           Control.Lens                   ( (^.)
                                                 , from
                                                 , folded
+                                                , (^?)
                                                 , traversed
                                                 , (<>~)
                                                 , (&)
@@ -83,7 +90,7 @@ import           NixManager.Util                ( threadDelayMillis, showText )
 import           NixManager.Changes             ( determineChanges
                                                 , ChangeType(NoChanges)
                                                 )
-import           NixManager.AskPass             ( askPass )
+import           NixManager.AskPass             ( askPass, sudoExpr )
 import           NixManager.NixRebuild          ( rebuild
                                                 , rollbackRebuild
                                                 )
@@ -107,6 +114,8 @@ import           NixManager.Admin.RebuildData   ( rdBuildState
                                                 )
 import           NixManager.Admin.BuildState    ( bsProcessData
                                                 , bsCounter
+                                                , bsProcessData
+                                                , bsPassword
                                                 , BuildState(BuildState)
                                                 )
 import           NixManager.NixRebuildMode      ( rebuildModeIdx )
@@ -130,17 +139,19 @@ updateEvent ms _ EventGarbage = Transition
   ms
   (adminEvent . EventAskPassWatch EventGarbageWithPassword mempty <$> askPass)
 updateEvent ms _ EventRebuildCancel =
-  Transition (ms & msAdminState . asRebuildData . rdBuildState .~ Nothing) $ do
-    terminate
-      (   ms
-      ^?! msAdminState
-      .   asRebuildData
-      .   rdBuildState
-      .   folded
-      .   bsProcessData
-      )
-
-    pure Nothing
+  Transition (ms & msAdminState . asRebuildData . rdBuildState .~ Nothing) $
+    case ms ^. msAdminState . asRebuildData . rdBuildState of
+      Nothing -> pure Nothing
+      Just bs -> do
+        pid' <- getProcessId (bs ^. bsProcessData)
+        case pid' of
+          Nothing -> pure Nothing
+          Just pid -> do
+            pd <- runProcess (Just (encodeUtf8 (getPassword (bs ^. bsPassword)))) (sudoExpr (kill pid))
+            po <- waitUntilFinished pd
+            BS.putStrLn ((po ^. poStderr <> po ^. poStdout))
+            pure Nothing
+            
 updateEvent ms _ EventGarbageCancel =
   Transition (ms & msAdminState . asGarbageData . gdBuildState .~ Nothing) $ do
     terminate
@@ -156,7 +167,7 @@ updateEvent ms _ (EventGarbageWithPassword password) = Transition ms $ do
   garbagePo <- collectGarbage
     (ms ^. msAdminState . asGarbageData . gdOlderGenerations)
     password
-  pure (adminEvent (EventGarbageStarted garbagePo))
+  pure (adminEvent (EventGarbageStarted garbagePo password))
 updateEvent ms _ (EventRebuildWithPassword password) = Transition ms $ do
   rebuildPo <- rebuild
     (  ms
@@ -188,20 +199,20 @@ updateEvent ms _ (EventRebuildStarted pd password) =
       &  msAdminState
       .  asRebuildData
       .  rdBuildState
-      ?~ BuildState 0 pd
+      ?~ BuildState 0 pd password
       &  msAdminState
       .  asRebuildData
       .  rdProcessOutput
       .~ mempty
       )
     $ pure (adminEvent (EventRebuildWatch password mempty pd))
-updateEvent ms _ (EventGarbageStarted pd) =
+updateEvent ms _ (EventGarbageStarted pd password) =
   Transition
       (  ms
       &  msAdminState
       .  asGarbageData
       .  gdBuildState
-      ?~ BuildState 0 pd
+      ?~ BuildState 0 pd password
       &  msAdminState
       .  asGarbageData
       .  gdProcessOutput
