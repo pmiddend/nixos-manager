@@ -28,6 +28,7 @@ import           NixManager.BashDsl             ( mkdir
                                                   , Then
                                                   )
                                                 , Arg(LiteralArg)
+                                                , devNullify
                                                 , cp
                                                 , mv
                                                 )
@@ -73,7 +74,7 @@ rollbackExpr :: IO Expr
 rollbackExpr = do
   rootPackagesFile <- locateRootPackagesFile
   rootServicesFile <- locateRootServicesFile
-  pure (moveFromOld rootServicesFile `And` moveFromOld rootPackagesFile)
+  pure (moveFromOld rootServicesFile `Then` moveFromOld rootPackagesFile)
 
 installExpr :: NixRebuildMode -> NixRebuildUpdateMode -> IO Expr
 installExpr rebuildMode updateMode = do
@@ -82,15 +83,13 @@ installExpr rebuildMode updateMode = do
   localServicesFile <- locateLocalServicesFileMaybeCreate
   rootServicesFile  <- locateRootServicesFile
   rollback          <- rollbackExpr
-  let finalOperator = if isDry rebuildMode then Then else Or
+  let copyOldFiles = devNullify (copyToOld rootServicesFile `Then` copyToOld rootPackagesFile)
+      copyToRoot = cp localPackagesFile rootPackagesFile `And`           cp localServicesFile rootServicesFile
+      finalOperator = if isDry rebuildMode then Then else Or
   pure
-    $               mkdir True [rootManagerPath]
-    `And`           copyToOld rootServicesFile
-    `And`           copyToOld rootPackagesFile
-    `And`           cp localPackagesFile rootPackagesFile
-    `And`           cp localServicesFile rootServicesFile
+    $ ((mkdir True [rootManagerPath] `And` copyOldFiles) `Then` copyToRoot)
     `And`           nixosRebuild rebuildMode updateMode
-    `finalOperator` Subshell rollback
+    `finalOperator` Subshell (devNullify rollback)
 
 rollbackRebuild :: Password -> IO ()
 rollbackRebuild password = do

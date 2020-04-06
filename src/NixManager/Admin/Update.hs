@@ -117,6 +117,10 @@ calculateRebuildUpdateMode _update@True _ = NixRebuildUpdateUpdate
 calculateRebuildUpdateMode _ _rollback@True = NixRebuildUpdateRollback
 calculateRebuildUpdateMode _ _ = NixRebuildUpdateNone
 
+formatExitCode :: ExitCode -> BS.ByteString
+formatExitCode (ExitFailure code) = "error code " <> BS.pack (show code)
+formatExitCode ExitSuccess = "success"
+
 updateEvent
   :: ManagerState -> State -> Event -> Transition ManagerState ManagerEvent
 updateEvent ms _ EventRebuild = Transition
@@ -261,7 +265,7 @@ updateEvent ms _ (EventGarbageFinished totalOutput exitCode) = pureTransition
   &  msAdminState
   .  asGarbageData
   .  gdProcessOutput
-  .~ (totalOutput & poStdout <>~ ("\nFinished with " <> BS.pack (show exitCode)))
+  .~ (totalOutput & poStdout <>~ ("\nFinished with " <> formatExitCode exitCode))
   )
 updateEvent ms _ (EventRebuildFinished totalOutput exitCode) =
   Transition
@@ -273,7 +277,7 @@ updateEvent ms _ (EventRebuildFinished totalOutput exitCode) =
       &  msAdminState
       .  asRebuildData
       .  rdProcessOutput
-      .~ (totalOutput & poStdout <>~ ("\nFinished with " <> BS.pack (show exitCode)))
+      .~ (totalOutput & poStdout <>~ ("\nFinished with " <> formatExitCode exitCode))
       &  msAdminState
       .  asChanges
       .~ NoChanges

@@ -6,6 +6,8 @@ module NixManager.BashDsl
   , mkdir
   , cp
   , mv
+  , appendArgs
+  , devNullify
   , nixSearch
   )
 where
@@ -73,3 +75,13 @@ mv from to = Command "mv" (LiteralArg <$> [pack from, pack to])
 
 nixSearch :: Text -> Expr
 nixSearch term = Command "nix" ["search", LiteralArg term, "--json"]
+
+appendArgs :: [Arg] -> Expr -> Expr
+appendArgs newArgs (Command t args) = Command t (args <> newArgs)
+appendArgs newArgs (And l r) = And (appendArgs newArgs l) (appendArgs newArgs r)
+appendArgs newArgs (Or l r) = Or (appendArgs newArgs l) (appendArgs newArgs r)
+appendArgs newArgs (Then l r) = Then (appendArgs newArgs l) (appendArgs newArgs r)
+appendArgs newArgs (Subshell e) = Subshell (appendArgs newArgs e)
+
+devNullify :: Expr -> Expr
+devNullify = appendArgs [RawArg ">/dev/null", RawArg "2>&1"]
