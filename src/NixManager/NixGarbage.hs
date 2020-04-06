@@ -7,7 +7,7 @@ where
 import           NixManager.AskPass             ( sudoExpr )
 import           Data.Text.Encoding             ( encodeUtf8 )
 import           NixManager.Util                ( mwhen )
-import           NixManager.BashDsl             ( Expr(Command) )
+import           NixManager.Bash             ( Expr(Command) )
 import           Prelude                 hiding ( readFile )
 import           NixManager.Process             ( runProcess
                                                 , ProcessData

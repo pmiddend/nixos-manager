@@ -27,9 +27,8 @@ import           System.Exit                    ( ExitCode
                                                   , ExitFailure
                                                   )
                                                 )
-import           NixManager.BashDsl             ( Expr(Command)
+import           NixManager.Bash             ( Expr(Command)
                                                 , Arg(LiteralArg)
-                                                , nixSearch
                                                 )
 import           Data.Map.Strict                ( singleton )
 import           Control.Monad                  ( void
@@ -119,6 +118,9 @@ import           NixManager.Process             ( runProcess
                                                 , poResult
                                                 )
 import           Data.Monoid                    ( First(getFirst) )
+
+nixSearch :: Text -> Expr
+nixSearch term = Command "nix" ["search", LiteralArg term, "--json"]
 
 searchPackages :: Text -> IO (TextualError [NixPackage])
 searchPackages t = do

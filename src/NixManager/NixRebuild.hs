@@ -19,8 +19,9 @@ import           Data.Text.Encoding             ( encodeUtf8 )
 import           NixManager.Util                ( showText
                                                 , mwhen
                                                 )
-import           NixManager.BashDsl             ( mkdir
-                                                , Expr
+import NixManager.PosixTools(mkdir, cp, mv)
+import           NixManager.Bash             ( 
+                                                Expr
                                                   ( And
                                                   , Command
                                                   , Or
@@ -29,8 +30,6 @@ import           NixManager.BashDsl             ( mkdir
                                                   )
                                                 , Arg(LiteralArg)
                                                 , devNullify
-                                                , cp
-                                                , mv
                                                 )
 import           Prelude                 hiding ( readFile )
 import           NixManager.NixPackages         ( locateLocalPackagesFileMaybeCreate

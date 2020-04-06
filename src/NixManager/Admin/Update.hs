@@ -9,7 +9,7 @@ module NixManager.Admin.Update
 where
 
 import Control.Monad(void)
-import NixManager.BashDsl(kill)
+import NixManager.PosixTools(kill)
 import qualified Data.ByteString.Char8 as BS
 import Debug.Trace(traceShowId)
 import           NixManager.Password            ( Password(Password, getPassword) )
