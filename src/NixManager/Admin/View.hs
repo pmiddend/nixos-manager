@@ -117,7 +117,7 @@ rebuildGrid as =
     changes     = (as ^. asChanges) == Changes
     applyButton = imageButton
       [ #label
-        := (if changes then "Apply Changes" else "No changes to apply (rebuild)"
+        := (if changes then "Apply Changes" else "Rebuild (no changes to apply)"
            )
       , on #clicked (ManagerEventAdmin EventRebuild)
       , #valign := Gtk.AlignCenter
