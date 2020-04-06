@@ -8,6 +8,7 @@ module NixManager.Admin.Update
   )
 where
 
+import Debug.Trace(traceShowId)
 import           NixManager.Password            ( Password(Password) )
 import           NixManager.NixGarbage          ( collectGarbage )
 import           NixManager.ManagerEvent        ( adminEvent

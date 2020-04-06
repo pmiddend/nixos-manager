@@ -94,9 +94,10 @@ import           Control.Lens                   ( (^.)
                                                 , (^?!)
                                                 )
 import           Data.Monoid                    ( getFirst )
-import           NixManager.Admin.ValidRebuildTypes
-                                                ( rebuildTypes
-                                                , descriptionForRebuildType
+import           NixManager.Admin.ValidRebuildModes
+                                                ( validRebuildModes
+                                                , descriptionForValidRebuildMode
+                                                , validRebuildModeIdx
                                                 )
 import           Data.Default                   ( def )
 import           NixManager.Admin.DetailsState  ( detailsBool )
@@ -134,17 +135,17 @@ rebuildGrid as =
       widget Gtk.Label [#label := "Build type: ", #valign := Gtk.AlignCenter]
     buildTypeCombo = changeBuildType <$> comboBox
       [#valign := Gtk.AlignCenter]
-      (ComboBoxProperties (rebuildModeToText <$> rebuildTypes)
+      (ComboBoxProperties (rebuildModeToText <$> validRebuildModes)
                           (as ^. asRebuildData . rdActiveRebuildModeIdx)
       )
     buildTypeDescription = inBox def $ widget
       Gtk.Label
       [ #label
-        := (   descriptionForRebuildType
+        := (   descriptionForValidRebuildMode
                (  as
                ^. asRebuildData
                .  rdActiveRebuildModeIdx
-               .  from rebuildModeIdx
+               .  from validRebuildModeIdx
                )
            ^?! folded
            )

@@ -1,11 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
-module NixManager.Admin.ValidRebuildTypes
-  ( rebuildTypesWithDescription
-  , rebuildTypes
-  , descriptionForRebuildType
+module NixManager.Admin.ValidRebuildModes
+  ( validRebuildModesWithDescription
+  , validRebuildModes
+  , descriptionForValidRebuildMode
+  , validRebuildModeIdx
   )
 where
 
+import Data.Maybe(fromJust)
+import Control.Lens(Iso', iso)
+import Data.List(elemIndex)
 import           NixManager.NixRebuildMode      ( NixRebuildMode
                                                   ( NixRebuildSwitch
                                                   , NixRebuildBoot
@@ -16,11 +20,11 @@ import           NixManager.NixRebuildMode      ( NixRebuildMode
                                                 )
 import           Data.Text                      ( Text )
 
-descriptionForRebuildType :: NixRebuildMode -> Maybe Text
-descriptionForRebuildType m = lookup m rebuildTypesWithDescription
+descriptionForValidRebuildMode :: NixRebuildMode -> Maybe Text
+descriptionForValidRebuildMode m = lookup m validRebuildModesWithDescription
 
-rebuildTypesWithDescription :: [(NixRebuildMode, Text)]
-rebuildTypesWithDescription =
+validRebuildModesWithDescription :: [(NixRebuildMode, Text)]
+validRebuildModesWithDescription =
   [ ( NixRebuildSwitch
     , "Build and activate the changes immediately. You can go back to previous configurations by rebooting and selecting an older generation."
     )
@@ -38,5 +42,8 @@ rebuildTypesWithDescription =
     )
   ]
 
-rebuildTypes :: [NixRebuildMode]
-rebuildTypes = fst <$> rebuildTypesWithDescription
+validRebuildModes :: [NixRebuildMode]
+validRebuildModes = fst <$> validRebuildModesWithDescription
+
+validRebuildModeIdx :: Iso' NixRebuildMode Int
+validRebuildModeIdx = iso (fromJust . (`elemIndex` validRebuildModes)) (validRebuildModes !!)
