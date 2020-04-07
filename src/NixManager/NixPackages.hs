@@ -181,7 +181,7 @@ packageLens =
 emptyPackagesFile :: NixExpr
 emptyPackagesFile = NixFunctionDecl
   (NixFunction
-    ["config", "pkgs", "..."]
+    ["config", "nixpkgs", "..."]
     (NixSet (singleton "environment.systemPackages" (NixList mempty)))
   )
 
@@ -216,7 +216,7 @@ parsePackagesExpr fp =
 parsePackages :: FilePath -> IO (TextualError [Text])
 parsePackages fp = ifSuccessIO (parsePackagesExpr fp) $ \expr ->
   case expr ^? packageLens of
-    Just packages -> pure (Right (Text.drop 5 <$> evalSymbols packages))
+    Just packages -> pure (Right (evalSymbols packages))
     Nothing -> pure (Left "Couldn't find packages node in packages.nix file.")
 
 parseLocalPackages :: IO (TextualError [Text])
@@ -251,20 +251,17 @@ readPendingUninstallPackages =
     ifSuccessIO (packagesOrEmpty locateRootPackagesFile)
       $ \root -> pure (Right (root \\ local))
 
-packagePrefix :: Text
-packagePrefix = "pkgs."
-
-installPackage :: Text -> IO (TextualError ())
+installPackage :: NixPackage -> IO (TextualError ())
 installPackage p = ifSuccessIO parseLocalPackagesExpr $ \expr -> do
   writeLocalPackages
-    (expr & packageLens . _NixList <>~ [NixSymbol (packagePrefix <> p)])
+    (expr & packageLens . _NixList <>~ [NixSymbol (p ^. npPath)])
   pure (Right ())
 
-uninstallPackage :: Text -> IO (TextualError ())
+uninstallPackage :: NixPackage -> IO (TextualError ())
 uninstallPackage p = ifSuccessIO parseLocalPackagesExpr $ \expr -> do
   writeLocalPackages
     (expr & packageLens . _NixList %~ filter
-      (hasn't (_NixSymbol . only (packagePrefix <> p)))
+      (hasn't (_NixSymbol . only (p ^. npPath)))
     )
   pure (Right ())
 
@@ -291,7 +288,7 @@ readPackageCache = ifSuccessIO (searchPackages "") $ \cache ->
           $   (\ip ->
                 ip
                   &  npStatus
-                  .~ evaluateStatus (ip ^. npName)
+                  .~ evaluateStatus (ip ^. npPath)
                                     installedPackages
                                     pendingPackages
                                     pendingUninstallPackages

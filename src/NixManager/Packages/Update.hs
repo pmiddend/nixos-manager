@@ -126,7 +126,7 @@ updateEvent s (EventOperationCompleted e completionType) =
         CompletionReload -> pure (adminEvent AdminEvent.EventReload)
         CompletionPass   -> pure Nothing
 updateEvent s (EventInstallCompleted cache installationType) = Transition
-  (s & msPackagesState . psPackageCache .~ cache)
+  (s & msPackagesState . psPackageCache .~ cache & msPackagesState . psSelectedIdx .~ Nothing)
   (pure
     (packagesEvent
       (EventOperationCompleted (installCompletedMessage installationType)
@@ -135,7 +135,7 @@ updateEvent s (EventInstallCompleted cache installationType) = Transition
     )
   )
 updateEvent s (EventUninstallCompleted cache installationType) = Transition
-  (s & msPackagesState . psPackageCache .~ cache)
+  (s & msPackagesState . psPackageCache .~ cache & msPackagesState . psSelectedIdx .~ Nothing)
   (pure
     (packagesEvent
       (EventOperationCompleted (uninstallCompletedMessage installationType)
@@ -147,7 +147,7 @@ updateEvent s (EventInstall installationType) =
   case s ^. msPackagesState . psSelectedPackage of
     Nothing       -> pureTransition s
     Just selected -> Transition s $ do
-      installResult <- installPackage (selected ^. npName)
+      installResult <- installPackage selected
       cacheResult   <- readPackageCache
       case installResult >>= const cacheResult of
         Right newCache ->
@@ -162,7 +162,7 @@ updateEvent s (EventUninstall installationType) =
   case s ^. msPackagesState . psSelectedPackage of
     Nothing       -> pureTransition s
     Just selected -> Transition s $ do
-      uninstallResult <- uninstallPackage (selected ^. npName)
+      uninstallResult <- uninstallPackage selected
       cacheResult     <- readPackageCache
       case uninstallResult >>= const cacheResult of
         Right newCache -> pure

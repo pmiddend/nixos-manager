@@ -58,12 +58,14 @@ import           NixManager.NixRebuildUpdateMode
 
 
 nixosRebuild :: NixRebuildMode -> NixRebuildUpdateMode -> Expr
-nixosRebuild mode updateMode = Command
-  "nixos-rebuild"
-  (  [LiteralArg (rebuildModeToText mode)]
-  <> mwhen (updateMode == NixRebuildUpdateUpdate)   ["--upgrade"]
-  <> mwhen (updateMode == NixRebuildUpdateRollback) ["--rollback"]
-  )
+nixosRebuild _mode _updateMode = Command "sleep" ["3s"]
+-- nixosRebuild :: NixRebuildMode -> NixRebuildUpdateMode -> Expr
+-- nixosRebuild mode updateMode = Command
+--   "nixos-rebuild"
+--   (  [LiteralArg (rebuildModeToText mode)]
+--   <> mwhen (updateMode == NixRebuildUpdateUpdate)   ["--upgrade"]
+--   <> mwhen (updateMode == NixRebuildUpdateRollback) ["--rollback"]
+--   )
 
 copyToOld :: FilePath -> Expr
 copyToOld fn = cp fn (fn -<.> "old")
