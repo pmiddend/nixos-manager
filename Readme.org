@@ -56,14 +56,6 @@ nixos-manager isn’t in nixpkgs yet, so you’ll have to build it using…Nix!
 nix-build
 #+end_src
 
-This would suffice, /if/ =gi-gtk-declarative= wasn’t broken in nixpkgs currently (its tests don’t work). So you have to allow the installation of “broken packages”. The error message you get will tell you how, but the simplest way is:
-
-#+begin_src bash
-mkdir -p $HOME/.config/nixpkgs && echo "{ allowBroken = true; }" > $HOME/.config/nixpkgs/config.nix
-#+end_src
-
-*Caution*: this will overwrite any existing =config.nix= file. Check that first.
-
 After the build processed has finished, run =result/bin/nixos-manager=.
 
 ** Setup

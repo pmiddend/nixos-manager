@@ -1,2 +1,1 @@
 language: nix
-script: mkdir -p "$HOME/.config/nixpkgs" && echo "{ allowBroken = true; }" > $HOME/.config/nixpkgs/config.nix && nix-build

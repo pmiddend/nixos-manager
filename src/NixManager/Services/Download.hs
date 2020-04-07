@@ -53,7 +53,7 @@ data DownloadState = DownloadState {
 makeLenses ''DownloadState
 
 tryDownload :: IO (Either HttpException (Response ByteString))
-tryDownload = try (get "https://nixos.org/nixos/options.json")
+tryDownload = try (get "https://channels.nixos.org/nixos-19.09/options.json.br")
 
 start :: IO DownloadState
 start = do

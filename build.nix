@@ -5,11 +5,12 @@ let
 
   myHaskellPackages = pkgs.haskell.packages.${compiler}.override {
     overrides = se: su: {
-      gi-gtk-declarative = su.gi-gtk-declarative.overrideAttrs (oldAttrs: {
+
+      gi-gtk-declarative = pkgs.haskell.lib.markUnbroken (su.gi-gtk-declarative.overrideAttrs (oldAttrs: {
         doCheck = false;
-        # why doesn't this work?
-        broken = false;
-      });
+      }));
+
+      gi-gtk-declarative-app-simple = pkgs.haskell.lib.markUnbroken su.gi-gtk-declarative-app-simple;
 
       "nixos-manager" =
         se.callCabal2nix
