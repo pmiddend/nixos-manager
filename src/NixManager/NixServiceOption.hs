@@ -25,7 +25,6 @@ import           Control.Monad                  ( mzero )
 import           Prelude                 hiding ( readFile )
 import           Data.Map.Strict                ( Map )
 import           NixManager.Util                ( TextualError
-                                                , toEither
                                                 , addToError
                                                 , fromEither
                                                 )
@@ -60,7 +59,7 @@ makeLenses ''NixServiceOption
 instance FromJSON NixServiceOption where
   parseJSON (Object v) = do
     objectType <- v .: "type"
-    let realOptionType = toEither (parseNixServiceOptionType objectType)
+    let realOptionType = parseNixServiceOptionType objectType
     description <- v .: "description"
     loc         <- v .: "loc"
     -- pure $ NixServiceOption (convertJson objectType <$> defaultValue)

@@ -1,3 +1,8 @@
+{-|
+Description: Random utilities for NixOS Manager
+
+As a general rule, stuff defined here should not import anything from the manager itself.
+-}
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.Util where
 
@@ -30,30 +35,24 @@ import           Prelude                 hiding ( putStrLn
                                                 , length
                                                 )
 import           Control.Lens                   ( Getter
+                                                , Iso'
+                                                , iso
                                                 , to
                                                 )
 import qualified Data.Text.Encoding            as Encoding
 
+--| Since we’re working with 'Text' as much as possible, we’re using a text based error type instead of the customary 'Either String'
 type TextualError = Either Text
 
+--| Convert something showable to 'Text'. Notably 'String' and 'Exception' types.
 fromShowableError :: Show ex => Either ex e -> TextualError e
-fromShowableError = fromEither . first show
+fromShowableError = first showText
 
+--| Convert from a'String' error to 'Text'
 fromEither :: Either String e -> TextualError e
 fromEither = first pack
 
-toEither :: TextualError e -> Either Text e
-toEither = id
-
-errorFallback :: e -> TextualError e -> e
-errorFallback v (Left  _) = v
-errorFallback _ (Right v) = v
-
-ifNothing :: Monoid p => Maybe a -> p -> p
-ifNothing v f = case v of
-  Nothing -> f
-  _       -> mempty
-
+--| More easily chain errors in IO computations
 ifSuccessIO
   :: Monad m
   => m (TextualError t)
@@ -61,18 +60,23 @@ ifSuccessIO
   -> m (TextualError a)
 ifSuccessIO v f = v >>= either (pure . Left) f
 
+--| Add some (descriptive) prefix text to an error.
 addToError :: Text -> Endo (TextualError a)
 addToError prefix = first (prefix <>)
 
+--| Like 'Show' from the prelude, but produces a 'Text'
 showText :: Show a => a -> Text
 showText = pack . show
 
+--| Return a monoidal value if true, otherwise return 'mempty’
 mwhen :: Monoid m => Bool -> m -> m
 mwhen True  v = v
 mwhen False _ = mempty
 
+--| A type representing an endomorphisms of types. This sometimes makes transformations more explicit.
 type Endo a = a -> a
 
+--| Like 'Text.splitOn', but with 'String'
 splitRepeat :: Char -> String -> [String]
 splitRepeat c = unfoldr f
  where
@@ -82,15 +86,19 @@ splitRepeat c = unfoldr f
     (before, []       ) -> Just (before, "")
     (before, _ : after) -> Just (before, after)
 
-
+--| '&&' for predicates
 predAnd :: (t -> Bool) -> (t -> Bool) -> t -> Bool
 predAnd a b x = a x && b x
 
+--| Create an opening HTML tag
 openTag :: (IsString s, Semigroup s) => s -> s
 openTag t = "<" <> t <> ">"
+
+--| Create a closing HTML tag
 closeTag :: (IsString s, Semigroup s) => s -> s
 closeTag t = "</" <> t <> ">"
 
+--| “Kebapize” a name, transforming e.g. “FooBarBaz” to “foo-bar-baz”
 kebapize :: Text -> Text -> Text
 kebapize prefix =
   foldl
@@ -101,30 +109,39 @@ kebapize prefix =
       mempty
     . drop (length prefix)
 
+--| Surround a string by an HTML tag (without attributes)
 surroundSimple :: (IsString s, Semigroup s) => s -> s -> s
 surroundSimple tag content = openTag tag <> content <> closeTag tag
 
+--| The standard library’s 'threadDelay' takes a plain 'Int', which confuses me terribly.
 threadDelayMillis :: Int -> IO ()
 threadDelayMillis = threadDelay . (* 1000)
 
+--| Convert between a strict UTF-8 'ByteString' and 'Text'
 decodeUtf8 :: Getter ByteString Text
 decodeUtf8 = to Encoding.decodeUtf8
 
+--| Convert between a strict UTF-8 'ByteString' and 'Text'
 encodeUtf8 :: Getter Text ByteString
 encodeUtf8 = to Encoding.encodeUtf8
 
+--| Convert between a lazy UTF-8 'ByteString' and 'Text'
 decodeUtf8Lazy :: Getter BSL.ByteString Text
 decodeUtf8Lazy = to (TL.toStrict . TLE.decodeUtf8)
 
+--| Convert between a lazy UTF-8 'ByteString' and 'Text'
 encodeUtf8Lazy :: Getter Text BSL.ByteString
 encodeUtf8Lazy = to (TLE.encodeUtf8 . TL.fromStrict)
 
-fromStrictBS :: Getter ByteString BSL.ByteString
-fromStrictBS = to BSL.fromStrict
+--| Convert between a lazy 'ByteString' and a strict one
+fromStrictBS :: Iso' ByteString BSL.ByteString
+fromStrictBS = iso BSL.fromStrict BSL.toStrict
 
+--| Stupid function to convert HTML (or XML?) entities. Probably buggy as hell, but worked for now.
 replaceHtmlEntities :: Text -> Text
 replaceHtmlEntities =
   replace "<" "&lt;" . replace ">" "&gt;" . replace "&" "&amp;"
 
+--| Check if two files are bitwise-equal. Doesn’t consider memory a problem.
 filesEqual :: FilePath -> FilePath -> IO Bool
 filesEqual a b = (==) <$> BSL.readFile a <*> BSL.readFile b

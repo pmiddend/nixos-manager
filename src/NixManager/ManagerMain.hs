@@ -1,3 +1,8 @@
+{-|
+Description: NixOS manager's /real/ entry point
+
+This file should initializing the application state, as well as GTK, and then run gi-gtk-declarative-app-simple's main method.
+ -}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedLists #-}
@@ -28,6 +33,7 @@ import           Prelude                 hiding ( length
                                                 , putStrLn
                                                 )
 
+--| Initialize the application state, optionally returning an error.
 initState :: IO (TextualError ManagerState)
 initState = ifSuccessIO PackagesState.initState $ \packagesState -> do
   serviceState <- ServicesState.initState
