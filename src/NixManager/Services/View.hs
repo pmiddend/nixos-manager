@@ -12,10 +12,12 @@ import           NixManager.View.GtkUtil        ( paddedAround
                                                 , expandAndFill
                                                 )
 import           Data.List.NonEmpty             ( NonEmpty((:|)) )
-import           NixManager.NixServiceOptionLocation
-                                                ( NixServiceOptionLocation
+import           NixManager.NixLocation
+                                                ( NixLocation
                                                 , flattenedTail
-                                                , flattenOptionLocation
+                                                , flattened
+                                                , flattenLocation
+                                                , firstComponent
                                                 , needsMarkup
                                                 , locationComponents
                                                 , locationDropComponents
@@ -160,7 +162,7 @@ import           NixManager.NixServiceOptionType
 buildServiceRow
   :: FromWidget (Bin Gtk.ListBoxRow) target => NixService -> target event
 buildServiceRow svc =
-  let title    = svc ^. serviceLoc . to flattenedTail
+  let title    = svc ^. serviceLoc . flattenedTail
       markedUp = if needsMarkup (svc ^. serviceLoc)
         then surroundSimple "b" title
         else title
@@ -180,14 +182,14 @@ rowSelectionHandler (Just row) _ = do
         )
 rowSelectionHandler _ _ = pure (ManagerEventServices (EventSelected Nothing))
 
-categoryMatches :: ServiceCategory -> NixServiceOptionLocation -> Bool
-categoryMatches c (i :| _) = categoryToNixPrefix c == i
+categoryMatches :: ServiceCategory -> NixLocation -> Bool
+categoryMatches c loc = categoryToNixPrefix c == firstComponent loc
 
 filterPredicate :: StateData -> NixService -> Bool
 filterPredicate sd =
-  (         (((sd ^. sdSearchString) `isInfixOf`) . flattenOptionLocation)
-    `predAnd` ((not . ("<" `isInfixOf`)) . flattenOptionLocation)
-    `predAnd` ((not . ("*" `isInfixOf`)) . flattenOptionLocation)
+  (         (((sd ^. sdSearchString) `isInfixOf`) . flattenLocation)
+    `predAnd` ((not . ("<" `isInfixOf`)) . flattenLocation)
+    `predAnd` ((not . ("*" `isInfixOf`)) . flattenLocation)
     `predAnd` categoryMatches (sd ^. sdCategoryIdx . from serviceCategoryIdx)
     )
     . view serviceLoc
@@ -239,7 +241,7 @@ buildOptionValueCell :: NixExpr -> NixServiceOption -> Widget ManagerEvent
 buildOptionValueCell serviceExpression serviceOption =
   let
     optionPath :: Text
-    optionPath = serviceOption ^. optionLoc . to flattenOptionLocation
+    optionPath = serviceOption ^. optionLoc . flattened
     optionValue :: Maybe NixExpr
     optionValue = serviceExpression ^? optionLens' optionPath . folded
     rawChangeEvent :: Text -> ManagerEvent
@@ -324,8 +326,8 @@ convertMarkup t = case parseDocbook t of
 buildOptionRows :: NixExpr -> NixServiceOption -> BoxChild ManagerEvent
 buildOptionRows serviceExpression serviceOption =
   let
-    formatOptionName :: NixServiceOptionLocation -> Text
-    formatOptionName loc = flattenOptionLocation
+    formatOptionName :: NixLocation -> Text
+    formatOptionName loc = flattenLocation
       (locationDropComponents (if locationComponents loc == 2 then 1 else 2) loc
       )
     optionBox = container
@@ -370,7 +372,7 @@ servicesRightPane sd _ = case sd ^. sdSelectedIdx of
     let
       svc =
         (sd ^.. sdCache . folded . filtered (filterPredicate sd)) ^?! ix idx
-      svcLabel = svc ^. serviceLoc . to flattenedTail
+      svcLabel = svc ^. serviceLoc . flattenedTail
       optBox =
         container Gtk.Box
                   [#orientation := Gtk.OrientationVertical, #spacing := 10]

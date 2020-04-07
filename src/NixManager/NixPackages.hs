@@ -30,6 +30,7 @@ import           System.Exit                    ( ExitCode
 import           NixManager.Bash                ( Expr(Command)
                                                 , Arg(LiteralArg)
                                                 )
+import NixManager.NixLocation(flattenedTail, flattened, NixLocation, locationFromText)
 import           Data.Map.Strict                ( singleton )
 import           Control.Monad                  ( void
                                                 , unless
@@ -153,7 +154,7 @@ matchName pkgName bins =
 
 dryInstall :: NixPackage -> IO ProcessData
 dryInstall pkg =
-  let realPath = pkg ^?! npPath . to (stripPrefix "nixpkgs.") . folded
+  let realPath = pkg ^. npPath . flattenedTail
   in  runProcess
         Nothing
         (Command "nix-build"
@@ -213,13 +214,13 @@ parsePackagesExpr fp =
       )
     <$> parseNixFile fp emptyPackagesFile
 
-parsePackages :: FilePath -> IO (TextualError [Text])
+parsePackages :: FilePath -> IO (TextualError [NixLocation])
 parsePackages fp = ifSuccessIO (parsePackagesExpr fp) $ \expr ->
   case expr ^? packageLens of
-    Just packages -> pure (Right (evalSymbols packages))
+    Just packages -> pure (Right (locationFromText <$> evalSymbols packages))
     Nothing -> pure (Left "Couldn't find packages node in packages.nix file.")
 
-parseLocalPackages :: IO (TextualError [Text])
+parseLocalPackages :: IO (TextualError [NixLocation])
 parseLocalPackages = locateLocalPackagesFile >>= parsePackages
 
 parseLocalPackagesExpr :: IO (TextualError NixExpr)
@@ -230,22 +231,22 @@ writeLocalPackages e = do
   pkgsFile <- locateLocalPackagesFile
   writeNixFile pkgsFile e
 
-packagesOrEmpty :: IO FilePath -> IO (TextualError [Text])
+packagesOrEmpty :: IO FilePath -> IO (TextualError [NixLocation])
 packagesOrEmpty fp' = do
   fp       <- fp'
   fpExists <- doesFileExist fp
   if fpExists then parsePackages fp else pure (Right [])
 
-readInstalledPackages :: IO (TextualError [Text])
+readInstalledPackages :: IO (TextualError [NixLocation])
 readInstalledPackages = packagesOrEmpty locateRootPackagesFile
 
-readPendingPackages :: IO (TextualError [Text])
+readPendingPackages :: IO (TextualError [NixLocation])
 readPendingPackages =
   ifSuccessIO (packagesOrEmpty locateLocalPackagesFile) $ \local ->
     ifSuccessIO (packagesOrEmpty locateRootPackagesFile)
       $ \root -> pure (Right (local \\ root))
 
-readPendingUninstallPackages :: IO (TextualError [Text])
+readPendingUninstallPackages :: IO (TextualError [NixLocation])
 readPendingUninstallPackages =
   ifSuccessIO (packagesOrEmpty locateLocalPackagesFile) $ \local ->
     ifSuccessIO (packagesOrEmpty locateRootPackagesFile)
@@ -254,14 +255,14 @@ readPendingUninstallPackages =
 installPackage :: NixPackage -> IO (TextualError ())
 installPackage p = ifSuccessIO parseLocalPackagesExpr $ \expr -> do
   writeLocalPackages
-    (expr & packageLens . _NixList <>~ [NixSymbol (p ^. npPath)])
+    (expr & packageLens . _NixList <>~ [NixSymbol (p ^. npPath . flattened)])
   pure (Right ())
 
 uninstallPackage :: NixPackage -> IO (TextualError ())
 uninstallPackage p = ifSuccessIO parseLocalPackagesExpr $ \expr -> do
   writeLocalPackages
     (expr & packageLens . _NixList %~ filter
-      (hasn't (_NixSymbol . only (p ^. npPath)))
+      (hasn't (_NixSymbol . only (p ^. npPath . flattened)))
     )
   pure (Right ())
 

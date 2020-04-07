@@ -51,8 +51,8 @@ import           NixManager.Util                ( Endo
                                                 , TextualError
                                                 , addToError
                                                 )
-import           NixManager.NixServiceOptionLocation
-                                                ( NixServiceOptionLocation
+import           NixManager.NixLocation
+                                                ( NixLocation
                                                 , removeLastComponent
                                                 , isPrefixOf
                                                 )
@@ -62,33 +62,33 @@ import           NixManager.NixServiceOption    ( NixServiceOption
 
 
 data NixService = NixService {
-    _serviceLoc :: NixServiceOptionLocation
+    _serviceLoc :: NixLocation
   , _serviceOptions :: [NixServiceOption]
   } deriving(Show)
 
 makeLenses ''NixService
 
--- canBeEnabled :: NixServiceOptionLocation -> Bool
+-- canBeEnabled :: NixLocation -> Bool
 -- canBeEnabled = (== "enable") . last
 
--- isService :: NixServiceOptionLocation -> Bool
+-- isService :: NixLocation -> Bool
 -- isService = (== "services") . head
 
 makeServices :: Map Text NixServiceOption -> [NixService]
 makeServices options' =
   let
     options = elems options'
-    servicePaths :: Set.Set NixServiceOptionLocation
+    servicePaths :: Set.Set NixLocation
     servicePaths =
       Set.fromList (removeLastComponent `mapMaybe` (view optionLoc <$> options))
-    serviceForOption :: NixServiceOption -> Maybe NixServiceOptionLocation
+    serviceForOption :: NixServiceOption -> Maybe NixLocation
     serviceForOption opt = case Set.lookupLT (opt ^. optionLoc) servicePaths of
       Nothing -> Nothing
       Just result ->
         if result `isPrefixOf` (opt ^. optionLoc) then Just result else Nothing
     transducer
       :: NixServiceOption
-      -> Endo (Map NixServiceOptionLocation [NixServiceOption])
+      -> Endo (Map NixLocation [NixServiceOption])
     transducer opt m = case serviceForOption opt of
       Nothing          -> m
       Just serviceLoc' -> insertWith (<>) serviceLoc' [opt] m

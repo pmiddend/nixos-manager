@@ -32,10 +32,11 @@ import           NixManager.NixPackageStatus    ( NixPackageStatus
                                                   ( NixPackageNothing
                                                   )
                                                 )
+import NixManager.NixLocation(NixLocation(NixLocation), locationFromText)
 
 data NixPackage = NixPackage {
     _npName :: Text
-  , _npPath :: Text
+  , _npPath :: NixLocation
   , _npVersion :: Text
   , _npDescription :: Text
   , _npStatus :: NixPackageStatus
@@ -49,7 +50,7 @@ readPackagesJson = (packagesFromMap <$>) . fromEither . eitherDecode
 packagesFromMap :: Map Text NixPackageMeta -> [NixPackage]
 packagesFromMap m =
   (\(path, meta) -> NixPackage (meta ^. npmName)
-                               path
+                               (locationFromText path)
                                (meta ^. npmVersion)
                                (meta ^. npmDescription)
                                NixPackageNothing

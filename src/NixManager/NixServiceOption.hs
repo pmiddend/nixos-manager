@@ -10,7 +10,6 @@ module NixManager.NixServiceOption
   , optionValue
   , readOptionsFile
   , locateOptionsFile
-  , NixServiceOptionLocation
   , desiredOptionsFileLocation
   )
 where
@@ -34,8 +33,8 @@ import           Data.ByteString.Lazy           ( ByteString
                                                 , readFile
                                                 )
 import           Data.Text                      ( Text )
-import           NixManager.NixServiceOptionLocation
-                                                ( NixServiceOptionLocation )
+import           NixManager.NixLocation
+                                                ( NixLocation(NixLocation) )
 import           NixManager.NixServiceOptionType
                                                 ( NixServiceOptionType
                                                 , parseNixServiceOptionType
@@ -51,7 +50,7 @@ import           Data.Aeson                     ( FromJSON
 
 data NixServiceOption = NixServiceOption {
    _optionDescription :: Text
-  , _optionLoc :: NixServiceOptionLocation
+  , _optionLoc :: NixLocation
   , _optionType :: Either Text NixServiceOptionType
   , _optionValue :: Maybe NixExpr
   } deriving(Show)
@@ -65,7 +64,7 @@ instance FromJSON NixServiceOption where
     description <- v .: "description"
     loc         <- v .: "loc"
     -- pure $ NixServiceOption (convertJson objectType <$> defaultValue)
-    pure $ NixServiceOption description loc realOptionType Nothing
+    pure $ NixServiceOption description (NixLocation loc) realOptionType Nothing
   parseJSON _ = mzero
 
 

@@ -7,6 +7,7 @@ module NixManager.Packages.View
   )
 where
 
+import NixManager.NixLocation(flattenedTail)
 import           NixManager.Packages.PackageCategory
                                                 ( packageCategories
                                                 , categoryToText
@@ -162,21 +163,18 @@ searchBox s =
           )
         ]
 
-stripPrefixSafe :: Text -> Text -> Text
-stripPrefixSafe prefix t = fromMaybe t (stripPrefix prefix t)
-
 formatPkgLabel :: NixPackage -> Text
 formatPkgLabel pkg =
   let
-    path = stripPrefixSafe "nixpkgs." (pkg ^. npPath)
+    path = pkg ^. npPath . flattenedTail
     name = pkg ^. npName
-    firstLine =
-      if path == name then name else name <> " " <> surroundSimple "tt" path
-    description
+    firstLine = ["<span size=\"x-large\">" <> name <> "</span>"]
+    descriptionLine
       | null (pkg ^. npDescription)
       = []
       | otherwise
-      = [pkg ^. npDescription . to (surroundSimple "i" . replaceHtmlEntities)]
+      = ["Description: " <> pkg ^. npDescription . to (surroundSimple "i" . replaceHtmlEntities)]
+    pathLine = ["Full Nix path: " <> surroundSimple "tt" path | path /= name]
     formatStatus NixPackageNothing          = []
     formatStatus NixPackageInstalled        = ["Installed"]
     formatStatus NixPackagePendingInstall   = ["Marked for installation"]
@@ -184,8 +182,9 @@ formatPkgLabel pkg =
   in
     init
     . unlines
-    $ (  [firstLine]
-      <> description
+    $ (  firstLine
+      <> pathLine
+      <> descriptionLine
       <> (surroundSimple "b" <$> formatStatus (pkg ^. npStatus))
       )
 
