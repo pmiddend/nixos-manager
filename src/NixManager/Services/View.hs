@@ -8,12 +8,15 @@ module NixManager.Services.View
   )
 where
 
+import           NixManager.View.InformationBox ( informationBox )
+import           NixManager.View.ImageButton ( imageButton )
+import qualified NixManager.View.IconName      as IconName
+import           Data.Default                   ( def )
 import           NixManager.View.GtkUtil        ( paddedAround
                                                 , expandAndFill
                                                 )
 import           Data.List.NonEmpty             ( NonEmpty((:|)) )
-import           NixManager.NixLocation
-                                                ( NixLocation
+import           NixManager.NixLocation         ( NixLocation
                                                 , flattenedTail
                                                 , flattened
                                                 , flattenLocation
@@ -78,7 +81,7 @@ import           NixManager.NixServiceOption    ( optionType
                                                 , optionLoc
                                                 , optionDescription
                                                 )
-import           GI.Gtk.Declarative.Widget      ( Widget )
+import           GI.Gtk.Declarative.Widget      ( Widget, fromWidget )
 import           GI.Gtk.Declarative.SingleWidget
                                                 ( SingleWidget )
 import           GI.Gtk.Declarative             ( bin
@@ -403,23 +406,33 @@ invalidOptionsMessage (Just e) =
 invalidOptionsMessage Nothing =
   "Service definitions need to be downloaded first.\nPress the button below to start the download. It'll only take a few seconds, depending on your internet speed."
 
-noticeBox buttonEvent buttonText message = container
+invalidOptionsIcon (Just _) = IconName.DialogError
+invalidOptionsIcon Nothing = IconName.EmblemDocuments
+
+invalidOptionsButtonText (Just _) = "Retry Download"
+invalidOptionsButtonText Nothing = "Start Download"
+
+noticeBox icon buttonEvent buttonIcon buttonText message = container
   Gtk.Box
-  [#orientation := Gtk.OrientationVertical, #spacing := 10]
-  [ BoxChild defaultBoxChildProperties
-             (widget Gtk.Label [#label := message, #wrap := True])
+  [#orientation := Gtk.OrientationVertical, #spacing := 10, #marginLeft := 40, #marginRight := 40, #marginTop := 5]
+  [ BoxChild def (informationBox icon message)
   , BoxChild
-    defaultBoxChildProperties
+    def
     (container
       Gtk.Box
       [#orientation := Gtk.OrientationHorizontal, #halign := Gtk.AlignCenter]
-      [widget Gtk.Button [#label := buttonText, on #clicked buttonEvent]]
+      [BoxChild def $ imageButton [#label := buttonText, on #clicked buttonEvent, #alwaysShowImage := True] buttonIcon]
     )
   ]
 
 servicesBox' (StateDownloading ssdd) _ = container
   Gtk.Box
-  [#orientation := Gtk.OrientationVertical, #spacing := 10]
+  [ #orientation := Gtk.OrientationVertical,
+    #spacing := 10,
+    #marginLeft := 40,
+    #marginRight := 40,
+    #marginTop := 5
+  ]
   [ BoxChild defaultBoxChildProperties
              (widget Gtk.Label [#label := "Downloading services..."])
   , BoxChild defaultBoxChildProperties (progressBar [] (ssdd ^. sddCounter))
@@ -436,15 +449,19 @@ servicesBox' (StateDownloading ssdd) _ = container
       ]
     )
   ]
-servicesBox' (StateInvalidExpr e) _ = noticeBox
+servicesBox' (StateInvalidExpr e) _ = bin Gtk.ScrolledWindow [] $ noticeBox
+  IconName.DialogError
   (ManagerEventServices EventStateReload)
+  IconName.EmblemDownloads
   "Reload service state"
   ("Your service expression file is not valid. Maybe you have edited it by hand and it's become corrupted?\nPlease fix the error and then press the button below. The error is:\n"
   <> e
   )
-servicesBox' (StateInvalidOptions possibleError) _ = noticeBox
+servicesBox' (StateInvalidOptions possibleError) _ = bin Gtk.ScrolledWindow [] $ noticeBox
+  (invalidOptionsIcon possibleError)
   (ManagerEventServices EventDownloadStart)
-  "Start Download"
+  IconName.EmblemDownloads
+  (invalidOptionsButtonText possibleError)
   (invalidOptionsMessage possibleError)
 servicesBox' (StateDone sd) s = paned
   []

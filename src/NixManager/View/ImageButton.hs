@@ -63,4 +63,3 @@ imageButton customAttributes customParams = Widget
         (fromIntegral (fromEnum Gtk.IconSizeButton))
       Gtk.buttonSetImage w (Just newImage)
       pure newImage
-

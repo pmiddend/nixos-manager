@@ -14,6 +14,9 @@ data IconName = SystemRun
               | PreferencesOther
               | PackageXGeneric
               | EmblemImportant
+              | EmblemDocuments
+              | EmblemDownloads
+              | DialogError
               | DialogQuestion
               | DialogInformation
               | UserTrash

@@ -66,6 +66,7 @@ executable nixos-manager
                      , NixManager.View.Icon
                      , NixManager.View.IconName
                      , NixManager.View.ImageButton
+                     , NixManager.View.InformationBox
                      , NixManager.View.ProgressBar
                      , NixManager.View.Root
   build-depends:       base

@@ -9,6 +9,7 @@ module NixManager.Admin.View
   )
 where
 
+import           NixManager.View.InformationBox      ( informationBox)
 import           NixManager.NixRebuildMode      ( rebuildModeToText
                                                 , rebuildModeIdx
                                                 )
@@ -403,21 +404,6 @@ buildingBox cancelEvent buildState = container
 
 adminBox' ms =
   let
-    informationBox iconName message = container
-      Gtk.Box
-      [ #orientation := Gtk.OrientationHorizontal
-      , #spacing := 15
-      , #halign := Gtk.AlignCenter
-      ]
-      [ BoxChild def $ icon [] (IconProps Gtk.IconSizeDialog iconName)
-      , BoxChild def $ widget
-        Gtk.Label
-        [ #label := message
-        , #wrap := True
-        , #halign := Gtk.AlignCenter
-        , classes ["nixos-manager-italic"]
-        ]
-      ]
     headlineItems =
       [ BoxChild fillNoExpand $ widget
         Gtk.Label
