@@ -14,7 +14,7 @@ import           Prelude                 hiding ( writeFile )
 import           System.FilePath                ( dropFileName )
 import           System.Directory               ( createDirectoryIfMissing )
 import           NixManager.NixServiceOption    ( desiredOptionsFileLocation )
-import           Control.Exception              ( try )
+import           Control.Exception              ( try, Exception, SomeException )
 import           Network.Wreq                   ( get
                                                 , Response
                                                 , responseStatus
@@ -40,6 +40,7 @@ import           Control.Lens                   ( makeLenses
 import           Data.ByteString.Lazy           ( ByteString
                                                 , writeFile
                                                 )
+import Codec.Compression.Brotli(decompress)
 
 type DownloadResult = TextualError FilePath
 
@@ -52,8 +53,16 @@ data DownloadState = DownloadState {
 
 makeLenses ''DownloadState
 
-tryDownload :: IO (Either HttpException (Response ByteString))
-tryDownload = try (get "https://channels.nixos.org/nixos-19.09/options.json.br")
+tryDecompress :: Response ByteString -> IO (Either SomeException (Response ByteString))
+tryDecompress bs = try (pure (decompress <$> bs))
+
+tryDownload :: IO (Either SomeException (Response ByteString))
+tryDownload = do
+  errorOrResponse <- try (get "https://channels.nixos.org/nixos-19.09/options.json.br")
+  case errorOrResponse of
+    -- FIXME: This is pretty ugly.
+    Left e -> pure (Left e)
+    Right v -> tryDecompress v
 
 start :: IO DownloadState
 start = do

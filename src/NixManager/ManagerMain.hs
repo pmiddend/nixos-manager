@@ -33,7 +33,7 @@ import           Prelude                 hiding ( length
                                                 , putStrLn
                                                 )
 
---| Initialize the application state, optionally returning an error.
+-- | Initialize the application state, optionally returning an error.
 initState :: IO (TextualError ManagerState)
 initState = ifSuccessIO PackagesState.initState $ \packagesState -> do
   serviceState <- ServicesState.initState
