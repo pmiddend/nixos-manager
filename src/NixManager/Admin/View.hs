@@ -62,6 +62,7 @@ import           NixManager.Changes             ( ChangeType(Changes) )
 import           NixManager.Admin.Event         ( Event
                                                   ( EventRebuild
                                                   , EventGarbage
+                                                  , EventGarbageCancel
                                                   , EventRebuildDoUpdateChanged
                                                   , EventGarbageChangeDetails
                                                   , EventGarbageOlderGenerationsChanged
@@ -126,7 +127,7 @@ rebuildGrid as =
       ]
       IconName.ViewRefresh
     lastLine =
-      maybe applyButton buildingBox (as ^. asRebuildData . rdBuildState)
+      maybe applyButton (buildingBox EventRebuildCancel) (as ^. asRebuildData . rdBuildState)
     changeBuildType :: ComboBoxChangeEvent -> ManagerEvent
     changeBuildType (ComboBoxChangeEvent idx) =
       ManagerEventAdmin (EventRebuildModeIdxChanged idx)
@@ -231,7 +232,7 @@ garbageGrid as =
       ]
       IconName.UserTrash
     lastLine =
-      maybe applyButton buildingBox (as ^. asGarbageData . gdBuildState)
+      maybe applyButton (buildingBox EventGarbageCancel) (as ^. asGarbageData . gdBuildState)
     gridProperties = [#rowSpacing := 10, #columnSpacing := 10]
     inBox props w = container Gtk.Box [] [BoxChild props w]
     olderGenerationsRow   = 0
@@ -385,12 +386,12 @@ garbageBox as =
             ([BoxChild def (garbageGrid as)] <> lastStatusRow <> details)
 
 
-buildingBox buildState = container
+buildingBox cancelEvent buildState = container
   Gtk.Box
   [#orientation := Gtk.OrientationHorizontal, #spacing := 8]
   [ BoxChild fillNoExpand $ imageButton
     [ #label := "Cancel"
-    , on #clicked (ManagerEventAdmin EventRebuildCancel)
+    , on #clicked (ManagerEventAdmin cancelEvent)
     , #valign := Gtk.AlignCenter
     , #alwaysShowImage := True
     ]

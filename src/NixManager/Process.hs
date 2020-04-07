@@ -4,6 +4,7 @@ module NixManager.Process
   ( ProcessOutput
   , ProcessData
   , runProcess
+  , runProcessToFinish
   , terminate
   , waitUntilFinished
   , getProcessId
@@ -79,6 +80,11 @@ noStdin = Nothing
 
 getProcessId :: ProcessData -> IO (Maybe Pid)
 getProcessId = getPid . view pdProcessHandle
+
+runProcessToFinish :: Maybe ByteString -> Expr -> IO ProcessOutput
+runProcessToFinish stdinString command = do
+  pd <- runProcess stdinString command
+  waitUntilFinished pd
 
 runProcess :: Maybe ByteString -> Expr -> IO ProcessData
 runProcess stdinString command = do

@@ -111,6 +111,7 @@ import           Control.Lens                   ( (^.)
                                                 )
 import           Data.Text.Lens                 ( unpacked )
 import           NixManager.Process             ( runProcess
+                                                , runProcessToFinish
                                                 , ProcessData
                                                 , waitUntilFinished
                                                 , poStdout
@@ -124,8 +125,7 @@ nixSearch term = Command "nix" ["search", LiteralArg term, "--json"]
 
 searchPackages :: Text -> IO (TextualError [NixPackage])
 searchPackages t = do
-  pd <- runProcess Nothing (nixSearch t)
-  po <- waitUntilFinished pd
+  po <- runProcessToFinish Nothing (nixSearch t)
   let
     processedResult = addToError
       "Error parsing output of \"nix search\" command. This could be due to changes in this command in a later version (and doesn't fix itself). Please open an issue in the nixos-manager repository. The error was: "

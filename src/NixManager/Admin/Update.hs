@@ -8,6 +8,7 @@ module NixManager.Admin.Update
   )
 where
 
+import Data.Foldable(for_)
 import           Control.Monad                  ( void )
 import           NixManager.PosixTools          ( kill )
 import qualified Data.ByteString.Char8         as BS
@@ -34,6 +35,7 @@ import           System.Exit                    ( ExitCode
                                                 )
 import           NixManager.Process             ( updateProcess
                                                 , runProcess
+                                                , runProcessToFinish
                                                 , poResult
                                                 , waitUntilFinished
                                                 , poStdout
@@ -141,6 +143,17 @@ formatExitCode :: ExitCode -> BS.ByteString
 formatExitCode (ExitFailure code) = "error code " <> BS.pack (show code)
 formatExitCode ExitSuccess        = "success"
 
+sudoKillProcess :: BuildState -> IO (Maybe ManagerEvent)
+sudoKillProcess bs = do
+  pid' <- getProcessId (bs ^. bsProcessData)
+  case pid' of
+    Nothing  -> pure Nothing
+    Just pid -> do
+      _po <- runProcessToFinish
+        (Just (encodeUtf8 (getPassword (bs ^. bsPassword))))
+        (sudoExpr (kill pid))
+      pure Nothing
+
 updateEvent
   :: ManagerState -> State -> Event -> Transition ManagerState ManagerEvent
 updateEvent ms _ EventRebuild = Transition
@@ -150,32 +163,11 @@ updateEvent ms _ EventGarbage = Transition
   ms
   (adminEvent . EventAskPassWatch EventGarbageWithPassword mempty <$> askPass)
 updateEvent ms _ EventRebuildCancel =
-  Transition (ms & msAdminState . asRebuildData . rdBuildState .~ Nothing)
-    $ case ms ^. msAdminState . asRebuildData . rdBuildState of
-        Nothing -> pure Nothing
-        Just bs -> do
-          pid' <- getProcessId (bs ^. bsProcessData)
-          case pid' of
-            Nothing  -> pure Nothing
-            Just pid -> do
-              pd <- runProcess
-                (Just (encodeUtf8 (getPassword (bs ^. bsPassword))))
-                (sudoExpr (kill pid))
-              po <- waitUntilFinished pd
-              BS.putStrLn ((po ^. poStderr <> po ^. poStdout))
-              pure Nothing
-
+  Transition (ms & msAdminState . asRebuildData . rdBuildState .~ Nothing) $
+    maybe (pure Nothing) sudoKillProcess (ms ^. msAdminState . asRebuildData . rdBuildState)
 updateEvent ms _ EventGarbageCancel =
-  Transition (ms & msAdminState . asGarbageData . gdBuildState .~ Nothing) $ do
-    terminate
-      (   ms
-      ^?! msAdminState
-      .   asGarbageData
-      .   gdBuildState
-      .   folded
-      .   bsProcessData
-      )
-    pure Nothing
+  Transition (ms & msAdminState . asGarbageData . gdBuildState .~ Nothing) $
+    maybe (pure Nothing) sudoKillProcess (ms ^. msAdminState . asGarbageData . gdBuildState)
 updateEvent ms _ (EventGarbageWithPassword password) = Transition ms $ do
   garbagePo <- collectGarbage
     (ms ^. msAdminState . asGarbageData . gdOlderGenerations)
