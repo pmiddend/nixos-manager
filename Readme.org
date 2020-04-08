@@ -14,6 +14,12 @@
 
 [[./screenshots/services.png]]
 
+** Screencast
+
+[[https://www.youtube.com/watch?v=Fa4_9ueOdpY&feature=youtu.be][Watch on YouTube]]
+
+Please recommend to me another platform where I can upload this, preferably lossless as the source mkv that I have.
+
 ** Rationale
 
 The idea is to build something to *configure NixOS graphically*. To me, this means: managing the installed software packages, and managing the enabled services, as well as updating and garbage-collecting. For the moment, I’m focusing on a solution for a declarative, global configuration; so /for the moment/ it’s not calling =nix-env= and it’s not supporting =home-manager=.
