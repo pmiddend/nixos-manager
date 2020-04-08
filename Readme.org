@@ -108,5 +108,13 @@ nixos-manager will create these two files when you apply changes.
 - I’m using [[https://www.gtk.org/][the GTK toolkit]] and specifically [[https://owickstrom.github.io/gi-gtk-declarative/][gi-gtk-declarative]] as a declarative approach to writing GTK applications. The documentation is [[https://owickstrom.github.io/gi-gtk-declarative/widgets/the-widget-type/][here]]. A good blog post by the author is [[https://wickstrom.tech/programming/2018/09/04/declarative-gtk-programming-with-haskell.html][Declarative GTK+ Programming with Haskell]].
 *** Code structure
 
-Each module has haddock documentation. Finding information about the code just from that might be difficult though, so let me give you a short overview: *TODO*.
+Each module has haddock documentation. Finding information about the code just from that might be difficult though, so let me give you a short overview:
 
+- Each of the tabs you see (notebook pages, in GTK-Speak) has a submodule. There’s =NixManager.Admin=, =NixManager.Services= and =NixManager.Packages=, respectively.
+- Inside each such submodule you have modules =Event=, =Update= and =View=.
+  - =Event= contains the even data type for the submodule (which is then embedded in =NixManager.ManagerEvent=)
+  - =Update= contains the update handler (a function receiving the current state and an event and returns a new state, as well as an event and IO side-effects)
+  - =View= contains the =gi-gtk-declarative= classes for the notebook page.
+** Alternatives
+
+- [[https://gitlab.com/juliendehos/nix42b][nix42b]] — is another user-friendly Nix package manager, also written in Haskell. It doesn’t seem to be actively maintained anymore.
