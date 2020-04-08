@@ -410,9 +410,9 @@ adminBox' ms =
         [ #label := "Welcome to NixOS-Manager"
         , classes ["nixos-manager-headline"]
         ]
-      , BoxChild def $ informationBox
+      , BoxChild def $ informationBox True
         IconName.DialogInformation
-        "Select the “Packages” and “Services” tabs above to make changes to your system.\nOnce you're done with that, apply the changes using the form below."
+        "Select the “Add/Remove Software” and “Configure your system” tabs above to make changes to your system.\nOnce you're done with that, <b>apply the changes</b> using the form below."
       ]
   in
     bin Gtk.ScrolledWindow []
@@ -427,7 +427,7 @@ adminBox' ms =
          ]
     $  headlineItems
     <> [rebuildBox (ms ^. msAdminState)]
-    <> [ BoxChild def $ informationBox
+    <> [ BoxChild def $ informationBox True
            IconName.UserTrash
            "NixOS doesn't explicitly delete anything once it has been downloaded.\nThis makes reinstalling things faster, but your disk drive will dwindle over time.\nThat’s why you should collect all the garbage regularly using this form."
        ]

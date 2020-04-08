@@ -25,12 +25,14 @@ import           NixManager.View.Icon           ( icon
 import           Data.Default                   ( def )
 import Data.Text(Text)
 
+-- | Display a box with an icon and a descriptive text next to it, possibly using Pango markup
 informationBox
   :: FromWidget (Container Gtk.Box (Children BoxChild)) target
-  => IconName.IconName
-  -> Text
+  => Bool -- ^ Whether to use pango markup
+  -> IconName.IconName -- ^ Icon to display
+  -> Text -- ^ Message to display
   -> target event
-informationBox iconName message = container
+informationBox useMarkup iconName message = container
   Gtk.Box
   [ #orientation := Gtk.OrientationHorizontal
   , #spacing := 15
@@ -41,6 +43,7 @@ informationBox iconName message = container
     Gtk.Label
     [ #label := message
     , #wrap := True
+    , #useMarkup := useMarkup
     , #halign := Gtk.AlignCenter
     , classes ["nixos-manager-italic"]
     ]

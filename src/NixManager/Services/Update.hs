@@ -64,7 +64,7 @@ updateEvent :: ManagerState -> Event -> Transition ManagerState ManagerEvent
 updateEvent s EventDownloadStart =
   Transition s (servicesEvent . EventDownloadStarted <$> ServiceDownload.start)
 updateEvent s (EventCategoryIdxChanged newCategory) = pureTransition
-  (s & msServiceState . _StateDone . sdCategoryIdx .~ newCategory)
+  (s & msServiceState . _StateDone . sdCategoryIdx .~ newCategory & msServiceState . _StateDone . sdSelectedIdx .~ Just 0)
 updateEvent s (EventSearchChanged t) = pureTransition
   (  s
   &  msServiceState

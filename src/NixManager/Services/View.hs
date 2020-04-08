@@ -422,7 +422,7 @@ noticeBox icon buttonEvent buttonIcon buttonText message = container
   , #marginRight := 40
   , #marginTop := 5
   ]
-  [ BoxChild def (informationBox icon message)
+  [ BoxChild def (informationBox False icon message)
   , BoxChild
     def
     (container
