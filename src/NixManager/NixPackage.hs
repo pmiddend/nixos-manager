@@ -1,3 +1,6 @@
+{-|
+  Description: Types representing a Nix package (as read from @nix search@)
+  -}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.NixPackage
@@ -32,21 +35,26 @@ import           NixManager.NixPackageStatus    ( NixPackageStatus
                                                   ( NixPackageNothing
                                                   )
                                                 )
-import NixManager.NixLocation(NixLocation(NixLocation), locationFromText)
+import           NixManager.NixLocation         ( NixLocation(NixLocation)
+                                                , locationFromText
+                                                )
 
+-- | Type representing a Nix package, along with information about its current status
 data NixPackage = NixPackage {
-    _npName :: Text
-  , _npPath :: NixLocation
-  , _npVersion :: Text
-  , _npDescription :: Text
-  , _npStatus :: NixPackageStatus
+    _npName :: Text -- ^ Name of the package (as per the JSON)
+  , _npPath :: NixLocation -- ^ Package path (as per the JSON)
+  , _npVersion :: Text -- ^ Package version (as per the JSON)
+  , _npDescription :: Text -- ^ Package description (as per the JSON)
+  , _npStatus :: NixPackageStatus -- ^ Current status of the package (will be added after parsing the JSON)
   } deriving(Eq,Show)
 
 makeLenses ''NixPackage
 
+-- | Read a package list from a 'ByteString'
 readPackagesJson :: ByteString -> TextualError [NixPackage]
 readPackagesJson = (packagesFromMap <$>) . fromEither . eitherDecode
 
+-- | Convert a map (like the one @nix search@ returns) into a package list
 packagesFromMap :: Map Text NixPackageMeta -> [NixPackage]
 packagesFromMap m =
   (\(path, meta) -> NixPackage (meta ^. npmName)

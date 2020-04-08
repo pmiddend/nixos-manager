@@ -1,3 +1,6 @@
+{-|
+  Description: Metadata for a Nix package. This is a companion module to "NixManager.NixPackage"
+  -}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 module NixManager.NixPackageMeta

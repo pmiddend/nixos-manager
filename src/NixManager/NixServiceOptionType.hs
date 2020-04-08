@@ -1,3 +1,6 @@
+{-|
+  Description: Provides a type, as well as a parser for the option type contained in @options.json@
+  -}
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.NixServiceOptionType
   ( NixServiceOptionType(..)
@@ -29,22 +32,23 @@ import           Text.Megaparsec                ( Parsec
                                                 )
 import           NixManager.Util
 
+-- | The @options.json@ file contains a type for the option. This is a mini-DSL which is typed here.
 data NixServiceOptionType = NixServiceOptionInteger
-                         | NixServiceOptionFloat
-                         | NixServiceOptionAttributeSet (Maybe NixServiceOptionType)
-                         | NixServiceOptionBoolean
-                         | NixServiceOptionOr NixServiceOptionType NixServiceOptionType
-                         | NixServiceOptionOneOfNumeric [Integer]
-                         | NixServiceOptionOneOfString [Text]
-                         | NixServiceOptionString
-                         | NixServiceOptionList NixServiceOptionType
-                         | NixServiceOptionLoa NixServiceOptionType
-                         | NixServiceOptionPackage
-                         | NixServiceOptionPath
-                         | NixServiceOptionSubmodule
-                         | NixServiceOptionUnspecified
-                         | NixServiceOptionNull
-  deriving(Eq)
+                          | NixServiceOptionFloat
+                          | NixServiceOptionAttributeSet (Maybe NixServiceOptionType)
+                          | NixServiceOptionBoolean
+                          | NixServiceOptionOr NixServiceOptionType NixServiceOptionType
+                          | NixServiceOptionOneOfNumeric [Integer]
+                          | NixServiceOptionOneOfString [Text]
+                          | NixServiceOptionString
+                          | NixServiceOptionList NixServiceOptionType
+                          | NixServiceOptionLoa NixServiceOptionType
+                          | NixServiceOptionPackage
+                          | NixServiceOptionPath
+                          | NixServiceOptionSubmodule
+                          | NixServiceOptionUnspecified
+                          | NixServiceOptionNull
+                          deriving(Eq)
 
 instance Show NixServiceOptionType where
   show NixServiceOptionInteger  = "integer"

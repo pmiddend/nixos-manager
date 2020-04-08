@@ -33,7 +33,7 @@ import           Prelude                 hiding ( length
                                                 , putStrLn
                                                 )
 
--- | Initialize the application state, optionally returning an error.
+-- |Initialize the application state, optionally returning an error.
 initState :: IO (TextualError ManagerState)
 initState = ifSuccessIO PackagesState.initState $ \packagesState -> do
   serviceState <- ServicesState.initState
@@ -43,6 +43,7 @@ initState = ifSuccessIO PackagesState.initState $ \packagesState -> do
                               , _msAdminState    = adminState
                               }
 
+-- |Initialize GTK, the state and run the GTK main loop
 nixMain :: IO ()
 nixMain = do
   void (Gtk.init Nothing)

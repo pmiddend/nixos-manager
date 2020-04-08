@@ -1,3 +1,6 @@
+{-|
+  Description: Functions and structures relating to the @nixos-rebuild@ command
+  -}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -57,28 +60,34 @@ import           NixManager.NixRebuildUpdateMode
                                                 )
 
 
-nixosRebuild :: NixRebuildMode -> NixRebuildUpdateMode -> Expr
-nixosRebuild _mode _updateMode = Command "sleep" ["3s"]
--- nixosRebuild :: NixRebuildMode -> NixRebuildUpdateMode -> Expr
--- nixosRebuild mode updateMode = Command
---   "nixos-rebuild"
---   (  [LiteralArg (rebuildModeToText mode)]
---   <> mwhen (updateMode == NixRebuildUpdateUpdate)   ["--upgrade"]
---   <> mwhen (updateMode == NixRebuildUpdateRollback) ["--rollback"]
---   )
 
+-- | Bash expression for @nixos-rebuild@ (see the "NixManager.Bash" module)
+nixosRebuildExpr :: NixRebuildMode -> NixRebuildUpdateMode -> Expr
+-- Turn this on for debugging purposes
+-- nixosRebuildExpr _mode _updateMode = Command "sleep" ["3s"]
+nixosRebuildExpr mode updateMode = Command
+  "nixos-rebuild"
+  (  [LiteralArg (rebuildModeToText mode)]
+  <> mwhen (updateMode == NixRebuildUpdateUpdate)   ["--upgrade"]
+  <> mwhen (updateMode == NixRebuildUpdateRollback) ["--rollback"]
+  )
+
+-- | Copy @<file>.<ext>@ to @<file>.old@
 copyToOld :: FilePath -> Expr
 copyToOld fn = cp fn (fn -<.> "old")
 
+-- | Move @<file>.<old>@ to @<file>@
 moveFromOld :: FilePath -> Expr
 moveFromOld fn = mv (fn -<.> "old") fn
 
+-- | Expression to rollback a rebuild (by moving the nixos-manager files, not via @nixos-rebuild --rollback@, mind you)
 rollbackExpr :: IO Expr
 rollbackExpr = do
   rootPackagesFile <- locateRootPackagesFile
   rootServicesFile <- locateRootServicesFile
   pure (moveFromOld rootServicesFile `Then` moveFromOld rootPackagesFile)
 
+-- | Expression to call @nixos-rebuild@, after coping the local files to the root location, and possibly rolling that back.
 installExpr :: NixRebuildMode -> NixRebuildUpdateMode -> IO Expr
 installExpr rebuildMode updateMode = do
   localPackagesFile <- locateLocalPackagesFileMaybeCreate
@@ -94,9 +103,10 @@ installExpr rebuildMode updateMode = do
       finalOperator = if isDry rebuildMode then Then else Or
   pure
     $ ((mkdir True [rootManagerPath] `And` copyOldFiles) `Then` copyToRoot)
-    `And` nixosRebuild rebuildMode updateMode
+    `And` nixosRebuildExpr rebuildMode updateMode
     `finalOperator` Subshell (devNullify rollback)
 
+-- | Rollback a rebuild
 rollbackRebuild :: Password -> IO ()
 rollbackRebuild password = do
   rollback <- rollbackExpr
@@ -104,6 +114,7 @@ rollbackRebuild password = do
                          (sudoExpr rollback)
   void (waitUntilFinished result)
 
+-- | Call @nixos-rebuild@, after asking for a password
 rebuild :: NixRebuildMode -> NixRebuildUpdateMode -> Password -> IO ProcessData
 rebuild rebuildMode updateMode password =
   installExpr rebuildMode updateMode

@@ -8,8 +8,9 @@ module NixManager.Services.View
   )
 where
 
+import           NixManager.Constants           ( globalOptionsMagicString )
 import           NixManager.View.InformationBox ( informationBox )
-import           NixManager.View.ImageButton ( imageButton )
+import           NixManager.View.ImageButton    ( imageButton )
 import qualified NixManager.View.IconName      as IconName
 import           Data.Default                   ( def )
 import           NixManager.View.GtkUtil        ( paddedAround
@@ -21,7 +22,7 @@ import           NixManager.NixLocation         ( NixLocation
                                                 , flattened
                                                 , flattenLocation
                                                 , firstComponent
-                                                , needsMarkup
+                                                , isSingleton
                                                 , locationComponents
                                                 , locationDropComponents
                                                 )
@@ -81,7 +82,9 @@ import           NixManager.NixServiceOption    ( optionType
                                                 , optionLoc
                                                 , optionDescription
                                                 )
-import           GI.Gtk.Declarative.Widget      ( Widget, fromWidget )
+import           GI.Gtk.Declarative.Widget      ( Widget
+                                                , fromWidget
+                                                )
 import           GI.Gtk.Declarative.SingleWidget
                                                 ( SingleWidget )
 import           GI.Gtk.Declarative             ( bin
@@ -165,10 +168,9 @@ import           NixManager.NixServiceOptionType
 buildServiceRow
   :: FromWidget (Bin Gtk.ListBoxRow) target => NixService -> target event
 buildServiceRow svc =
-  let title    = svc ^. serviceLoc . flattenedTail
-      markedUp = if needsMarkup (svc ^. serviceLoc)
-        then surroundSimple "b" title
-        else title
+  let markedUp = if isSingleton (svc ^. serviceLoc)
+        then surroundSimple "b" globalOptionsMagicString
+        else svc ^. serviceLoc . flattenedTail
   in  bin Gtk.ListBoxRow
           []
           (widget Gtk.Label [#label := markedUp, #useMarkup := True])
@@ -407,31 +409,42 @@ invalidOptionsMessage Nothing =
   "Service definitions need to be downloaded first.\nPress the button below to start the download. It'll only take a few seconds, depending on your internet speed."
 
 invalidOptionsIcon (Just _) = IconName.DialogError
-invalidOptionsIcon Nothing = IconName.EmblemDocuments
+invalidOptionsIcon Nothing  = IconName.EmblemDocuments
 
 invalidOptionsButtonText (Just _) = "Retry Download"
-invalidOptionsButtonText Nothing = "Start Download"
+invalidOptionsButtonText Nothing  = "Start Download"
 
 noticeBox icon buttonEvent buttonIcon buttonText message = container
   Gtk.Box
-  [#orientation := Gtk.OrientationVertical, #spacing := 10, #marginLeft := 40, #marginRight := 40, #marginTop := 5]
+  [ #orientation := Gtk.OrientationVertical
+  , #spacing := 10
+  , #marginLeft := 40
+  , #marginRight := 40
+  , #marginTop := 5
+  ]
   [ BoxChild def (informationBox icon message)
   , BoxChild
     def
     (container
       Gtk.Box
       [#orientation := Gtk.OrientationHorizontal, #halign := Gtk.AlignCenter]
-      [BoxChild def $ imageButton [#label := buttonText, on #clicked buttonEvent, #alwaysShowImage := True] buttonIcon]
+      [ BoxChild def $ imageButton
+          [ #label := buttonText
+          , on #clicked buttonEvent
+          , #alwaysShowImage := True
+          ]
+          buttonIcon
+      ]
     )
   ]
 
 servicesBox' (StateDownloading ssdd) _ = container
   Gtk.Box
-  [ #orientation := Gtk.OrientationVertical,
-    #spacing := 10,
-    #marginLeft := 40,
-    #marginRight := 40,
-    #marginTop := 5
+  [ #orientation := Gtk.OrientationVertical
+  , #spacing := 10
+  , #marginLeft := 40
+  , #marginRight := 40
+  , #marginTop := 5
   ]
   [ BoxChild defaultBoxChildProperties
              (widget Gtk.Label [#label := "Downloading services..."])
@@ -457,12 +470,13 @@ servicesBox' (StateInvalidExpr e) _ = bin Gtk.ScrolledWindow [] $ noticeBox
   ("Your service expression file is not valid. Maybe you have edited it by hand and it's become corrupted?\nPlease fix the error and then press the button below. The error is:\n"
   <> e
   )
-servicesBox' (StateInvalidOptions possibleError) _ = bin Gtk.ScrolledWindow [] $ noticeBox
-  (invalidOptionsIcon possibleError)
-  (ManagerEventServices EventDownloadStart)
-  IconName.EmblemDownloads
-  (invalidOptionsButtonText possibleError)
-  (invalidOptionsMessage possibleError)
+servicesBox' (StateInvalidOptions possibleError) _ =
+  bin Gtk.ScrolledWindow [] $ noticeBox
+    (invalidOptionsIcon possibleError)
+    (ManagerEventServices EventDownloadStart)
+    IconName.EmblemDownloads
+    (invalidOptionsButtonText possibleError)
+    (invalidOptionsMessage possibleError)
 servicesBox' (StateDone sd) s = paned
   []
   (pane defaultPaneProperties (servicesLeftPane sd s))

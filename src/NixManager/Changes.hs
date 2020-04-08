@@ -1,3 +1,6 @@
+{-|
+  Description: Determine if the user made any changes which will have to be applied.
+  #-}
 module NixManager.Changes
   ( determineChanges
   , ChangeType(..)
@@ -14,10 +17,12 @@ import           NixManager.NixService          ( locateLocalServicesFile
                                                 )
 
 
-data ChangeType = NoChanges
-                | Changes
+-- | Avoid boolean blindness by using this enum instead.
+data ChangeType = NoChanges -- ^ No changes to apply
+                | Changes   -- ^ There are changes to apply
                 deriving (Eq, Bounded, Enum)
 
+-- | Determine if two files, a local one and a root one, are equal, treating “local file doesn’t” exist as “we have no changes to apply regarding that file”.
 determineFilesEqual :: IO FilePath -> IO FilePath -> IO Bool
 determineFilesEqual fp' rootFp' = do
   fp          <- fp'
@@ -29,6 +34,7 @@ determineFilesEqual fp' rootFp' = do
       if rootExists then filesEqual fp rootFp else pure False
     else pure True
 
+-- | Determine if there are changes that have to be applied.
 determineChanges :: IO ChangeType
 determineChanges = do
   packagesEqual <- determineFilesEqual locateLocalPackagesFile

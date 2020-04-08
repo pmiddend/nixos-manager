@@ -109,6 +109,10 @@ kebapize prefix =
       mempty
     . drop (length prefix)
 
+-- | Surround a text by something constant
+surround :: Text -> Text -> Text
+surround c e = c <> e <> c
+
 -- | Surround a string by an HTML tag (without attributes)
 surroundSimple :: (IsString s, Semigroup s) => s -> s -> s
 surroundSimple tag content = openTag tag <> content <> closeTag tag

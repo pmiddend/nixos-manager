@@ -1,3 +1,6 @@
+{-|
+  Description: Provides functions and types regarding “services” (so anything that’s not a package basically)
+  -}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -51,8 +54,7 @@ import           NixManager.Util                ( Endo
                                                 , TextualError
                                                 , addToError
                                                 )
-import           NixManager.NixLocation
-                                                ( NixLocation
+import           NixManager.NixLocation         ( NixLocation
                                                 , removeLastComponent
                                                 , isPrefixOf
                                                 )
@@ -60,10 +62,10 @@ import           NixManager.NixServiceOption    ( NixServiceOption
                                                 , optionLoc
                                                 )
 
-
+-- | Represents a service with a location and some options.
 data NixService = NixService {
-    _serviceLoc :: NixLocation
-  , _serviceOptions :: [NixServiceOption]
+    _serviceLoc :: NixLocation -- ^ Service location
+  , _serviceOptions :: [NixServiceOption] -- ^ Service options
   } deriving(Show)
 
 makeLenses ''NixService
@@ -74,6 +76,7 @@ makeLenses ''NixService
 -- isService :: NixLocation -> Bool
 -- isService = (== "services") . head
 
+-- | Create a list of services from a map (such as the map contained in the @options.json@ file)
 makeServices :: Map Text NixServiceOption -> [NixService]
 makeServices options' =
   let
@@ -86,9 +89,7 @@ makeServices options' =
       Nothing -> Nothing
       Just result ->
         if result `isPrefixOf` (opt ^. optionLoc) then Just result else Nothing
-    transducer
-      :: NixServiceOption
-      -> Endo (Map NixLocation [NixServiceOption])
+    transducer :: NixServiceOption -> Endo (Map NixLocation [NixServiceOption])
     transducer opt m = case serviceForOption opt of
       Nothing          -> m
       Just serviceLoc' -> insertWith (<>) serviceLoc' [opt] m
@@ -96,18 +97,22 @@ makeServices options' =
   in
     uncurry NixService <$> toList serviceMap
 
+-- | File name for the services Nix file
 servicesFileName :: IsString s => s
 servicesFileName = "services.nix"
 
+-- | Locate the /local/ services file (the one for the user). Uses the XDG mechanism(s); returns the fill path.
 locateLocalServicesFile :: IO FilePath
 locateLocalServicesFile =
   getXdgDirectory XdgConfig (appName </> servicesFileName)
 
+-- | Locate the /root/ services file; returns its full path.
 locateRootServicesFile :: IO FilePath
 locateRootServicesFile = do
   localFile <- locateLocalServicesFile
   pure (rootManagerPath </> takeFileName localFile)
 
+-- | Locate the /local/ services file and possibly create an empty one (with a valid Nix expression though) if it doesn't exist.
 locateLocalServicesFileMaybeCreate :: IO FilePath
 locateLocalServicesFileMaybeCreate = do
   pkgsFile <- locateLocalServicesFile
@@ -115,7 +120,7 @@ locateLocalServicesFileMaybeCreate = do
   unless exists (writeLocalServiceFile emptyServiceFileContents)
   pure pkgsFile
 
-
+-- | Parse the local Nix services file into a Nix expression, possibly returning an empty packages expression.
 readLocalServiceFile :: IO (TextualError NixExpr)
 readLocalServiceFile = do
   svcsFile <- locateLocalServicesFile
@@ -126,10 +131,12 @@ readLocalServiceFile = do
       )
     <$> parseNixFile svcsFile emptyServiceFileContents
 
+-- | The initial, empty services file (containing, of course, no services)
 emptyServiceFileContents :: NixExpr
 emptyServiceFileContents =
   NixFunctionDecl (NixFunction ["config", "pkgs", "..."] (NixSet mempty))
 
+-- | Write a Nix service expression into the corresponding /local/ file.
 writeLocalServiceFile :: NixExpr -> IO ()
 writeLocalServiceFile e = do
   svcsFile <- locateLocalServicesFile
