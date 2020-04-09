@@ -1,3 +1,8 @@
+{-|
+  Description: The root of the view hierarchy
+
+The root of the view hierarchy
+  -}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedLists #-}
@@ -33,6 +38,7 @@ import           NixManager.ManagerEvent        ( ManagerEvent
                                                 )
 import           Data.Vector                    ( Vector )
 
+-- | The main window’s attributes
 windowAttributes :: Vector (Attribute Gtk.Window ManagerEvent)
 windowAttributes =
   [ #title := "nixos-manager 1.0"
@@ -41,6 +47,7 @@ windowAttributes =
   , #heightRequest := 768
   ]
 
+-- | A label with an image next to it (used in the notebook’s tab headers)
 imagedLabel iconProps text = container
   Gtk.Box
   [#orientation := Gtk.OrientationHorizontal, #spacing := 5]
@@ -48,6 +55,7 @@ imagedLabel iconProps text = container
   , BoxChild def (widget Gtk.Label [#label := text, #valign := Gtk.AlignCenter])
   ]
 
+-- | The root view function
 view' :: ManagerState -> AppView Gtk.Window ManagerEvent
 view' s =
   let windowContents = notebook

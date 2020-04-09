@@ -1,3 +1,7 @@
+{-|
+  Description: Contains the update logic for the Packages tab
+Contains the update logic for the Packages tab
+  -}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -107,16 +111,19 @@ import           Prelude                 hiding ( length
                                                 , putStrLn
                                                 )
 
+-- | What message to display when the install operation completes
 installCompletedMessage :: InstallationType -> Message
 installCompletedMessage Uncancelled = infoMessage
   "Marked for installation! Head to the Admin tab to apply the changes."
 installCompletedMessage Cancelled = infoMessage "Uninstall cancelled!"
 
+-- | What message to display when the uninstall operation completes
 uninstallCompletedMessage :: InstallationType -> Message
 uninstallCompletedMessage Uncancelled = infoMessage
   "Marked for uninstall! Head to the Admin tab to apply the changes."
 uninstallCompletedMessage Cancelled = infoMessage "Installation cancelled!"
 
+-- | The actual update function
 updateEvent :: ManagerState -> Event -> Transition ManagerState ManagerEvent
 updateEvent s (EventCategoryChanged newCategory) =
   pureTransition (s & msPackagesState . psCategoryIdx .~ newCategory)
@@ -213,6 +220,7 @@ updateEvent s (EventTryInstallWatch pd po) =
   Transition
       (s & msPackagesState . psInstallingPackage . traversed . isCounter +~ 1)
     $ do
+        -- See the readme about an explanation of why we do this “watch” event stuff
         newOutput <- (po <>) <$> updateProcess pd
         case newOutput ^. poResult . to getFirst of
           Nothing -> do

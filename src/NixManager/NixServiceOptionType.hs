@@ -71,15 +71,20 @@ instance Show NixServiceOptionType where
     "one of " <> intercalate ", " (unpack <$> xs)
   show (NixServiceOptionOr a b) = show a <> " or " <> show b
 
+
+-- | Parsec type for the parser.
 type Parser = Parsec Void Text
 
+-- | Parser for decimals (needed for “one of 1, 2”)
 decimalParser :: Parser Integer
 decimalParser = L.decimal
 
+-- | Parser for string literals (needed for “one of "foo", "bar"”)
 stringLiteral :: Parser String
 stringLiteral =
   (char '\"' *> manyTill L.charLiteral (char '\"')) <?> "string literal"
 
+-- | Actual service option parser (probably sort of incomplete)
 serviceOptionTypeParser :: Parser NixServiceOptionType
 serviceOptionTypeParser =
   let
@@ -170,6 +175,7 @@ serviceOptionTypeParser =
   in
     expressionParser
 
+-- | Parse an @options.json@ option type
 parseNixServiceOptionType :: Text -> TextualError NixServiceOptionType
 parseNixServiceOptionType t = fromEither
   ( first errorBundlePretty

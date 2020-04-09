@@ -1,6 +1,8 @@
 {-|
   Description: Tools to parse and transform the Docbook descriptions for, e.g. services, into GTK pango markup (see https://developer.gnome.org/pango/stable/pango-Markup.html)
-  #-}
+
+Tools to parse and transform the Docbook descriptions for, e.g. services, into GTK pango markup (see https://developer.gnome.org/pango/stable/pango-Markup.html)
+  -}
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.Docbook
   ( parseDocbook

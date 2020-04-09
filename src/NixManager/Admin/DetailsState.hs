@@ -1,3 +1,6 @@
+{-|
+  Description: Contains "DetailsState" to signify if a GTK expander is contracted
+  -}
 module NixManager.Admin.DetailsState
   ( DetailsState(..)
   , detailsBool
@@ -8,10 +11,12 @@ import           Control.Lens                   ( Iso'
                                                 , iso
                                                 )
 
+-- | Signifies if an expander is contracted or expanded
 data DetailsState = DetailsContracted
                   | DetailsExpanded
                   deriving(Eq, Bounded, Enum)
 
+-- | Isomorphism to boolean (contracted being @false@)
 detailsBool :: Iso' DetailsState Bool
 detailsBool = iso toBool fromBool
  where

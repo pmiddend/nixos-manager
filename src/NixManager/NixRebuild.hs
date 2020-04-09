@@ -64,13 +64,13 @@ import           NixManager.NixRebuildUpdateMode
 -- | Bash expression for @nixos-rebuild@ (see the "NixManager.Bash" module)
 nixosRebuildExpr :: NixRebuildMode -> NixRebuildUpdateMode -> Expr
 -- Turn this on for debugging purposes
--- nixosRebuildExpr _mode _updateMode = Command "sleep" ["3s"]
-nixosRebuildExpr mode updateMode = Command
-  "nixos-rebuild"
-  (  [LiteralArg (rebuildModeToText mode)]
-  <> mwhen (updateMode == NixRebuildUpdateUpdate)   ["--upgrade"]
-  <> mwhen (updateMode == NixRebuildUpdateRollback) ["--rollback"]
-  )
+nixosRebuildExpr _mode _updateMode = Command "sleep" ["3s"]
+-- nixosRebuildExpr mode updateMode = Command
+--   "nixos-rebuild"
+--   (  [LiteralArg (rebuildModeToText mode)]
+--   <> mwhen (updateMode == NixRebuildUpdateUpdate)   ["--upgrade"]
+--   <> mwhen (updateMode == NixRebuildUpdateRollback) ["--rollback"]
+--   )
 
 -- | Copy @<file>.<ext>@ to @<file>.old@
 copyToOld :: FilePath -> Expr

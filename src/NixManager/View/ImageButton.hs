@@ -1,3 +1,8 @@
+{-|
+  Description: An image button widget
+
+An image button widget
+  -}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE OverloadedLabels #-}
@@ -31,6 +36,7 @@ import           NixManager.View.IconName       ( IconName
                                                 , nameToGtk
                                                 )
 
+-- | Create an image button widget
 imageButton :: Vector (Attribute Gtk.Button e) -> IconName -> Widget e
 imageButton customAttributes customParams = Widget
   (CustomWidget { customWidget

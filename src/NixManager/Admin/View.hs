@@ -1,3 +1,6 @@
+{-|
+  Description: Contains the actual GUI (widgets) for the Administation tab
+  -}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RankNTypes #-}
@@ -112,9 +115,12 @@ import           NixManager.Admin.RebuildData   ( rdBuildState
                                                 )
 import           NixManager.Admin.BuildState    ( bsCounter )
 
+
+-- | The “root” GUI function
 adminBox :: ManagerState -> Widget ManagerEvent
 adminBox s = container Gtk.Box [] [BoxChild expandAndFill (adminBox' s)]
 
+-- | The grid for the “rebuild” GUI
 rebuildGrid as =
   let
     changes     = (as ^. asChanges) == Changes
@@ -223,6 +229,7 @@ rebuildGrid as =
       , GridChild (def { width = 3, topAttach = applyRow }) lastLine
       ]
 
+-- | The grid for the “Collect garbage” GUI
 garbageGrid as =
   let
     applyButton = imageButton
@@ -274,7 +281,7 @@ garbageGrid as =
       , GridChild (def { width = 3, topAttach = applyRow }) lastLine
       ]
 
-
+-- | A descriptive label for a process exit status
 statusLabel ExitSuccess = widget
   Gtk.Label
   [ #label := "Build finished successfully!"
@@ -289,6 +296,7 @@ statusLabel _ = widget
   , classes ["error-message"]
   ]
 
+-- | The details box (the one you can expand/contract). Here in general, for GC and Rebuild
 detailsBox detailsState processOutput eventF =
   let processExpanded w = do
         expandedState <- Gtk.getExpanderExpanded w
@@ -335,7 +343,7 @@ detailsBox detailsState processOutput eventF =
           ]
     ]
 
-
+-- | The rebuild GUI
 rebuildBox as =
   let lastStatusRow =
           case
@@ -361,6 +369,7 @@ rebuildBox as =
             [#orientation := Gtk.OrientationVertical, #spacing := 5]
             ([BoxChild def (rebuildGrid as)] <> lastStatusRow <> rebuildDetails)
 
+-- | The collect garbage GUI
 garbageBox as =
   let lastStatusRow =
           case
@@ -386,7 +395,7 @@ garbageBox as =
             [#orientation := Gtk.OrientationVertical, #spacing := 5]
             ([BoxChild def (garbageGrid as)] <> lastStatusRow <> details)
 
-
+-- | When rebuilding, the Rebuild button changes to this progress bar plus cancel button
 buildingBox cancelEvent buildState = container
   Gtk.Box
   [#orientation := Gtk.OrientationHorizontal, #spacing := 8]
@@ -402,6 +411,7 @@ buildingBox cancelEvent buildState = container
     (buildState ^. bsCounter)
   ]
 
+-- | The child immediately below the root node, containing the headline and all the other stuff.
 adminBox' ms =
   let
     headlineItems =

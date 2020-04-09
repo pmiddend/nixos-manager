@@ -121,6 +121,8 @@ Each module has haddock documentation. Finding information about the code just f
   - =Event= contains the even data type for the submodule (which is then embedded in =NixManager.ManagerEvent=)
   - =Update= contains the update handler (a function receiving the current state and an event and returns a new state, as well as an event and IO side-effects)
   - =View= contains the =gi-gtk-declarative= classes for the notebook page.
+  - =State= contains the state corresponding to the subsystem
+- When starting a process, such as the rebuild process, we cannot easily run it in the background and emit an event when it’s finished (at least I don’t know how to do that comfortably with =gi-gtk-declarative-app-simple=). Instead, we are spawning the process (in the background, mind you), then wait for a small amount of time (which doesn’t block the GUI, fortunately) and then emit a “watch” event, which does the same thing, until the process signals completion. It sounds hacky, and it is, but it’s not that bad.
 ** Alternatives
 
 - [[https://gitlab.com/juliendehos/nix42b][nix42b]] — is another user-friendly Nix package manager, also written in Haskell. It doesn’t seem to be actively maintained anymore.

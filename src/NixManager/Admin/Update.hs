@@ -1,3 +1,7 @@
+{-|
+  Description: Contains the update logic for the Administration tab
+Contains the update logic for the Administration tab
+  -}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedLists #-}
@@ -134,15 +138,18 @@ import           NixManager.NixRebuildMode      ( rebuildModeIdx )
 import           NixManager.Admin.ValidRebuildModes
                                                 ( validRebuildModeIdx )
 
+-- | Given two mutually exclusive "do rollback" and "do update" booleans, calculate the update mode.
 calculateRebuildUpdateMode :: Bool -> Bool -> NixRebuildUpdateMode
 calculateRebuildUpdateMode _update@True _ = NixRebuildUpdateUpdate
 calculateRebuildUpdateMode _ _rollback@True = NixRebuildUpdateRollback
 calculateRebuildUpdateMode _ _ = NixRebuildUpdateNone
 
+-- | Format a process exit code somewhat nicer than the default 'Show' instance
 formatExitCode :: ExitCode -> BS.ByteString
 formatExitCode (ExitFailure code) = "error code " <> BS.pack (show code)
 formatExitCode ExitSuccess        = "success"
 
+-- | Kill a running process using good olde @kill -9@. You might be wondering why this is done. The thing is, simply terminating the process (via "System.Process") didn’t really /do/ anything to the process. Weird as it seems. This one works — hopefully.
 sudoKillProcess :: BuildState -> IO (Maybe ManagerEvent)
 sudoKillProcess bs = do
   pid' <- getProcessId (bs ^. bsProcessData)
@@ -154,6 +161,7 @@ sudoKillProcess bs = do
         (sudoExpr (kill pid))
       pure Nothing
 
+-- | For a broad description of what the events do, see 'Event'
 updateEvent
   :: ManagerState -> State -> Event -> Transition ManagerState ManagerEvent
 updateEvent ms _ EventRebuild = Transition
@@ -188,6 +196,7 @@ updateEvent ms _ (EventRebuildWithPassword password) = Transition ms $ do
     password
   pure (adminEvent (EventRebuildStarted rebuildPo password))
 updateEvent ms _ (EventAskPassWatch andThen po pd) = Transition ms $ do
+  -- See the readme about an explanation of why we do this “watch” event stuff
   newpo <- updateProcess pd
   let totalPo = po <> newpo
   case totalPo ^. poResult . to getFirst of
@@ -239,6 +248,7 @@ updateEvent ms _ (EventGarbageWatch priorOutput pd) =
       +~ 1
       )
     $ do
+        -- See the readme about an explanation of why we do this “watch” event stuff
         updates <- updateProcess pd
         let newOutput = priorOutput <> updates
         case updates ^. poResult . to getFirst of
@@ -261,6 +271,7 @@ updateEvent ms _ (EventRebuildWatch password priorOutput pd) =
       +~ 1
       )
     $ do
+        -- See the readme about an explanation of why we do this “watch” event stuff
         updates <- updateProcess pd
         let newOutput = priorOutput <> updates
         case updates ^. poResult . to getFirst of

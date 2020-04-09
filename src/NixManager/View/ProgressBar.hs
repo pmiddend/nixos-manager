@@ -1,3 +1,8 @@
+{-|
+  Description: A progress bar widget
+
+A progress bar widget
+  -}
 {-# LANGUAGE NamedFieldPuns #-}
 module NixManager.View.ProgressBar
   ( progressBar
@@ -24,6 +29,7 @@ import           GI.Gtk.Declarative             ( Widget(Widget)
 import qualified GI.Gtk                        as Gtk
 
 
+-- | Create a progress bar widget. It’s currently not “percentage-based”, but has to be regularly “pulsed” to show that something is happening. You can do this by incrementing (or changing) the integer you provide here.
 progressBar :: Vector (Attribute Gtk.ProgressBar e) -> Int -> Widget e
 progressBar customAttributes customParams = Widget
   (CustomWidget { customWidget

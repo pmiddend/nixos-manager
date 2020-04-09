@@ -1,3 +1,8 @@
+{-|
+  Description: An enum wrapping GTK’s icon name values
+
+An enum wrapping GTK’s icon name values
+  -}
 module NixManager.View.IconName
   ( IconName(..)
   , nameToGtk
@@ -9,6 +14,7 @@ import           NixManager.Util                ( showText
                                                 , kebapize
                                                 )
 
+-- | An enum wrapping GTK’s icon name values
 data IconName = SystemRun
               | SystemSoftwareInstall
               | PreferencesOther
@@ -27,5 +33,6 @@ data IconName = SystemRun
               | ViewRefresh
               deriving(Eq, Show)
 
+-- | Convert the enum to a GTK-compatible string
 nameToGtk :: IconName -> Text
 nameToGtk = kebapize mempty . showText

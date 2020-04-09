@@ -1,3 +1,6 @@
+{-|
+  Description: Contains a subset of 'NixRebuildMode' deemed “sensible” for the Manager
+  -}
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.Admin.ValidRebuildModes
   ( validRebuildModesWithDescription
@@ -22,6 +25,7 @@ import           NixManager.NixRebuildMode      ( NixRebuildMode
                                                 )
 import           Data.Text                      ( Text )
 
+-- | Get a nice description for a given rebuild mode (if it’s a “valid” one)
 descriptionForValidRebuildMode :: NixRebuildMode -> Maybe Text
 descriptionForValidRebuildMode m = lookup m validRebuildModesWithDescription
 
@@ -44,9 +48,11 @@ validRebuildModesWithDescription =
     )
   ]
 
+-- | List of “valid” rebuild modes
 validRebuildModes :: [NixRebuildMode]
 validRebuildModes = fst <$> validRebuildModesWithDescription
 
+-- | Convert between a rebuild mode and its index in the list of valid modes (needed for the "NixManager.View.ComboBox")
 validRebuildModeIdx :: Iso' NixRebuildMode Int
 validRebuildModeIdx =
   iso (fromJust . (`elemIndex` validRebuildModes)) (validRebuildModes !!)

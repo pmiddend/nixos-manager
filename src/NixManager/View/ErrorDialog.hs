@@ -1,3 +1,8 @@
+{-|
+  Description: An error dialog which is displayed in case initialization fails
+
+An error dialog which is displayed in case initialization fails
+ -}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedLists #-}
@@ -38,8 +43,10 @@ import           GI.Gtk.Declarative             ( bin
                                                 )
 import qualified GI.Gtk                        as Gtk
 
+-- | There’s just one event, to exit the dialog
 data Event = ExitEvent
 
+-- | The error dialog’s view function
 errorDialog :: Text -> () -> AppView Gtk.Dialog Event
 errorDialog e _ =
   let msgLabel = widget
@@ -69,6 +76,7 @@ errorDialog e _ =
               ]
             ]
 
+-- | Display an error dialog, wait for the user to close it again.
 runErrorDialog :: Text -> IO ()
 runErrorDialog e = void $ run App { view         = errorDialog e
                                   , update       = \_ _ -> Exit

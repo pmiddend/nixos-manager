@@ -1,3 +1,8 @@
+{-|
+  Description: Functions to display informational boxes
+
+Functions to display informational boxes
+  -}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE FlexibleContexts #-}

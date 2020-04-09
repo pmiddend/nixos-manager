@@ -1,3 +1,8 @@
+{-|
+  Description: An icon widget
+
+An icon widget
+  -}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -36,13 +41,15 @@ import           NixManager.View.IconName       ( IconName
                                                 , nameToGtk
                                                 )
 
+-- | An icon’s properties
 data IconProps = IconProps {
-    _ipIconSize :: Gtk.IconSize
-  , _ipIconName :: IconName
+    _ipIconSize :: Gtk.IconSize -- ^ The icon’s desired size
+  , _ipIconName :: IconName -- ^ What icon to display
   } deriving(Eq)
 
 makeLenses ''IconProps
 
+-- | Create an icon widget
 icon :: Vector (Attribute Gtk.Image e) -> IconProps -> Widget e
 icon customAttributes customParams = Widget
   (CustomWidget { customWidget

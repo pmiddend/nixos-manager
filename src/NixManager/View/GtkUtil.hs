@@ -1,3 +1,8 @@
+{-|
+  Description: Various GTK-related utilities
+
+Various GTK-related utilities
+  -}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedLists #-}
@@ -22,6 +27,7 @@ import           GI.Gtk.Declarative             ( bin
 import qualified GI.Gtk                        as Gtk
 
 
+-- | Add some padding around a widget
 paddedAround spacing =
   container Gtk.Box [#orientation := Gtk.OrientationVertical]
     . pure
@@ -36,9 +42,11 @@ paddedAround spacing =
                                          , fill    = True
                                          }
 
+-- | A shortcut for a box child that has both the expand and fill flag
 expandAndFill :: BoxChildProperties
 expandAndFill = defaultBoxChildProperties { expand = True, fill = True }
 
+-- | A shortcut for a box child that has the fill, but not the expand flag
 fillNoExpand :: BoxChildProperties
 fillNoExpand = defaultBoxChildProperties { expand = False, fill = True }
 

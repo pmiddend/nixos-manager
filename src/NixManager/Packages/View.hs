@@ -1,3 +1,6 @@
+{-|
+  Description: Contains the actual GUI (widgets) for the Packages tab
+  -}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedLists #-}
@@ -127,6 +130,7 @@ import           NixManager.Message             ( messageText
 import           Control.Monad.IO.Class         ( MonadIO )
 
 
+-- | Callback for the search entry widget
 processSearchChange
   :: (IsDescendantOf Gtk.Entry o, MonadIO f, Gtk.GObject o)
   => o
@@ -134,10 +138,12 @@ processSearchChange
 processSearchChange w =
   ManagerEventPackages . EventSearchChanged <$> Gtk.getEntryText w
 
+-- | Label for the search entry
 searchLabel :: Widget event
 searchLabel =
   widget Gtk.Label [#label := "Search in packages:", #halign := Gtk.AlignEnd]
 
+-- | The actual search entry widget
 searchField :: Widget ManagerEvent
 searchField = widget
   Gtk.SearchEntry
@@ -147,6 +153,7 @@ searchField = widget
   , #halign := Gtk.AlignFill
   ]
 
+-- | The box containing the search field, label, and combobox
 searchBox :: State -> Widget ManagerEvent
 searchBox s =
   let changeCallback (ComboBoxChangeEvent idx) =
@@ -163,6 +170,7 @@ searchBox s =
           )
         ]
 
+-- | Given a package, format its corresponding list box row
 formatPkgLabel :: NixPackage -> Text
 formatPkgLabel pkg =
   let
@@ -189,6 +197,7 @@ formatPkgLabel pkg =
       )
 
 
+-- | Create a list box row widget from a package (the first argument is the index, used for alternatively coloring rows)
 buildResultRow
   :: FromWidget (Bin Gtk.ListBoxRow) target => Int -> NixPackage -> target event
 buildResultRow i pkg = bin
@@ -202,6 +211,7 @@ buildResultRow i pkg = bin
     ]
   )
 
+-- | Handles a row selection event
 rowSelectionHandler :: Maybe Gtk.ListBoxRow -> Gtk.ListBox -> IO ManagerEvent
 rowSelectionHandler (Just row) _ = do
   selectedIndex <- Gtk.listBoxRowGetIndex row
@@ -214,6 +224,7 @@ rowSelectionHandler (Just row) _ = do
 rowSelectionHandler _ _ =
   pure (ManagerEventPackages (EventPackageSelected Nothing))
 
+-- | The package list
 packagesBox
   :: FromWidget (Container Gtk.Box (Children BoxChild)) target
   => ManagerState

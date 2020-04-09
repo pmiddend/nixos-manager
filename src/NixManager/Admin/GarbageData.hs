@@ -1,6 +1,9 @@
+{-|
+  Description: Contains all data for the garbage collection GUI
+  -}
 {-# LANGUAGE TemplateHaskell #-}
 module NixManager.Admin.GarbageData
-  ( GarbageData
+  ( GarbageData(..)
   , initialGarbageData
   , gdBuildState
   , gdProcessOutput
@@ -17,14 +20,16 @@ import           NixManager.Admin.DetailsState  ( DetailsState
 import           NixManager.Process             ( ProcessOutput )
 import           NixManager.Admin.BuildState    ( BuildState )
 
+-- | Contains all data for the garbage collection GUI
 data GarbageData = GarbageData {
-    _gdProcessOutput :: ProcessOutput
-  , _gdBuildState :: Maybe BuildState
-  , _gdDetailsState :: DetailsState
-  , _gdOlderGenerations :: Bool
+    _gdProcessOutput :: ProcessOutput -- ^ Output of the current or last garbage collection process (possibly empty)
+  , _gdBuildState :: Maybe BuildState -- ^ Contains the current build state of the garbage collection
+  , _gdDetailsState :: DetailsState -- ^ Are the Details expanded?
+  , _gdOlderGenerations :: Bool -- ^ Shall we delete older generations?
   }
 
 makeLenses ''GarbageData
 
+-- | The initial garbage collection state
 initialGarbageData :: GarbageData
 initialGarbageData = GarbageData mempty Nothing DetailsContracted False

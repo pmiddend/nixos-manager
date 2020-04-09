@@ -1,3 +1,8 @@
+{-|
+  Description: CSS styles and CSS initialization (see https://developer.gnome.org/gtk3/stable/chap-css-overview.html)
+
+CSS styles and CSS initialization (see https://developer.gnome.org/gtk3/stable/chap-css-overview.html)
+  -}
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.View.Css where
 

@@ -1,3 +1,8 @@
+{-|
+  Description: Declarative @ComboBoxText@ wrapper
+
+Declarative @ComboBoxText@ wrapper.
+  -}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE OverloadedLabels #-}
@@ -40,15 +45,18 @@ import           Control.Lens                   ( makeLenses
                                                 , to
                                                 )
 
+-- | The ComboBox properties
 data ComboBoxProperties = ComboBoxProperties {
-    _cbpValues :: [Text]
-  , _cbpActive :: Int
+    _cbpValues :: [Text] -- ^ The possible values (note that, sadly, this isn't a list of pairs (T, Text) or something, just texts; patches welcome!)
+  , _cbpActive :: Int -- ^ The active index in the combobox.
   } deriving(Eq)
 
 makeLenses ''ComboBoxProperties
 
+-- ^ Triggered when the combobox changes its value to a new index
 newtype ComboBoxChangeEvent = ComboBoxChangeEvent Int
 
+-- ^ Build a Combobox from Gtk attributes and some user-defined ones
 comboBox
   :: Vector (Attribute Gtk.ComboBoxText ComboBoxChangeEvent)
   -> ComboBoxProperties

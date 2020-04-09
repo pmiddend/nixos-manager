@@ -1,3 +1,6 @@
+{-|
+  Description: Contains all the state for the Packages tab
+  -}
 {-# LANGUAGE TemplateHaskell #-}
 module NixManager.Packages.State
   ( State
@@ -60,31 +63,36 @@ import           NixManager.Packages.PackageCategory
                                                 , categoryIdx
                                                 )
 
+-- | This is only used when the “Try install” operation is in progress and cumulates all the state pertaining to that
 data InstallingState = InstallingState {
-    _isPackage :: NixPackage
-  , _isCounter :: Int
-  , _isProcessData :: ProcessData
+    _isPackage :: NixPackage -- ^ Which package is being try-installed
+  , _isCounter :: Int  -- ^ This field is necessary to “pulse” the GTK progress bar while installing, see "NixManager.View.ProgressBar" for details
+  , _isProcessData :: ProcessData -- ^ The process data
   }
 
 makeLenses ''InstallingState
 
+-- | Contains all the state for the packages tab
 data State = State {
-    _psPackageCache :: [NixPackage]
-  , _psSearchString :: Text
-  , _psSelectedIdx :: Maybe Int
-  , _psInstallingPackage :: Maybe InstallingState
-  , _psLatestMessage :: Maybe Message
-  , _psCategoryIdx :: Int
+    _psPackageCache :: [NixPackage] -- ^ Cache of all available Nix packages
+  , _psSearchString :: Text -- ^ Current search string
+  , _psSelectedIdx :: Maybe Int -- ^ Currently selected index
+  , _psInstallingPackage :: Maybe InstallingState -- ^ Only set if “Try install” is in progress
+  , _psLatestMessage :: Maybe Message -- ^ The latest message to display, if any (“Install successful” and stuff)
+  , _psCategoryIdx :: Int -- ^ Currently selected category
   }
 
 makeLenses ''State
 
+-- | Isomorphism between a category and its index in the list of all categories (needed for the combobox logic) 
 psCategory :: Lens' State PackageCategory
 psCategory = psCategoryIdx . from categoryIdx
 
+-- | Whether a package matches the given search string
 packageMatches :: Text -> NixPackage -> Bool
 packageMatches t p = toLower t `isInfixOf` (p ^. npName . to toLower)
 
+-- | Whether a package matches the given category
 packageMatchesCategory :: PackageCategory -> NixPackage -> Bool
 packageMatchesCategory PackageCategoryAll _ = True
 packageMatchesCategory PackageCategoryInstalled pkg =
@@ -94,6 +102,7 @@ packageMatchesCategory PackageCategoryPendingInstall pkg =
 packageMatchesCategory PackageCategoryPendingUninstall pkg =
   (pkg ^. npStatus) == NixPackagePendingUninstall
 
+-- | Getter for the filtered search result
 psSearchResult :: Getter State [NixPackage]
 psSearchResult = to
   (\s ->
@@ -104,6 +113,7 @@ psSearchResult = to
       .   filtered (packageMatchesCategory (s ^. psCategory))
   )
 
+-- | Getter for the selected package (if any)
 psSelectedPackage :: Getter State (Maybe NixPackage)
 psSelectedPackage = to f
  where
@@ -111,6 +121,7 @@ psSelectedPackage = to f
     Nothing     -> Nothing
     Just pkgIdx -> s ^? psSearchResult . ix pkgIdx
 
+-- | The initial Packages tab state (needs to read the package cache, hence the side-effect)
 initState :: IO (TextualError State)
 initState = ifSuccessIO readPackageCache $ \cache -> pure $ Right $ State
   { _psPackageCache      = cache

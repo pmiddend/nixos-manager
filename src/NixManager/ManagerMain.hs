@@ -1,13 +1,13 @@
 {-|
 Description: NixOS manager's /real/ entry point
 
-This file should initializing the application state, as well as GTK, and then run gi-gtk-declarative-app-simple's main method.
+This file should initialize the application state, as well as GTK, and then run gi-gtk-declarative-app-simple's main method.
  -}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
-module NixManager.ManagerMain where
+module NixManager.ManagerMain(nixMain) where
 
 import qualified NixManager.Update             as GlobalUpdate
 import qualified NixManager.Admin.State        as AdminState
@@ -43,7 +43,7 @@ initState = ifSuccessIO PackagesState.initState $ \packagesState -> do
                               , _msAdminState    = adminState
                               }
 
--- |Initialize GTK, the state and run the GTK main loop
+-- |Initialize GTK, the application state (see "NixManager.ManagerState") and run the GTK main loop. See also: "NixManager.Update" and "NixManager.View.Root"
 nixMain :: IO ()
 nixMain = do
   void (Gtk.init Nothing)

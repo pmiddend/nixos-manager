@@ -1,6 +1,6 @@
 {-|
   Description: Determine if the user made any changes which will have to be applied.
-  #-}
+ -}
 module NixManager.Changes
   ( determineChanges
   , ChangeType(..)
