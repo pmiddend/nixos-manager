@@ -1,3 +1,7 @@
+{-|
+  Description: Contains the update logic for the Services tab
+Contains the update logic for the Services tab
+  -}
 module NixManager.Services.Update
   ( updateEvent
   )
@@ -60,6 +64,7 @@ import           Prelude                 hiding ( length
                                                 )
 
 
+-- | The actual update function
 updateEvent :: ManagerState -> Event -> Transition ManagerState ManagerEvent
 updateEvent s EventDownloadStart =
   Transition s (servicesEvent . EventDownloadStarted <$> ServiceDownload.start)

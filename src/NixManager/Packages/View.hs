@@ -1,5 +1,6 @@
 {-|
   Description: Contains the actual GUI (widgets) for the Packages tab
+Contains the actual GUI (widgets) for the Packages tab
   -}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE FlexibleContexts #-}

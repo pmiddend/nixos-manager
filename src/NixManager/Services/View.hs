@@ -1,3 +1,7 @@
+{-|
+  Description: Contains the actual GUI (widgets) for the services tab
+Contains the actual GUI (widgets) for the services tab
+  -}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -164,7 +168,7 @@ import           NixManager.NixServiceOptionType
                                                   )
                                                 )
 
-
+-- | Create a list box row widget from a service
 buildServiceRow
   :: FromWidget (Bin Gtk.ListBoxRow) target => NixService -> target event
 buildServiceRow svc =
@@ -175,6 +179,7 @@ buildServiceRow svc =
           []
           (widget Gtk.Label [#label := markedUp, #useMarkup := True])
 
+-- | Handles a row selection event
 rowSelectionHandler :: Maybe Gtk.ListBoxRow -> Gtk.ListBox -> IO ManagerEvent
 rowSelectionHandler (Just row) _ = do
   selectedIndex <- Gtk.listBoxRowGetIndex row
@@ -187,9 +192,11 @@ rowSelectionHandler (Just row) _ = do
         )
 rowSelectionHandler _ _ = pure (ManagerEventServices (EventSelected Nothing))
 
+-- | Check if a service matches a cateogry
 categoryMatches :: ServiceCategory -> NixLocation -> Bool
 categoryMatches c loc = categoryToNixPrefix c == firstComponent loc
 
+-- | We need to filter some option categories, for example something like @service.<name>.bar@ or @service.*.bar@. At least until we can handle that, too.
 filterPredicate :: StateData -> NixService -> Bool
 filterPredicate sd =
   (         (((sd ^. sdSearchString) `isInfixOf`) . flattenLocation)
@@ -200,12 +207,13 @@ filterPredicate sd =
     . view serviceLoc
 
 
+-- | The list of service rows (the left half of the tab, minus the search)
 serviceRows :: StateData -> Vector.Vector (Bin Gtk.ListBoxRow event)
 serviceRows sd = toVectorOf
   (sdCache . folded . filtered (filterPredicate sd) . to buildServiceRow)
   sd
 
-
+-- | The left half of the tab
 servicesLeftPane sd _ =
   let searchField = widget
         Gtk.SearchEntry
@@ -239,9 +247,11 @@ servicesLeftPane sd _ =
         , BoxChild expandAndFill $ bin Gtk.ScrolledWindow [] serviceList
         ]
 
+-- | Given an option path, return a traversal for the corresponding attribute set element
 optionLens' :: Text -> Traversal' NixExpr (Maybe NixExpr)
 optionLens' optionPath = _NixFunctionDecl . nfExpr . _NixSet . at optionPath
 
+-- | Given the whole services Nix expression and a concrete service option, construct the edit widget for that option. This does some case analysis on the type.
 buildOptionValueCell :: NixExpr -> NixServiceOption -> Widget ManagerEvent
 buildOptionValueCell serviceExpression serviceOption =
   let
@@ -323,11 +333,13 @@ buildOptionValueCell serviceExpression serviceOption =
           ]
         ]
 
+-- | Convert the docbook documentation markup to GTK (pango) markup
 convertMarkup :: Text -> Text
 convertMarkup t = case parseDocbook t of
   Left  e -> "error parsing description: " <> e
   Right v -> docbookToPango v
 
+-- | Build all the option rows for a selected service, given the whole services Nix expression
 buildOptionRows :: NixExpr -> NixServiceOption -> BoxChild ManagerEvent
 buildOptionRows serviceExpression serviceOption =
   let
@@ -362,6 +374,7 @@ buildOptionRows serviceExpression serviceOption =
   in
     BoxChild defaultBoxChildProperties rootBox
 
+-- | The right half of the services tab
 servicesRightPane
   :: ( FromWidget (SingleWidget Gtk.Label) target
      , FromWidget (Bin Gtk.ScrolledWindow) target
@@ -401,6 +414,7 @@ servicesBox s = container
   []
   [BoxChild expandAndFill (servicesBox' (s ^. msServiceState) s)]
 
+-- | What to display when the service definitions couldn't be parsed
 invalidOptionsMessage :: Maybe Text -> Text
 invalidOptionsMessage (Just e) =
   "Service definition file is invalid, possibly because of a corrupt download. You should try again. The error is:\n\n"
@@ -408,12 +422,15 @@ invalidOptionsMessage (Just e) =
 invalidOptionsMessage Nothing =
   "Service definitions need to be downloaded first.\nPress the button below to start the download. It'll only take a few seconds, depending on your internet speed."
 
+-- | The icon to display in case the service definitions aren't there or invalid
 invalidOptionsIcon (Just _) = IconName.DialogError
 invalidOptionsIcon Nothing  = IconName.EmblemDocuments
 
+-- | The button text to display in case the service definitions aren't there or invalid
 invalidOptionsButtonText (Just _) = "Retry Download"
 invalidOptionsButtonText Nothing  = "Start Download"
 
+-- | General function to display the notice box in case the service definitions aren't there or are invalid
 noticeBox icon buttonEvent buttonIcon buttonText message = container
   Gtk.Box
   [ #orientation := Gtk.OrientationVertical
@@ -438,6 +455,7 @@ noticeBox icon buttonEvent buttonIcon buttonText message = container
     )
   ]
 
+-- | The while services tab
 servicesBox' (StateDownloading ssdd) _ = container
   Gtk.Box
   [ #orientation := Gtk.OrientationVertical

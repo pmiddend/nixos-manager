@@ -1,3 +1,7 @@
+{-|
+  Description: Contains all functions relating to the service JSON download
+Contains all functions relating to the service JSON download
+  -}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.Services.Download
@@ -45,21 +49,26 @@ import           Data.ByteString.Lazy           ( ByteString
                                                 )
 import           Codec.Compression.Brotli       ( decompress )
 
+-- | When the download finishes, this type contains either an error or the filepath to the downloaded file
 type DownloadResult = TextualError FilePath
 
+-- | We regularly check for the current state of the download. Locking is done with this 'MVar'
 type DownloadVar = MVar DownloadResult
 
+-- | The current state of the download
 data DownloadState = DownloadState {
-  _sdsVar :: DownloadVar
-  , _sdsThreadId :: ThreadId
+    _sdsVar :: DownloadVar -- ^ The mutex to check
+  , _sdsThreadId :: ThreadId -- ^ The thread we started the download in
   }
 
 makeLenses ''DownloadState
 
+-- | Try to decompress the received data (it’s Brotli compressed nowadays)
 tryDecompress
   :: Response ByteString -> IO (Either SomeException (Response ByteString))
 tryDecompress bs = try (pure (decompress <$> bs))
 
+-- | Try to download and decompress the options file
 tryDownload :: IO (Either SomeException (Response ByteString))
 tryDownload = do
   errorOrResponse <- try
@@ -69,6 +78,7 @@ tryDownload = do
     Left  e -> pure (Left e)
     Right v -> tryDecompress v
 
+-- | Start the download, return its state
 start :: IO DownloadState
 start = do
   resultVar      <- newEmptyMVar
@@ -88,8 +98,10 @@ start = do
                            (Left ("HTTP error, status code: " <> showText sc))
   pure (DownloadState resultVar resultThreadId)
 
+-- | Cancel a started download
 cancel :: DownloadState -> IO ()
 cancel = killThread . view sdsThreadId
 
+-- | Return the result of the download, maybe
 result :: DownloadState -> IO (Maybe DownloadResult)
 result = tryTakeMVar . view sdsVar
