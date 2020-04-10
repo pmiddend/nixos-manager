@@ -20,10 +20,11 @@ import           Data.Aeson                     ( FromJSON
                                                 , (.:)
                                                 )
 
+-- | Metadata for a Nix package. This is a companion module to "NixManager.NixPackage"
 data NixPackageMeta = NixPackageMeta {
-    _npmName :: Text
-  , _npmVersion :: Text
-  , _npmDescription :: Text
+    _npmName :: Text -- ^ Package name
+  , _npmVersion :: Text -- ^ Package version
+  , _npmDescription :: Text -- ^ Package description
   } deriving(Eq,Show)
 
 makeLenses ''NixPackageMeta

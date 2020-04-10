@@ -29,6 +29,7 @@ import           Data.Text                      ( Text )
 descriptionForValidRebuildMode :: NixRebuildMode -> Maybe Text
 descriptionForValidRebuildMode m = lookup m validRebuildModesWithDescription
 
+-- | List of all valid rebuild modes with a description
 validRebuildModesWithDescription :: [(NixRebuildMode, Text)]
 validRebuildModesWithDescription =
   [ ( NixRebuildSwitch

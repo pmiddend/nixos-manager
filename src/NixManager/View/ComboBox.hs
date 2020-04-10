@@ -53,10 +53,10 @@ data ComboBoxProperties = ComboBoxProperties {
 
 makeLenses ''ComboBoxProperties
 
--- ^ Triggered when the combobox changes its value to a new index
+-- | Triggered when the combobox changes its value to a new index
 newtype ComboBoxChangeEvent = ComboBoxChangeEvent Int
 
--- ^ Build a Combobox from Gtk attributes and some user-defined ones
+-- | Build a Combobox from Gtk attributes and some user-defined ones
 comboBox
   :: Vector (Attribute Gtk.ComboBoxText ComboBoxChangeEvent)
   -> ComboBoxProperties

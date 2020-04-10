@@ -10,7 +10,7 @@ import           Data.ByteString                ( ByteString )
 import qualified GI.Gdk                        as Gdk
 import qualified GI.Gtk                        as Gtk
 
-
+-- | Global app Stylesheet
 styles :: ByteString
 styles = mconcat
   [ ".package-row-installed { background-color: #cdffcd; }"
@@ -30,6 +30,7 @@ styles = mconcat
   , ".nixos-manager-grey-background { background-color: #eeeeee; }"
   ]
 
+-- | Initialize CSS stylesheets
 initCss :: IO ()
 initCss = do
   cssProvider <- Gtk.cssProviderNew

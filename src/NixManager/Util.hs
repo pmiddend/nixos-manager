@@ -44,7 +44,7 @@ import qualified Data.Text.Encoding            as Encoding
 -- | Since we’re working with 'Text' as much as possible, we’re using a text based error type instead of the customary 'Either String'
 type TextualError = Either Text
 
--- | Convert something showable to 'Text'. Notably 'String' and 'Exception' types.
+-- | Convert something showable to 'Text'. Notably 'String' and @Exception@ types.
 fromShowableError :: Show ex => Either ex e -> TextualError e
 fromShowableError = first showText
 
