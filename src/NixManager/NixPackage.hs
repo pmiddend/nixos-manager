@@ -38,6 +38,7 @@ import           NixManager.NixPackageStatus    ( NixPackageStatus
 import           NixManager.NixLocation         ( NixLocation(NixLocation)
                                                 , locationFromText
                                                 )
+import Data.List(sortOn)
 
 -- | Type representing a Nix package, along with information about its current status
 data NixPackage = NixPackage {
@@ -52,7 +53,7 @@ makeLenses ''NixPackage
 
 -- | Read a package list from a 'ByteString'
 readPackagesJson :: ByteString -> TextualError [NixPackage]
-readPackagesJson = (packagesFromMap <$>) . fromEither . eitherDecode
+readPackagesJson = (sortOn _npName <$>) . (packagesFromMap <$>) . fromEither . eitherDecode
 
 -- | Convert a map (like the one @nix search@ returns) into a package list
 packagesFromMap :: Map Text NixPackageMeta -> [NixPackage]
