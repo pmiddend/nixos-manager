@@ -1,2 +1,4 @@
-let pkgs = import <nixpkgs> {};
-in (import ./build.nix { inherit pkgs; })
+let
+  pkgs = import <nixpkgs> {};
+in
+(import ./build.nix { inherit pkgs; })

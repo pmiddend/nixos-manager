@@ -1,5 +1,13 @@
-{ mkDerivation, base, bytestring, HUnit, brotli-pkg
-, QuickCheck, stdenv, tasty, tasty-hunit, tasty-quickcheck
+{ mkDerivation
+, base
+, bytestring
+, HUnit
+, brotli-pkg
+, QuickCheck
+, stdenv
+, tasty
+, tasty-hunit
+, tasty-quickcheck
 , transformers
 }:
 mkDerivation {
@@ -11,7 +19,13 @@ mkDerivation {
   libraryHaskellDepends = [ base bytestring transformers ];
   libraryPkgconfigDepends = [ brotli-pkg ];
   testHaskellDepends = [
-    base bytestring HUnit QuickCheck tasty tasty-hunit tasty-quickcheck
+    base
+    bytestring
+    HUnit
+    QuickCheck
+    tasty
+    tasty-hunit
+    tasty-quickcheck
   ];
   homepage = "https://github.com/hvr/brotli";
   description = "Brotli (RFC7932) compression and decompression";
