@@ -251,7 +251,7 @@ servicesLeftPane sd _ =
 optionLens' :: Text -> Traversal' NixExpr (Maybe NixExpr)
 optionLens' optionPath = _NixFunctionDecl . nfExpr . _NixSet . at optionPath
 
--- | Given the whole services Nix expression and a concrete service option, construct the edit widget for that option. This does some case analysis on the type.
+-- | Given the whole services Nix expression and a concrete service option, construct the edit widget for that option. This does some case analysis on the type, see 'NixManager.NixServiceOptionType'
 buildOptionValueCell :: NixExpr -> NixServiceOption -> Widget ManagerEvent
 buildOptionValueCell serviceExpression serviceOption =
   let
@@ -455,7 +455,7 @@ noticeBox icon buttonEvent buttonIcon buttonText message = container
     )
   ]
 
--- | The while services tab
+-- | The services tab root
 servicesBox' (StateDownloading ssdd) _ = container
   Gtk.Box
   [ #orientation := Gtk.OrientationVertical
