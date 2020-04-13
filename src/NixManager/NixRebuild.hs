@@ -26,14 +26,11 @@ import           NixManager.PosixTools          ( mkdir
                                                 , cp
                                                 , mv
                                                 )
-import           NixManager.Bash                ( Expr
-                                                  ( And
-                                                  , Command
-                                                  , Or
-                                                  , Subshell
-                                                  , Then
-                                                  )
+import           NixManager.Bash                ( Expr(Command, Subshell)
                                                 , Arg(LiteralArg)
+                                                , (||.)
+                                                , (&&.)
+                                                , (>>.)
                                                 , devNullify
                                                 )
 import           Prelude                 hiding ( readFile )
@@ -85,7 +82,7 @@ rollbackExpr :: IO Expr
 rollbackExpr = do
   rootPackagesFile <- locateRootPackagesFile
   rootServicesFile <- locateRootServicesFile
-  pure (moveFromOld rootServicesFile `Then` moveFromOld rootPackagesFile)
+  pure (moveFromOld rootServicesFile >>. moveFromOld rootPackagesFile)
 
 -- | Expression to call @nixos-rebuild@, after coping the local files to the root location, and possibly rolling that back.
 installExpr :: NixRebuildMode -> NixRebuildUpdateMode -> IO Expr
@@ -95,15 +92,15 @@ installExpr rebuildMode updateMode = do
   localServicesFile <- locateLocalServicesFileMaybeCreate
   rootServicesFile  <- locateRootServicesFile
   rollback          <- rollbackExpr
-  let copyOldFiles = devNullify
-        (copyToOld rootServicesFile `Then` copyToOld rootPackagesFile)
+  let copyOldFiles =
+        devNullify (copyToOld rootServicesFile >>. copyToOld rootPackagesFile)
       copyToRoot =
         cp localPackagesFile rootPackagesFile
-          `And` cp localServicesFile rootServicesFile
-      finalOperator = if isDry rebuildMode then Then else Or
+          &&. cp localServicesFile rootServicesFile
+      finalOperator = if isDry rebuildMode then (>>.) else (||.)
   pure
-    $ ((mkdir True [rootManagerPath] `And` copyOldFiles) `Then` copyToRoot)
-    `And` nixosRebuildExpr rebuildMode updateMode
+    $ ((mkdir True [rootManagerPath] &&. copyOldFiles) >>. copyToRoot)
+    &&. nixosRebuildExpr rebuildMode updateMode
     `finalOperator` Subshell (devNullify rollback)
 
 -- | Rollback a rebuild

@@ -8,6 +8,9 @@ module NixManager.Bash
   , evalExpr
   , appendArgs
   , devNullify
+  , (&&.)
+  , (||.)
+  , (>>.)
   )
 where
 
@@ -39,6 +42,18 @@ data Expr = Command Text [Arg] -- ^ A command with some arguments
           | Or Expr Expr       -- ^ Serializes to @a || b@
           | Then Expr Expr     -- ^ Serializes to @a; b@
           | Subshell Expr      -- ^ Serializes to (expr)
+
+-- | Alias for @&&@ (resembling the Bash expression)
+(&&.) :: Expr -> Expr -> Expr
+(&&.) = And
+
+-- | Alias for @||@ (resembling the Bash expression)
+(||.) :: Expr -> Expr -> Expr
+(||.) = Or
+
+-- | Alias for @Then@ (resembling the @>>@ monad operator)
+(>>.) :: Expr -> Expr -> Expr
+(>>.) = Then
 
 -- | Escape a piece of text. Currently only supports escaping double quotes. More to come?
 escape :: Text -> Text
