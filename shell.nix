@@ -2,4 +2,4 @@ let
   sources = import ./nix/sources.nix;
   pkgs = import sources.nixpkgs {};
 in
-(import ./build.nix { inherit pkgs; }).shell
+(import ./build.nix { inherit pkgs; compiler = "ghc882"; }).shell
