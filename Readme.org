@@ -59,10 +59,10 @@ The simple reason is: I haven’t gotten to that part yet, and my Nix knowledge 
 nixos-manager isn’t in nixpkgs yet, so you’ll have to build it using…Nix!
 
 #+begin_src bash
-nix-build
+nix-build -I nixpkgs=channel:nixos-unstable
 #+end_src
 
-After the build processed has finished, run =result/bin/nixos-manager=.
+The channel argument is necessary in case you’re not on =nixos-unstable=. After the build processed has finished, run =result/bin/nixos-manager=.
 
 ** Setup
 
