@@ -55,7 +55,7 @@ data NixServiceOption = NixServiceOption {
   , _optionLoc :: NixLocation -- ^ The option location
   , _optionType :: Either Text NixServiceOptionType -- ^ The type, possibly parsed
   , _optionValue :: Maybe NixExpr -- ^ The option value, if present
-  } deriving(Show)
+  }
 
 makeLenses ''NixServiceOption
 

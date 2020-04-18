@@ -12,6 +12,7 @@ module NixManager.NixExpr
   , evalSymbols
   , prettyPrintSingleLine
   , NixFunction(NixFunction)
+  , NixListMap
   , nfArgs
   , nfExpr
   , _NixNull
@@ -31,6 +32,7 @@ import           System.FilePath                ( dropFileName )
 import           System.Directory               ( doesFileExist
                                                 , createDirectoryIfMissing
                                                 )
+import qualified NixManager.PseudoList as PL
 import           NixManager.Util                ( showText
                                                 , fromEither
                                                 , TextualError
@@ -86,11 +88,12 @@ import           Control.Lens                   ( makePrisms
 data NixFunction = NixFunction {
     _nfArgs :: [Text]
   , _nfExpr :: NixExpr
-  } deriving(Show)
+  }
 
+type NixListMap = PL.PseudoList NixExpr
 
 -- | Type for Nix expressions
-data NixExpr = NixList [NixExpr] -- ^ Nix list, as in @[a b c]@
+data NixExpr = NixList NixListMap -- ^ Nix list, as in @[a b c]@, represented as a “Map” here so we can dynamically add/remove elements
              | NixSet (Map Text NixExpr) -- ^ Nix attribute set, as in @{ foo = bar; }@. Keys are simplified to 'Text' until hnix arrives.
              | NixFunctionDecl NixFunction -- ^ Nix function declaration
              | NixSymbol Text -- ^ Nix symbols
@@ -99,7 +102,6 @@ data NixExpr = NixList [NixExpr] -- ^ Nix list, as in @[a b c]@
              | NixInt Integer -- ^ Nix integers (is unbounded justified?)
              | NixFloat Double -- ^ Nix floating point values
              | NixNull -- ^ Nix null value
-             deriving(Show)
 
 makePrisms ''NixExpr
 makeLenses ''NixFunction
@@ -107,7 +109,7 @@ makeLenses ''NixFunction
 -- | Extract all symbols from a Nix expression (reads all the packages, for example)
 evalSymbols :: NixExpr -> [Text]
 evalSymbols (NixSymbol r ) = [r]
-evalSymbols (NixList   rs) = concatMap evalSymbols rs
+evalSymbols (NixList   rs) = concatMap evalSymbols (PL.elems rs)
 evalSymbols _              = []
 
 -- | Pretty print a Nix expression as a single line (to be used in the GUI text entry fields)
@@ -178,7 +180,7 @@ listParser = do
   void (lexeme (char '['))
   exprs <- many (lexeme exprParser)
   void (char ']')
-  pure (NixList exprs)
+  pure (NixList (PL.fromList exprs))
 
 -- | Parser for a Nix string
 stringParser :: Parser NixExpr

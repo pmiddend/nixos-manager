@@ -28,6 +28,7 @@ data IconName = SystemRun
               | UserTrash
               | ApplicationsSystem
               | EditDelete
+              | ListAdd
               | EditClear
               | ProcessStop
               | ViewRefresh

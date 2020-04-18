@@ -4,8 +4,13 @@ Description: Random utilities for NixOS Manager
 As a general rule, stuff defined here should not import anything from the manager itself.
 -}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
 module NixManager.Util where
 
+import Data.Maybe(fromMaybe)
+import Data.Map.Strict(Map, toList, fromList, elems, insert, keys)
 import           Data.Char                      ( isUpper
                                                 , toLower
                                                 )
@@ -16,11 +21,11 @@ import           Data.String                    ( IsString )
 import           Data.Bifunctor                 ( first )
 import qualified Data.Text.Lazy                as TL
 import qualified Data.Text.Lazy.Encoding       as TLE
+import qualified Data.Text as Text
 import           Data.Text                      ( Text
                                                 , pack
                                                 , unpack
                                                 , drop
-                                                , length
                                                 , replace
                                                 , singleton
                                                 , snoc
@@ -32,12 +37,17 @@ import           Prelude                 hiding ( putStrLn
                                                 , foldl
                                                 , null
                                                 , drop
-                                                , length
                                                 )
 import           Control.Lens                   ( Getter
                                                 , Iso'
                                                 , iso
+                                                , lens
+                                                , set
+                                                , Lens'
                                                 , to
+                                                , ix
+                                                , at
+                                                , (^.)
                                                 )
 import qualified Data.Text.Encoding            as Encoding
 
@@ -107,7 +117,7 @@ kebapize prefix =
         else if isUpper c then prior <> snoc "-" (toLower c) else snoc prior c
       )
       mempty
-    . drop (length prefix)
+    . drop (Text.length prefix)
 
 -- | Surround a text by something constant
 surround :: Text -> Text -> Text
@@ -149,3 +159,8 @@ replaceHtmlEntities =
 -- | Check if two files are bitwise-equal. Doesn’t consider memory a problem.
 filesEqual :: FilePath -> FilePath -> IO Bool
 filesEqual a b = (==) <$> BSL.readFile a <*> BSL.readFile b
+
+-- | Same as 'Prelude.maximum', but handles empty lists safer (is there something in the Prelude for this?)
+safeMaximum :: Ord a => [a] -> Maybe a
+safeMaximum [] = Nothing
+safeMaximum xs = Just (maximum xs)

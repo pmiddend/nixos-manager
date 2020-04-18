@@ -4,6 +4,7 @@ Contains the actual GUI (widgets) for the services tab
   -}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -12,6 +13,15 @@ module NixManager.Services.View
   )
 where
 
+import qualified Data.Vector                   as V
+import           GI.Gtk.Declarative.Container.Grid
+                                                ( GridChild(GridChild)
+                                                , GridChildProperties
+                                                  ( width
+                                                  , leftAttach
+                                                  , topAttach
+                                                  )
+                                                )
 import           NixManager.Constants           ( globalOptionsMagicString )
 import           NixManager.View.InformationBox ( informationBox )
 import           NixManager.View.ImageButton    ( imageButton )
@@ -42,13 +52,14 @@ import           NixManager.View.ProgressBar    ( progressBar )
 import           NixManager.Docbook             ( parseDocbook
                                                 , docbookToPango
                                                 )
-import           Data.List                      ( elemIndex )
+import           Data.List                      ( elemIndex, genericLength )
 import           NixManager.NixExpr             ( NixExpr
                                                   ( NixBoolean
                                                   , NixString
                                                   , NixSymbol
                                                   )
                                                 , _NixFunctionDecl
+                                                , _NixList
                                                 , nfExpr
                                                 , prettyPrintSingleLine
                                                 , _NixSet
@@ -112,9 +123,11 @@ import           Control.Lens                   ( (^.)
                                                 , from
                                                 , non
                                                 , re
+                                                , (^@..)
                                                 , Traversal'
                                                 , filtered
                                                 , view
+                                                , _Just
                                                 , pre
                                                 , traversed
                                                 , set
@@ -158,14 +171,7 @@ import           NixManager.NixService          ( NixService
                                                 , serviceOptions
                                                 )
 import           NixManager.NixServiceOptionType
-                                                ( NixServiceOptionType
-                                                  ( NixServiceOptionString
-                                                  , NixServiceOptionPath
-                                                  , NixServiceOptionSubmodule
-                                                  , NixServiceOptionBoolean
-                                                  , NixServiceOptionOneOfString
-                                                  , NixServiceOptionPackage
-                                                  )
+                                                ( NixServiceOptionType ( ..)
                                                 )
 
 -- | Create a list box row widget from a service
@@ -248,33 +254,62 @@ servicesLeftPane sd _ =
         ]
 
 -- | Given an option path, return a traversal for the corresponding attribute set element
-optionLens' :: Text -> Traversal' NixExpr (Maybe NixExpr)
-optionLens' optionPath = _NixFunctionDecl . nfExpr . _NixSet . at optionPath
+baseOptionLens :: Text -> Traversal' NixExpr (Maybe NixExpr)
+baseOptionLens optionPath = _NixFunctionDecl . nfExpr . _NixSet . at optionPath
+
+defaultValue :: NixServiceOptionType -> Maybe NixExpr
+defaultValue NixServiceOptionInteger = Just $ NixInt 0
+defaultValue NixServiceOptionFloat = Just $ NixFloat 0
+defaultValue NixServiceOptionBoolean = Just $ NixBoolean False
+defaultValue NixServiceOptionNull = Just $ NixNull
+defaultValue NixServiceOptionString = Just $ NixString ""
+defaultValue NixServiceOptionSymbol = Just $ NixSymbol ""
+defaultValue NixServiceOptionList = Just $ NixList mempty
+defaultValue NixServiceOptionSet = Just $ NixSet mempty
+defaultValue _ = Nothing
+
+listEntry :: NixExpr -> Traversal' NixExpr (Maybe NixExpr) -> NixServiceOptionType -> Widget ManagerEvent
+listEntry serviceExpression optionLens optionSubtype =
+  let gridProperties = [#rowSpacing := 5, #columnSpacing := 5]
+      arrayElements :: [(Int, NixExpr)]
+      arrayElements =
+          serviceExpression ^@.. optionLens . traversed . _NixList . traversed
+      makeElement :: Int -> NixExpr -> [GridChild ManagerEvent]
+      makeElement i e =
+          [ GridChild (def { leftAttach = 0, topAttach = fromIntegral i })
+            (buildOptionValueCell serviceExpression (Right optionSubtype) (optionLens . traversed . _NixList . at i))
+          ]
+      arrayElementRows = concatMap (uncurry makeElement) arrayElements
+      addButton = imageButton [#label := "Add", #alwaysShowImage := True, on #clicked (ManagerEventServices (EventSettingChanged (optionLens %~ PL.append (defaultValue optionSubtype))))] IconName.ListAdd
+      addButtonChild = GridChild (def { leftAttach = 0, topAttach = genericLength arrayElements }) addButton
+      elements = addButtonChild : arrayElementRows
+  in  container
+        Gtk.Grid
+        gridProperties
+        (V.fromList elements)
 
 -- | Given the whole services Nix expression and a concrete service option, construct the edit widget for that option. This does some case analysis on the type, see 'NixManager.NixServiceOptionType'
-buildOptionValueCell :: NixExpr -> NixServiceOption -> Widget ManagerEvent
-buildOptionValueCell serviceExpression serviceOption =
+buildOptionValueCell :: NixExpr -> Either Text NixServiceOptionType -> Traversal' NixExpr (Maybe NixExpr) -> Widget ManagerEvent
+buildOptionValueCell serviceExpression serviceOptionType optionLens =
   let
-    optionPath :: Text
-    optionPath = serviceOption ^. optionLoc . flattened
     optionValue :: Maybe NixExpr
-    optionValue = serviceExpression ^? optionLens' optionPath . folded
+    optionValue = serviceExpression ^? optionLens . traversed
     rawChangeEvent :: Text -> ManagerEvent
     rawChangeEvent "" = ManagerEventServices
-      (EventSettingChanged (set (optionLens' optionPath) Nothing))
+      (EventSettingChanged (set optionLens Nothing))
     rawChangeEvent v = case parseNixString v of
       Left  _ -> ManagerEventDiscard
       Right e -> ManagerEventServices
-        (EventSettingChanged (set (optionLens' optionPath) (Just e)))
+        (EventSettingChanged (set optionLens (Just e)))
     changeEvent v = ManagerEventServices
-      (EventSettingChanged (set (optionLens' optionPath) (Just v)))
+      (EventSettingChanged (set optionLens (Just v)))
     textLikeEntry inL outL = widget
       Gtk.Entry
       [ #text := (optionValue ^. pre (traversed . outL) . non "")
       , onM #changed ((changeEvent . inL <$>) . Gtk.entryGetText)
       ]
   in
-    case serviceOption ^. optionType of
+    case serviceOptionType of
       Left e -> widget
         Gtk.Label
         [#label := ("Option value \"" <> e <> "\" not implemented yet")]
@@ -298,10 +333,10 @@ buildOptionValueCell serviceExpression serviceOption =
                   .  folded
             changeCallback :: ComboBoxChangeEvent -> ManagerEvent
             changeCallback (ComboBoxChangeEvent 0) = ManagerEventServices
-              (EventSettingChanged $ set (optionLens' optionPath) Nothing)
+              (EventSettingChanged $ set optionLens Nothing)
             changeCallback (ComboBoxChangeEvent idx) = ManagerEventServices
               (EventSettingChanged
-                (set (optionLens' optionPath)
+                (set optionLens
                      (Just (values ^?! ix (fromIntegral idx) . re _NixString))
                 )
               )
@@ -314,7 +349,9 @@ buildOptionValueCell serviceExpression serviceOption =
       Right NixServiceOptionSubmodule -> textLikeEntry NixSymbol _NixSymbol
       Right NixServiceOptionPath      -> textLikeEntry NixSymbol _NixSymbol
       Right NixServiceOptionString    -> textLikeEntry NixString _NixString
-      Right v                         -> container
+      Right (NixServiceOptionList subType) ->
+        listEntry serviceExpression optionLens subType
+      Right v -> container
         Gtk.Box
         [#orientation := Gtk.OrientationVertical]
         [ widget
@@ -357,7 +394,7 @@ buildOptionRows serviceExpression serviceOption =
         , #halign := Gtk.AlignStart
         ]
       , BoxChild defaultBoxChildProperties
-        $ buildOptionValueCell serviceExpression serviceOption
+        $ buildOptionValueCell serviceExpression (serviceOption ^. optionType) (baseOptionLens (serviceOption ^. optionLoc . flattened))
       ]
     rootBox = container
       Gtk.Box

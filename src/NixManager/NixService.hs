@@ -66,7 +66,7 @@ import           NixManager.NixServiceOption    ( NixServiceOption
 data NixService = NixService {
     _serviceLoc :: NixLocation -- ^ Service location
   , _serviceOptions :: [NixServiceOption] -- ^ Service options
-  } deriving(Show)
+  }
 
 makeLenses ''NixService
 

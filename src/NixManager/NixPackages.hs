@@ -33,12 +33,14 @@ import           System.Exit                    ( ExitCode
 import           NixManager.Bash                ( Expr(Command)
                                                 , Arg(LiteralArg)
                                                 )
+import qualified NixManager.PseudoList as PL
 import           NixManager.NixLocation         ( flattenedTail
                                                 , flattened
                                                 , NixLocation
                                                 , locationFromText
                                                 )
-import           Data.Map.Strict                ( singleton )
+import           Data.Map.Strict                ( singleton, insert, keys, elems )
+import Data.Maybe(fromMaybe)
 import           Control.Monad                  ( void
                                                 , unless
                                                 )
@@ -62,6 +64,7 @@ import           Data.Text                      ( Text
                                                 , stripPrefix
                                                 )
 import           NixManager.Util                ( TextualError
+                                                , safeMaximum
                                                 , decodeUtf8
                                                 , fromStrictBS
                                                 , splitRepeat
@@ -280,16 +283,14 @@ readPendingUninstallPackages =
 installPackage :: NixPackage -> IO (TextualError ())
 installPackage p = ifSuccessIO parseLocalPackagesExpr $ \expr -> do
   writeLocalPackages
-    (expr & packageLens . _NixList <>~ [NixSymbol (p ^. npPath . flattened)])
+    (expr & packageLens . _NixList %~ (PL.append (NixSymbol (p ^. npPath . flattened))))
   pure (Right ())
 
 -- | Mark a package for uninstallation by removing it from the local packages file.
 uninstallPackage :: NixPackage -> IO (TextualError ())
 uninstallPackage p = ifSuccessIO parseLocalPackagesExpr $ \expr -> do
   writeLocalPackages
-    (expr & packageLens . _NixList %~ filter
-      (hasn't (_NixSymbol . only (p ^. npPath . flattened)))
-    )
+    (expr & packageLens . _NixList %~ PL.filter (hasn't (_NixSymbol . only (p ^. npPath . flattened))))
   pure (Right ())
 
 -- | Evaluate a package's status given all the packages lists (pending, installed, ...)
