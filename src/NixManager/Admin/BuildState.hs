@@ -1,7 +1,8 @@
-{-|
-  Description: Contains "BuildState"
-  -}
 {-# LANGUAGE TemplateHaskell #-}
+{-|
+  Description: Contains just the "BuildState" data type
+Contains just the "BuildState" data type
+  -}
 module NixManager.Admin.BuildState
   ( BuildState(BuildState)
   , bsCounter

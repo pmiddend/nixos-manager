@@ -22,6 +22,8 @@ data IconName = SystemRun
               | EmblemImportant
               | EmblemDocuments
               | EmblemDownloads
+              | EmblemDefault
+              | DriveMultidisk
               | DialogError
               | DialogQuestion
               | DialogInformation
@@ -31,6 +33,7 @@ data IconName = SystemRun
               | EditClear
               | ProcessStop
               | ViewRefresh
+              | UserHome
               deriving(Eq, Show)
 
 -- | Convert the enum to a GTK-compatible string

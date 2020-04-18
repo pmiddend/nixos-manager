@@ -1,5 +1,6 @@
 {-|
   Description: Provides a type, as well as a parser for the option type contained in @options.json@
+Provides a type, as well as a parser for the option type contained in @options.json@
   -}
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.NixServiceOptionType

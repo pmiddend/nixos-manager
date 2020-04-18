@@ -1,5 +1,6 @@
 {-|
   Description: Contains all data for the garbage collection GUI
+Contains all data for the garbage collection GUI
   -}
 {-# LANGUAGE TemplateHaskell #-}
 module NixManager.Admin.GarbageData
@@ -13,7 +14,7 @@ module NixManager.Admin.GarbageData
 where
 
 import           Control.Lens                   ( makeLenses )
-import           NixManager.Admin.DetailsState  ( DetailsState
+import           NixManager.View.DetailsState   ( DetailsState
                                                   ( DetailsContracted
                                                   )
                                                 )

@@ -72,7 +72,7 @@ maybeSurround (LiteralArg t) | specialChar t = surround "\"" (escape t)
 
 -- | Return the argument’s content, disregarding quoting
 argText :: Arg -> Text
-argText (RawArg t) = t
+argText (RawArg     t) = t
 argText (LiteralArg t) = t
 
 -- | Evaluate an expression to a bash string.

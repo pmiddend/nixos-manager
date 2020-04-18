@@ -11,11 +11,9 @@ import           NixManager.ManagerEvent        ( servicesEvent
                                                 , pureTransition
                                                 , ManagerEvent
                                                 )
-import           NixManager.Services.StateData  ( sdExpression
-                                                , sdSelectedIdx
-                                                , sdSearchString
-                                                , sdCategoryIdx
-                                                )
+import qualified NixManager.View.ServiceEditView
+                                               as EditView
+import           NixManager.Services.StateData  ( sdExpression )
 import           NixManager.Services.State      ( State
                                                   ( StateDownloading
                                                   , StateInvalidOptions
@@ -36,28 +34,24 @@ import           Control.Lens                   ( over
                                                 , (^?)
                                                 , (.~)
                                                 , (+~)
+                                                , (%~)
                                                 , (^?!)
                                                 )
 import           NixManager.ManagerState        ( ManagerState(..)
                                                 , msServiceState
                                                 )
-import           NixManager.NixService          ( writeLocalServiceFile )
+import           NixManager.NixServicesUtil     ( writeLocalServiceFile )
 import           NixManager.Services.Event      ( Event
                                                   ( EventDownloadStart
-                                                  , EventSettingChanged
                                                   , EventDownloadCancel
                                                   , EventStateResult
-                                                  , EventSearchChanged
+                                                  , EventEditView
                                                   , EventStateReload
                                                   , EventDownloadCheck
                                                   , EventDownloadStarted
-                                                  , EventSelected
-                                                  , EventCategoryIdxChanged
                                                   )
                                                 )
-import           NixManager.Util                ( TextualError
-                                                , threadDelayMillis
-                                                )
+import           NixManager.Util                ( threadDelayMillis )
 import           GI.Gtk.Declarative.App.Simple  ( Transition(Transition) )
 import           Prelude                 hiding ( length
                                                 , putStrLn
@@ -68,25 +62,14 @@ import           Prelude                 hiding ( length
 updateEvent :: ManagerState -> Event -> Transition ManagerState ManagerEvent
 updateEvent s EventDownloadStart =
   Transition s (servicesEvent . EventDownloadStarted <$> ServiceDownload.start)
-updateEvent s (EventCategoryIdxChanged newCategory) = pureTransition
-  (s & msServiceState . _StateDone . sdCategoryIdx .~ newCategory & msServiceState . _StateDone . sdSelectedIdx .~ Just 0)
-updateEvent s (EventSearchChanged t) = pureTransition
-  (  s
-  &  msServiceState
-  .  _StateDone
-  .  sdSearchString
-  .~ t
-  &  msServiceState
-  .  _StateDone
-  .  sdSelectedIdx
-  .~ Nothing
-  )
-updateEvent s (EventSettingChanged setter) =
+updateEvent s (EventEditView (EditView.EditViewSettingChanged setter)) =
   let newState = over (msServiceState . _StateDone . sdExpression) setter s
   in  Transition newState $ do
         writeLocalServiceFile
           (newState ^?! msServiceState . _StateDone . sdExpression)
         pure Nothing
+updateEvent s (EventEditView e) =
+  pureTransition (s & msServiceState . _StateDone %~ EditView.updateEvent e)
 updateEvent s EventDownloadCancel = Transition s $ do
   for_ (s ^? msServiceState . _StateDownloading . sddVar) ServiceDownload.cancel
   pure (servicesEvent EventStateReload)
@@ -109,5 +92,3 @@ updateEvent s (EventDownloadStarted var) =
     $ do
         threadDelayMillis 500
         pure (servicesEvent (EventDownloadCheck var))
-updateEvent s (EventSelected i) =
-  pureTransition (s & msServiceState . _StateDone . sdSelectedIdx .~ i)

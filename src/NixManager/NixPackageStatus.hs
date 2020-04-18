@@ -1,5 +1,6 @@
 {-|
   Description: Provides an enum value for a package’s status (installed, pending, …)
+Provides an enum value for a package’s status (installed, pending, …)
   -}
 {-# LANGUAGE TemplateHaskell #-}
 

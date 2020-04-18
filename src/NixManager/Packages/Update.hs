@@ -3,7 +3,6 @@
 Contains the update logic for the Packages tab
   -}
 {-# LANGUAGE OverloadedLabels #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -12,146 +11,100 @@ module NixManager.Packages.Update
   )
 where
 
-import           Data.Foldable                  ( for_ )
-import           System.Exit                    ( ExitCode
-                                                  ( ExitSuccess
-                                                  , ExitFailure
-                                                  )
-                                                )
-import           NixManager.Process             ( updateProcess
-                                                , poResult
-                                                , terminate
-                                                , poStderr
-                                                , poStdout
-                                                )
-import           System.FilePath                ( (</>) )
-import           Data.Text.IO                   ( putStrLn )
-import           Data.Monoid                    ( getFirst )
-import           Control.Lens                   ( (^.)
-                                                , (&)
+import           Control.Lens                   ( (&)
                                                 , (?~)
-                                                , (^?!)
-                                                , (^?)
-                                                , folded
-                                                , traversed
                                                 , (.~)
-                                                , to
-                                                , (+~)
+                                                , (^?)
                                                 )
 import           NixManager.ManagerState        ( ManagerState(..)
                                                 , msPackagesState
                                                 )
-import qualified NixManager.Admin.Event        as AdminEvent
-import           NixManager.Packages.State      ( psInstallingPackage
-                                                , isProcessData
-                                                , psSelectedPackage
-                                                , psCategoryIdx
-                                                , psLatestMessage
-                                                , psPackageCache
-                                                , psSelectedIdx
-                                                , psSearchString
-                                                , isPackage
-                                                , isCounter
-                                                , InstallingState
-                                                  ( InstallingState
-                                                  )
-                                                )
 import           NixManager.Packages.Event      ( Event
-                                                  ( EventSearchChanged
-                                                  , EventPackageSelected
-                                                  , EventReload
-                                                  , EventReloadFinished
-                                                  , EventTryInstallWatch
-                                                  , EventCategoryChanged
-                                                  , EventTryInstallStarted
-                                                  , EventInstall
+                                                  ( EventOperationCompleted
                                                   , EventInstallCompleted
                                                   , EventUninstallCompleted
-                                                  , EventTryInstallSuccess
-                                                  , EventUninstall
-                                                  , EventTryInstallCancel
-                                                  , EventTryInstall
-                                                  , EventTryInstallFailed
-                                                  , EventOperationCompleted
-                                                  )
-                                                , CompletionType
-                                                  ( CompletionReload
-                                                  , CompletionPass
-                                                  )
-                                                , InstallationType
-                                                  ( Cancelled
-                                                  , Uncancelled
+                                                  , EventReload
+                                                  , EventReloadFinished
+                                                  , EventPackageEditView
                                                   )
                                                 )
-import           NixManager.Util                ( TextualError
-                                                , replaceHtmlEntities
-                                                , decodeUtf8
-                                                , showText
-                                                , threadDelayMillis
-                                                )
+import qualified NixManager.Admin.Event        as AdminEvent
 import           NixManager.Message             ( errorMessage
                                                 , infoMessage
                                                 , Message
                                                 )
 import           NixManager.ManagerEvent        ( ManagerEvent
+                                                  ( ManagerEventPackages
+                                                  )
                                                 , pureTransition
+                                                , liftUpdate
                                                 , packagesEvent
                                                 , adminEvent
                                                 )
-import           NixManager.NixPackages         ( installPackage
+import           NixManager.NixPackagesUtil     ( installPackage
                                                 , readPackageCache
-                                                , dryInstall
-                                                , startProgram
                                                 , uninstallPackage
-                                                , executablesFromStorePath
                                                 )
-import           NixManager.NixPackage          ( npName )
 import           GI.Gtk.Declarative.App.Simple  ( Transition(Transition) )
 import           Prelude                 hiding ( length
                                                 , putStrLn
                                                 )
+import qualified NixManager.View.PackageEditView
+                                               as PEV
 
 -- | What message to display when the install operation completes
-installCompletedMessage :: InstallationType -> Message
-installCompletedMessage Uncancelled = infoMessage
+installCompletedMessage :: PEV.InstallationType -> Message
+installCompletedMessage PEV.Uncancelled = infoMessage
   "Marked for installation! Head to the Admin tab to apply the changes."
-installCompletedMessage Cancelled = infoMessage "Uninstall cancelled!"
+installCompletedMessage PEV.Cancelled = infoMessage "Uninstall cancelled!"
 
 -- | What message to display when the uninstall operation completes
-uninstallCompletedMessage :: InstallationType -> Message
-uninstallCompletedMessage Uncancelled = infoMessage
+uninstallCompletedMessage :: PEV.InstallationType -> Message
+uninstallCompletedMessage PEV.Uncancelled = infoMessage
   "Marked for uninstall! Head to the Admin tab to apply the changes."
-uninstallCompletedMessage Cancelled = infoMessage "Installation cancelled!"
+uninstallCompletedMessage PEV.Cancelled = infoMessage "Installation cancelled!"
 
 -- | The actual update function
 updateEvent :: ManagerState -> Event -> Transition ManagerState ManagerEvent
-updateEvent s (EventCategoryChanged newCategory) =
-  pureTransition (s & msPackagesState . psCategoryIdx .~ newCategory)
 updateEvent s (EventOperationCompleted e completionType) =
-  Transition (s & msPackagesState . psLatestMessage ?~ e)
+  Transition (s & msPackagesState . PEV.psLatestMessage ?~ e)
     $ case completionType of
-        CompletionReload -> pure (adminEvent AdminEvent.EventReload)
-        CompletionPass   -> pure Nothing
+        PEV.CompletionReload -> pure (adminEvent AdminEvent.EventReload)
+        PEV.CompletionPass   -> pure Nothing
 updateEvent s (EventInstallCompleted cache installationType) = Transition
-  (s & msPackagesState . psPackageCache .~ cache & msPackagesState . psSelectedIdx .~ Nothing)
+  (  s
+  &  msPackagesState
+  .  PEV.psPackageCache
+  .~ cache
+  &  msPackagesState
+  .  PEV.psSelectedIdx
+  .~ Nothing
+  )
   (pure
     (packagesEvent
       (EventOperationCompleted (installCompletedMessage installationType)
-                               CompletionReload
+                               PEV.CompletionReload
       )
     )
   )
 updateEvent s (EventUninstallCompleted cache installationType) = Transition
-  (s & msPackagesState . psPackageCache .~ cache & msPackagesState . psSelectedIdx .~ Nothing)
+  (  s
+  &  msPackagesState
+  .  PEV.psPackageCache
+  .~ cache
+  &  msPackagesState
+  .  PEV.psSelectedIdx
+  .~ Nothing
+  )
   (pure
     (packagesEvent
       (EventOperationCompleted (uninstallCompletedMessage installationType)
-                               CompletionReload
+                               PEV.CompletionReload
       )
     )
   )
-updateEvent s (EventInstall installationType) =
-  case s ^. msPackagesState . psSelectedPackage of
+updateEvent s (EventPackageEditView (PEV.EventInstall installationType)) =
+  case s ^? msPackagesState . PEV.psSelectedPackage of
     Nothing       -> pureTransition s
     Just selected -> Transition s $ do
       installResult <- installPackage selected
@@ -162,11 +115,11 @@ updateEvent s (EventInstall installationType) =
         Left e -> pure
           (packagesEvent
             (EventOperationCompleted (errorMessage ("Install failed: " <> e))
-                                     CompletionReload
+                                     PEV.CompletionReload
             )
           )
-updateEvent s (EventUninstall installationType) =
-  case s ^. msPackagesState . psSelectedPackage of
+updateEvent s (EventPackageEditView (PEV.EventUninstall installationType)) =
+  case s ^? msPackagesState . PEV.psSelectedPackage of
     Nothing       -> pureTransition s
     Just selected -> Transition s $ do
       uninstallResult <- uninstallPackage selected
@@ -178,110 +131,9 @@ updateEvent s (EventUninstall installationType) =
           (packagesEvent
             (EventOperationCompleted
               (errorMessage ("Uninstall failed: " <> e))
-              CompletionReload
+              PEV.CompletionReload
             )
           )
-updateEvent s EventTryInstallCancel =
-  Transition (s & msPackagesState . psInstallingPackage .~ Nothing) $ do
-    for_
-      (s ^? msPackagesState . psInstallingPackage . traversed . isProcessData)
-      terminate
-    pure Nothing
-updateEvent s EventTryInstall =
-  case s ^. msPackagesState . psSelectedPackage of
-    Nothing       -> pureTransition s
-    Just selected -> Transition s $ do
-      pd <- dryInstall selected
-      pure (packagesEvent (EventTryInstallStarted selected pd))
-updateEvent s (EventTryInstallStarted pkg pd) = Transition
-  (s & msPackagesState . psInstallingPackage ?~ InstallingState pkg 0 pd)
-  (pure (packagesEvent (EventTryInstallWatch pd mempty)))
-updateEvent s (EventTryInstallFailed e) = pureTransition
-  (  s
-  &  msPackagesState
-  .  psLatestMessage
-  ?~ e
-  &  msPackagesState
-  .  psInstallingPackage
-  .~ Nothing
-  )
-updateEvent s EventTryInstallSuccess = pureTransition
-  (  s
-  &  msPackagesState
-  .  psLatestMessage
-  ?~ infoMessage
-       "Downloaded and started the application!\nIf nothing happens, it's probably a terminal application and cannot be started from NixOS manager."
-
-  &  msPackagesState
-  .  psInstallingPackage
-  .~ Nothing
-  )
-updateEvent s (EventTryInstallWatch pd po) =
-  Transition
-      (s & msPackagesState . psInstallingPackage . traversed . isCounter +~ 1)
-    $ do
-        -- See the readme about an explanation of why we do this “watch” event stuff
-        newOutput <- (po <>) <$> updateProcess pd
-        case newOutput ^. poResult . to getFirst of
-          Nothing -> do
-            threadDelayMillis 500
-            pure (packagesEvent (EventTryInstallWatch pd newOutput))
-          Just ExitSuccess ->
-            executablesFromStorePath
-                (   s
-                ^?! msPackagesState
-                .   psInstallingPackage
-                .   folded
-                .   isPackage
-                )
-                (newOutput ^. poStdout)
-              >>= \case
-                    (_, []) -> pure
-                      (packagesEvent
-                        (EventTryInstallFailed
-                          (errorMessage "No binaries found in this package!")
-                        )
-                      )
-                    (bp, [singleBinary]) -> do
-                      startProgram (bp </> singleBinary)
-                      pure (packagesEvent EventTryInstallSuccess)
-                    multipleBinaries -> do
-                      putStrLn
-                        $  "found more bins: "
-                        <> showText multipleBinaries
-                      pure
-                        (packagesEvent
-                          (EventTryInstallFailed
-                            (errorMessage
-                              "Multiple binaries found in this package!"
-                            )
-                          )
-                        )
-          Just (ExitFailure code) -> pure
-            (packagesEvent
-              (EventTryInstallFailed
-                (errorMessage
-                  (  "Installing failed, exit code: "
-                  <> showText code
-                  <> ", standard error:\n<tt>"
-                  <> replaceHtmlEntities (newOutput ^. poStderr . decodeUtf8)
-                  <> "</tt>"
-                  )
-                )
-              )
-            )
-
-updateEvent s (EventPackageSelected i) =
-  pureTransition (s & msPackagesState . psSelectedIdx .~ i)
-updateEvent s (EventSearchChanged t) = pureTransition
-  (  s
-  &  msPackagesState
-  .  psSearchString
-  .~ t
-  &  msPackagesState
-  .  psSelectedIdx
-  .~ Nothing
-  )
 updateEvent s EventReload = Transition s $ do
   cacheResult <- readPackageCache
   case cacheResult of
@@ -290,8 +142,14 @@ updateEvent s EventReload = Transition s $ do
       (packagesEvent
         (EventOperationCompleted
           (errorMessage ("Couldn't reload packages cache: " <> e))
-          CompletionPass
+          PEV.CompletionPass
         )
       )
 updateEvent s (EventReloadFinished newCache) =
-  pureTransition (s & msPackagesState . psPackageCache .~ newCache)
+  pureTransition (s & msPackagesState . PEV.psPackageCache .~ newCache)
+updateEvent s (EventPackageEditView e) = liftUpdate
+  PEV.updateEvent
+  msPackagesState
+  (ManagerEventPackages . EventPackageEditView)
+  s
+  e

@@ -1,26 +1,22 @@
-{-|
-  Description: Contains the actual GUI (widgets) for the Administation tab
-  -}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-|
+  Description: Contains the actual GUI (widgets) for the Administation tab
+Contains the actual GUI (widgets) for the Administation tab
+  -}
 module NixManager.Admin.View
   ( adminBox
   )
 where
 
-import           NixManager.View.InformationBox      ( informationBox)
-import           NixManager.NixRebuildMode      ( rebuildModeToText
-                                                , rebuildModeIdx
-                                                )
+import           NixManager.View.InformationBox ( informationBox )
+import           NixManager.NixRebuildMode      ( rebuildModeToText )
 import           System.Exit                    ( ExitCode(ExitSuccess) )
 import qualified NixManager.View.IconName      as IconName
-import           NixManager.View.Icon           ( icon
-                                                , IconProps(IconProps)
-                                                )
 import           NixManager.View.GtkUtil        ( expandAndFill
                                                 , fillNoExpand
                                                 , paddedAround
@@ -62,7 +58,7 @@ import           NixManager.ManagerEvent        ( ManagerEvent
                                                   ( ManagerEventAdmin
                                                   )
                                                 )
-import           NixManager.Changes             ( ChangeType(Changes) )
+import           NixManager.ChangeType          ( ChangeType(Changes) )
 import           NixManager.Admin.Event         ( Event
                                                   ( EventRebuild
                                                   , EventGarbage
@@ -80,9 +76,9 @@ import           NixManager.ManagerState        ( ManagerState
                                                 , msAdminState
                                                 )
 import           GI.Gtk.Declarative.Widget      ( Widget )
-import           NixManager.Admin.State         ( asChanges
-                                                , asRebuildData
-                                                , asGarbageData
+import           NixManager.Admin.State         ( changes
+                                                , rebuildData
+                                                , garbageData
                                                 )
 import           NixManager.Admin.GarbageData   ( gdDetailsState
                                                 , gdBuildState
@@ -105,7 +101,7 @@ import           NixManager.Admin.ValidRebuildModes
                                                 , validRebuildModeIdx
                                                 )
 import           Data.Default                   ( def )
-import           NixManager.Admin.DetailsState  ( detailsBool )
+import           NixManager.View.DetailsState   ( detailsBool )
 import           NixManager.Admin.RebuildData   ( rdBuildState
                                                 , rdActiveRebuildModeIdx
                                                 , rdDoRollback
@@ -123,18 +119,21 @@ adminBox s = container Gtk.Box [] [BoxChild expandAndFill (adminBox' s)]
 -- | The grid for the “rebuild” GUI
 rebuildGrid as =
   let
-    changes     = (as ^. asChanges) == Changes
+    hasChanges  = (as ^. changes) == Changes
     applyButton = imageButton
       [ #label
-        := (if changes then "Apply Changes" else "Rebuild (no changes to apply)"
+        := (if hasChanges
+             then "Apply Changes"
+             else "Rebuild (no changes to apply)"
            )
       , on #clicked (ManagerEventAdmin EventRebuild)
       , #valign := Gtk.AlignCenter
       , #alwaysShowImage := True
       ]
       IconName.ViewRefresh
-    lastLine =
-      maybe applyButton (buildingBox EventRebuildCancel) (as ^. asRebuildData . rdBuildState)
+    lastLine = maybe applyButton
+                     (buildingBox EventRebuildCancel)
+                     (as ^. rebuildData . rdBuildState)
     changeBuildType :: ComboBoxChangeEvent -> ManagerEvent
     changeBuildType (ComboBoxChangeEvent idx) =
       ManagerEventAdmin (EventRebuildModeIdxChanged idx)
@@ -144,14 +143,14 @@ rebuildGrid as =
     buildTypeCombo = changeBuildType <$> comboBox
       [#valign := Gtk.AlignCenter]
       (ComboBoxProperties (rebuildModeToText <$> validRebuildModes)
-                          (as ^. asRebuildData . rdActiveRebuildModeIdx)
+                          (as ^. rebuildData . rdActiveRebuildModeIdx)
       )
     buildTypeDescription = inBox def $ widget
       Gtk.Label
       [ #label
         := (   descriptionForValidRebuildMode
                (  as
-               ^. asRebuildData
+               ^. rebuildData
                .  rdActiveRebuildModeIdx
                .  from validRebuildModeIdx
                )
@@ -170,7 +169,7 @@ rebuildGrid as =
       [#label := "Download updates:", #valign := Gtk.AlignCenter]
     updateRadio = inBox def $ widget
       Gtk.Switch
-      [ #active := (as ^. asRebuildData . rdDoUpdate)
+      [ #active := (as ^. rebuildData . rdDoUpdate)
       , on #stateSet
            (\b -> (False, ManagerEventAdmin (EventRebuildDoUpdateChanged b)))
       , #valign := Gtk.AlignCenter
@@ -190,7 +189,7 @@ rebuildGrid as =
       widget Gtk.Label [#label := "Rollback:", #valign := Gtk.AlignCenter]
     rollbackRadio = inBox def $ widget
       Gtk.Switch
-      [ #active := (as ^. asRebuildData . rdDoRollback)
+      [ #active := (as ^. rebuildData . rdDoRollback)
       , on
         #stateSet
         (\b -> (False, ManagerEventAdmin (EventRebuildDoRollbackChanged b)))
@@ -239,8 +238,9 @@ garbageGrid as =
       , #alwaysShowImage := True
       ]
       IconName.UserTrash
-    lastLine =
-      maybe applyButton (buildingBox EventGarbageCancel) (as ^. asGarbageData . gdBuildState)
+    lastLine = maybe applyButton
+                     (buildingBox EventGarbageCancel)
+                     (as ^. garbageData . gdBuildState)
     gridProperties = [#rowSpacing := 10, #columnSpacing := 10]
     inBox props w = container Gtk.Box [] [BoxChild props w]
     olderGenerationsRow   = 0
@@ -249,7 +249,7 @@ garbageGrid as =
       [#label := "Remove old generations:", #valign := Gtk.AlignCenter]
     olderGenerationsRadio = inBox def $ widget
       Gtk.Switch
-      [ #active := (as ^. asGarbageData . gdOlderGenerations)
+      [ #active := (as ^. garbageData . gdOlderGenerations)
       , on
         #stateSet
         (\b ->
@@ -347,14 +347,14 @@ detailsBox detailsState processOutput eventF =
 rebuildBox as =
   let lastStatusRow =
           case
-              ( has (asRebuildData . rdBuildState . _Nothing) as
-              , as ^. asRebuildData . rdProcessOutput . poResult . to getFirst
+              ( has (rebuildData . rdBuildState . _Nothing) as
+              , as ^. rebuildData . rdProcessOutput . poResult . to getFirst
               )
             of
               (True, Just v) -> [BoxChild def (paddedAround 5 (statusLabel v))]
               _              -> []
-      rebuildDetails = detailsBox (as ^. asRebuildData . rdDetailsState)
-                                  (as ^. asRebuildData . rdProcessOutput)
+      rebuildDetails = detailsBox (as ^. rebuildData . rdDetailsState)
+                                  (as ^. rebuildData . rdProcessOutput)
                                   EventRebuildChangeDetails
       frameMargin = 60
   in  bin
@@ -373,14 +373,14 @@ rebuildBox as =
 garbageBox as =
   let lastStatusRow =
           case
-              ( has (asGarbageData . gdBuildState . _Nothing) as
-              , as ^. asGarbageData . gdProcessOutput . poResult . to getFirst
+              ( has (garbageData . gdBuildState . _Nothing) as
+              , as ^. garbageData . gdProcessOutput . poResult . to getFirst
               )
             of
               (True, Just v) -> [BoxChild def (paddedAround 5 (statusLabel v))]
               _              -> []
-      details = detailsBox (as ^. asGarbageData . gdDetailsState)
-                           (as ^. asGarbageData . gdProcessOutput)
+      details = detailsBox (as ^. garbageData . gdDetailsState)
+                           (as ^. garbageData . gdProcessOutput)
                            EventGarbageChangeDetails
       frameMargin = 60
   in  bin
@@ -420,7 +420,8 @@ adminBox' ms =
         [ #label := "Welcome to NixOS-Manager"
         , classes ["nixos-manager-headline"]
         ]
-      , BoxChild def $ informationBox True
+      , BoxChild def $ informationBox
+        True
         IconName.DialogInformation
         "Select the “Add/Remove Software” and “Configure your system” tabs above to make changes to your system.\nOnce you're done with that, <b>apply the changes</b> using the form below."
       ]
@@ -437,7 +438,8 @@ adminBox' ms =
          ]
     $  headlineItems
     <> [rebuildBox (ms ^. msAdminState)]
-    <> [ BoxChild def $ informationBox True
+    <> [ BoxChild def $ informationBox
+           True
            IconName.UserTrash
            "NixOS doesn't explicitly delete anything once it has been downloaded.\nThis makes reinstalling things faster, but your disk drive will dwindle over time.\nThat’s why you should collect all the garbage regularly using this form."
        ]

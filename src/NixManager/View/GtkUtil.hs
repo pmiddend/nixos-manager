@@ -6,23 +6,17 @@ Various GTK-related utilities
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedLists #-}
-{-# LANGUAGE OverloadedStrings #-}
 module NixManager.View.GtkUtil where
 
-import           GI.Gtk.Declarative             ( bin
-                                                , padding
+import           GI.Gtk.Declarative             ( padding
                                                 , defaultBoxChildProperties
-                                                , on
                                                 , expand
                                                 , container
                                                 , fill
-                                                , widget
                                                 , Attribute((:=))
-                                                , classes
                                                 , container
                                                 , BoxChild(BoxChild)
                                                 , BoxChildProperties
-                                                , on
                                                 )
 import qualified GI.Gtk                        as Gtk
 

@@ -1,10 +1,11 @@
 {-|
   Description: Functions to process (install/uninstall, ...) Nix packages
+Functions to process (install/uninstall, ...) Nix packages
   -}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module NixManager.NixPackages
+module NixManager.NixPackagesUtil
   ( searchPackages
   , locateLocalPackagesFile
   , locateRootPackagesFile
@@ -21,15 +22,14 @@ module NixManager.NixPackages
   )
 where
 
+import           Data.Text                      ( strip
+                                                , toLower
+                                                , pack
+                                                )
 import           NixManager.Constants           ( appName
                                                 , rootManagerPath
                                                 )
 import           Data.ByteString                ( ByteString )
-import           System.Exit                    ( ExitCode
-                                                  ( ExitSuccess
-                                                  , ExitFailure
-                                                  )
-                                                )
 import           NixManager.Bash                ( Expr(Command)
                                                 , Arg(LiteralArg)
                                                 )
@@ -55,21 +55,13 @@ import           Data.List                      ( intercalate
                                                 , find
                                                 , inits
                                                 )
-import           Data.Text                      ( Text
-                                                , pack
-                                                , toLower
-                                                , strip
-                                                , stripPrefix
-                                                )
 import           NixManager.Util                ( TextualError
                                                 , decodeUtf8
-                                                , fromStrictBS
                                                 , splitRepeat
                                                 , addToError
                                                 , ifSuccessIO
                                                 , showText
                                                 )
-import qualified Data.Text                     as Text
 import           Data.String                    ( IsString )
 import           NixManager.NixExpr             ( NixExpr
                                                   ( NixSymbol
@@ -101,16 +93,13 @@ import           NixManager.NixPackage          ( NixPackage
                                                 , npPath
                                                 , npName
                                                 , npStatus
-                                                , readPackagesJson
                                                 )
 import           Control.Lens                   ( (^.)
                                                 , (.~)
                                                 , (^?)
-                                                , (^?!)
                                                 , ix
                                                 , Traversal'
                                                 , hasn't
-                                                , folded
                                                 , only
                                                 , (<>~)
                                                 , (&)
@@ -119,39 +108,9 @@ import           Control.Lens                   ( (^.)
                                                 )
 import           Data.Text.Lens                 ( unpacked )
 import           NixManager.Process             ( runProcess
-                                                , runProcessToFinish
                                                 , ProcessData
-                                                , waitUntilFinished
-                                                , poStdout
-                                                , poStderr
-                                                , poResult
                                                 )
-import           Data.Monoid                    ( First(getFirst) )
-
--- | Expression to call @nix search --json <search-term>@
-nixSearchExpr :: Text -> Expr
-nixSearchExpr term = Command "nix" ["search", LiteralArg term, "--json"]
-
--- | Call @nix search@ with a search parameter, return the parsed result
-searchPackages :: Text -> IO (TextualError [NixPackage])
-searchPackages t = do
-  po <- runProcessToFinish Nothing (nixSearchExpr t)
-  let
-    processedResult = addToError
-      "Error parsing output of \"nix search\" command. This could be due to changes in this command in a later version (and doesn't fix itself). Please open an issue in the nixos-manager repository. The error was: "
-      (readPackagesJson (po ^. poStdout . fromStrictBS))
-  case po ^?! poResult . to getFirst . folded of
-    ExitSuccess      -> pure processedResult
-    ExitFailure 1    -> pure processedResult
-    ExitFailure code -> pure
-      (Left
-        (  "Error executing \"nix search\" command (exit code "
-        <> showText code
-        <> "): standard error output: "
-        <> (po ^. poStderr . decodeUtf8)
-        )
-      )
-
+import           NixManager.NixPackageSearch    ( searchPackages )
 
 -- | Given a package name and a list of binaries in that package, try to identify which binary is likely /the/ binary for the package.
 matchName :: String -> [FilePath] -> Maybe FilePath
@@ -205,7 +164,7 @@ emptyPackagesFile = NixFunctionDecl
 packagesFileName :: IsString s => s
 packagesFileName = "packages.nix"
 
--- | Locate the /local/ packages file (the one for the user). Uses the XDG mechanism(s); returns the fill path.
+-- | Locate the /local/ packages file (the one for the user). Uses the XDG mechanism(s); returns the full path.
 locateLocalPackagesFile :: IO FilePath
 locateLocalPackagesFile =
   getXdgDirectory XdgConfig (appName </> packagesFileName)

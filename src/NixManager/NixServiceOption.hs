@@ -1,5 +1,6 @@
 {-|
   Description: Provides the type for a service option, as read from the @options.json@ file as well as functions to read and write it.
+Provides the type for a service option, as read from the @options.json@ file as well as functions to read and write it.
   -}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}

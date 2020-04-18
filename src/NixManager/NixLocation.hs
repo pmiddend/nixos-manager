@@ -10,6 +10,7 @@ module NixManager.NixLocation
   , firstComponent
   , isSingleton
   , isPrefixOf
+  , replaceFirstComponent
   , locationDropComponents
   , locationComponents
   , locationFromText
@@ -17,7 +18,6 @@ module NixManager.NixLocation
   )
 where
 
-import           Debug.Trace                    ( traceShowId )
 import qualified Data.List.NonEmpty            as NE
 import           Data.Text                      ( Text
                                                 , intercalate
@@ -85,3 +85,7 @@ isPrefixOf (NixLocation prefix) (NixLocation tester) =
 -- | Extract the first component
 firstComponent :: NixLocation -> Text
 firstComponent (NixLocation (x NE.:| _)) = x
+
+-- | Replace the first location’s first component, keeping the tail as-is.
+replaceFirstComponent :: Text -> Endo NixLocation
+replaceFirstComponent x (NixLocation (_ NE.:| xs)) = NixLocation (x NE.:| xs)

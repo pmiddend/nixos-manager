@@ -28,7 +28,7 @@ import           NixManager.View.Icon           ( icon
                                                 , IconProps(IconProps)
                                                 )
 import           Data.Default                   ( def )
-import Data.Text(Text)
+import           Data.Text                      ( Text )
 
 -- | Display a box with an icon and a descriptive text next to it, possibly using Pango markup
 informationBox

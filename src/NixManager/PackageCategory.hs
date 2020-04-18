@@ -4,7 +4,7 @@
 Contains the enum for the package category combobox
   -}
 {-# LANGUAGE OverloadedStrings #-}
-module NixManager.Packages.PackageCategory
+module NixManager.PackageCategory
   ( PackageCategory(..)
   , packageCategories
   , categoryToText

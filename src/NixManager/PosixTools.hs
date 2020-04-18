@@ -20,12 +20,7 @@ import           NixManager.Util                ( mwhen
 import           NixManager.Bash                ( Expr(Command)
                                                 , Arg(LiteralArg, RawArg)
                                                 )
-import           Data.Text                      ( Text
-                                                , unwords
-                                                , replace
-                                                , isInfixOf
-                                                , pack
-                                                )
+import           Data.Text                      ( pack )
 import           Data.List.NonEmpty             ( NonEmpty )
 
 -- | Wrapper for @mkdir@ (first parameter specifies recursion)

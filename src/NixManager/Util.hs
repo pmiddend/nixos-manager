@@ -4,6 +4,7 @@ Description: Random utilities for NixOS Manager
 As a general rule, stuff defined here should not import anything from the manager itself.
 -}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 module NixManager.Util where
 
 import           Data.Char                      ( isUpper
@@ -15,10 +16,10 @@ import           Control.Concurrent             ( threadDelay )
 import           Data.String                    ( IsString )
 import           Data.Bifunctor                 ( first )
 import qualified Data.Text.Lazy                as TL
+import           System.Directory               ( doesFileExist )
 import qualified Data.Text.Lazy.Encoding       as TLE
 import           Data.Text                      ( Text
                                                 , pack
-                                                , unpack
                                                 , drop
                                                 , length
                                                 , replace
@@ -35,8 +36,12 @@ import           Prelude                 hiding ( putStrLn
                                                 , length
                                                 )
 import           Control.Lens                   ( Getter
+                                                , Lens'
+                                                , elementOf
+                                                , Traversal'
                                                 , Iso'
                                                 , iso
+                                                , (^.)
                                                 , to
                                                 )
 import qualified Data.Text.Encoding            as Encoding
@@ -47,6 +52,10 @@ type TextualError = Either Text
 -- | Convert something showable to 'Text'. Notably 'String' and @Exception@ types.
 fromShowableError :: Show ex => Either ex e -> TextualError e
 fromShowableError = first showText
+
+toMaybe :: TextualError a -> Maybe a
+toMaybe (Left  _) = Nothing
+toMaybe (Right v) = Just v
 
 -- | Convert from a'String' error to 'Text'
 fromEither :: Either String e -> TextualError e
@@ -149,3 +158,22 @@ replaceHtmlEntities =
 -- | Check if two files are bitwise-equal. Doesn’t consider memory a problem.
 filesEqual :: FilePath -> FilePath -> IO Bool
 filesEqual a b = (==) <$> BSL.readFile a <*> BSL.readFile b
+
+-- | Determine if two files, a local one and a root one, are equal, treating “local file doesn’t” exist as “we have no changes to apply regarding that file”.
+determineFilesEqual :: IO FilePath -> IO FilePath -> IO Bool
+determineFilesEqual fp' rootFp' = do
+  fp          <- fp'
+  rootFp      <- rootFp'
+  localExists <- doesFileExist fp
+  if localExists
+    then do
+      rootExists <- doesFileExist rootFp
+      if rootExists then filesEqual fp rootFp else pure False
+    else pure True
+
+-- | Create a traversal from a given traversal and an optional index into it
+indirectIndexTraversal
+  :: Lens' a (Maybe Int) -> Traversal' a b -> Traversal' a b
+indirectIndexTraversal indexLens containerLens f gd = case gd ^. indexLens of
+  Nothing  -> pure gd
+  Just idx -> elementOf containerLens idx f gd

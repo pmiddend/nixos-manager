@@ -1,5 +1,6 @@
 {-|
   Description: Provides an enum for all @nixos-rebuild@ rebuild modes
+Provides an enum for all @nixos-rebuild@ rebuild modes
   -}
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.NixRebuildMode

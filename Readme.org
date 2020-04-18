@@ -2,24 +2,6 @@
 
 [[https://www.gnu.org/licenses/gpl-3.0][https://img.shields.io/badge/License-GPLv3-blue.svg]] [[https://travis-ci.com/pmiddend/nixos-manager.svg?branch=master][https://travis-ci.com/pmiddend/nixos-manager.svg?branch=master]]
 
-** Welcome screen, featuring a frontend for =nixos-rebuild=
-
-[[./screenshots/admin.png]]
-
-** Search and install (or try) packages
-
-[[./screenshots/packages.png]]
-
-** Configure services
-
-[[./screenshots/services.png]]
-
-** Screencast
-
-[[https://www.youtube.com/watch?v=Fa4_9ueOdpY&feature=youtu.be][Watch on YouTube]]
-
-Please recommend to me another platform where I can upload this, preferably lossless as the source mkv that I have.
-
 ** Rationale
 
 The idea is to build something to *configure NixOS graphically*. To me, this means: managing the installed software packages, and managing the enabled services, as well as updating and garbage-collecting. For the moment, I’m focusing on a solution for a declarative, global configuration; so /for the moment/ it’s not calling =nix-env= and it’s not supporting =home-manager=.
@@ -38,8 +20,29 @@ In nixos-manager, you can mark packages for installation. They will be added to 
 
 To gather service definitions, nixos-manager downloads and parses https://nixos.org/nixos/options.json. This way, the service definitions might not accurately reflect your system configuration, but I just found no other way to gather the definitions, see [[https://discourse.nixos.org/t/list-available-services-and-their-options/][this Discourse thread]].
 
-** FAQ
+** Screenshots
+*** Welcome screen, featuring a frontend for =nixos-rebuild=
 
+[[./screenshots/admin.png]]
+
+*** Welcome screen for =home-manager= users
+
+[[./screenshots/home-manager.png]]
+
+*** Search and install (or try) packages
+
+[[./screenshots/packages.png]]
+
+*** Configure services
+
+[[./screenshots/services.png]]
+** Screencast
+
+[[https://www.youtube.com/watch?v=Fa4_9ueOdpY&feature=youtu.be][Watch on YouTube]]
+
+Please recommend to me another platform where I can upload this, preferably lossless as the source mkv that I have.
+
+** FAQ
 *** Have you seen [[https://github.com/haskell-nix/hnix][hnix]]? Why don’t you parse your you Nix files with
 
 I’d love to! But sadly and ironically, it’s currently [[https://github.com/NixOS/nixpkgs/issues/82233][broken]] in nixpkgs. I’m waiting for someone to repair it, as I don’t have the knowledge to do that.
@@ -62,11 +65,29 @@ nixos-manager isn’t in nixpkgs yet, so you’ll have to build it using…Nix!
 nix-build -I nixpkgs=channel:nixos-unstable
 #+end_src
 
-The channel argument is necessary in case you’re not on =nixos-unstable=. After the build processed has finished, run =result/bin/nixos-manager=.
+The channel argument is necessary in case you’re not on =nixos-unstable=.
+** Setup and running
+*** With home-manager
+After building it (see above), you have to tell home-manager to read nixos-manager’s configuration files. To do that, open your =~/.config/nixpkgs/home.nix= file and insert the following somewhere inside the main attribute set:
 
-** Setup
+#+begin_example
+imports = [ ./hm-extra-services.nix ./hm-extra-packages.nix ];
+#+end_example
 
-To use nixos-manager, you have to tell NixOS to read its configuration files. To do that, open your =/etc/nixos/configuration.nix= file and look for a line containing ~imports = …~. Usually it looks something like this:
+nixos-manager, when run in home-manager mode, will write these extra files. To run nixos-manager in home-manager mode, simply run it with the =--home-manager= argument. For example, if you built it with Nix, run:
+
+#+begin_example
+result/bin/nixos-manager --home-manager
+#+end_example
+
+If you’ve built it with =cabal= (for example, to try it out after changing the code), run:
+
+#+begin_example
+cabal v2-run nixos-manager -- --home-manager
+#+end_example
+
+*** With NixOS
+After building it (see above), you have to tell NixOS to read nixos-manager’s configuration files. To do that, open your =/etc/nixos/configuration.nix= file and look for a line containing ~imports = …~. Usually it looks something like this:
 
 #+begin_src nix
 {

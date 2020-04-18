@@ -12,11 +12,8 @@ module NixManager.Admin.Update
   )
 where
 
-import Data.Foldable(for_)
-import           Control.Monad                  ( void )
 import           NixManager.PosixTools          ( kill )
 import qualified Data.ByteString.Char8         as BS
-import           Debug.Trace                    ( traceShowId )
 import           NixManager.Password            ( Password
                                                   ( Password
                                                   , getPassword
@@ -38,19 +35,16 @@ import           System.Exit                    ( ExitCode
                                                   )
                                                 )
 import           NixManager.Process             ( updateProcess
-                                                , runProcess
                                                 , runProcessToFinish
                                                 , poResult
-                                                , waitUntilFinished
                                                 , poStdout
-                                                , poStderr
                                                 , getProcessId
-                                                , terminate
                                                 )
 import           NixManager.Admin.State         ( State
-                                                , asChanges
-                                                , asRebuildData
-                                                , asGarbageData
+                                                , changes
+                                                , rebuildData
+                                                , garbageData
+                                                , determineChanges
                                                 )
 import           NixManager.Admin.GarbageData   ( gdOlderGenerations
                                                 , gdBuildState
@@ -60,8 +54,6 @@ import           NixManager.Admin.GarbageData   ( gdOlderGenerations
 import           Data.Monoid                    ( getFirst )
 import           Control.Lens                   ( (^.)
                                                 , from
-                                                , folded
-                                                , (^?)
                                                 , traversed
                                                 , (<>~)
                                                 , (&)
@@ -69,7 +61,6 @@ import           Control.Lens                   ( (^.)
                                                 , to
                                                 , (.~)
                                                 , (+~)
-                                                , (^?!)
                                                 )
 import           NixManager.Admin.Event         ( Event
                                                   ( EventRebuild
@@ -98,12 +89,8 @@ import           NixManager.Admin.Event         ( Event
 import           NixManager.ManagerState        ( ManagerState(..)
                                                 , msAdminState
                                                 )
-import           NixManager.Util                ( threadDelayMillis
-                                                , showText
-                                                )
-import           NixManager.Changes             ( determineChanges
-                                                , ChangeType(NoChanges)
-                                                )
+import           NixManager.Util                ( threadDelayMillis )
+import           NixManager.ChangeType          ( ChangeType(NoChanges) )
 import           NixManager.AskPass             ( askPass
                                                 , sudoExpr
                                                 )
@@ -134,7 +121,6 @@ import           NixManager.Admin.BuildState    ( bsProcessData
                                                 , bsPassword
                                                 , BuildState(BuildState)
                                                 )
-import           NixManager.NixRebuildMode      ( rebuildModeIdx )
 import           NixManager.Admin.ValidRebuildModes
                                                 ( validRebuildModeIdx )
 
@@ -171,27 +157,31 @@ updateEvent ms _ EventGarbage = Transition
   ms
   (adminEvent . EventAskPassWatch EventGarbageWithPassword mempty <$> askPass)
 updateEvent ms _ EventRebuildCancel =
-  Transition (ms & msAdminState . asRebuildData . rdBuildState .~ Nothing) $
-    maybe (pure Nothing) sudoKillProcess (ms ^. msAdminState . asRebuildData . rdBuildState)
+  Transition (ms & msAdminState . rebuildData . rdBuildState .~ Nothing) $ maybe
+    (pure Nothing)
+    sudoKillProcess
+    (ms ^. msAdminState . rebuildData . rdBuildState)
 updateEvent ms _ EventGarbageCancel =
-  Transition (ms & msAdminState . asGarbageData . gdBuildState .~ Nothing) $
-    maybe (pure Nothing) sudoKillProcess (ms ^. msAdminState . asGarbageData . gdBuildState)
+  Transition (ms & msAdminState . garbageData . gdBuildState .~ Nothing) $ maybe
+    (pure Nothing)
+    sudoKillProcess
+    (ms ^. msAdminState . garbageData . gdBuildState)
 updateEvent ms _ (EventGarbageWithPassword password) = Transition ms $ do
   garbagePo <- collectGarbage
-    (ms ^. msAdminState . asGarbageData . gdOlderGenerations)
+    (ms ^. msAdminState . garbageData . gdOlderGenerations)
     password
   pure (adminEvent (EventGarbageStarted garbagePo password))
 updateEvent ms _ (EventRebuildWithPassword password) = Transition ms $ do
   rebuildPo <- rebuild
     (  ms
     ^. msAdminState
-    .  asRebuildData
+    .  rebuildData
     .  rdActiveRebuildModeIdx
     .  from validRebuildModeIdx
     )
     (calculateRebuildUpdateMode
-      (ms ^. msAdminState . asRebuildData . rdDoUpdate)
-      (ms ^. msAdminState . asRebuildData . rdDoRollback)
+      (ms ^. msAdminState . rebuildData . rdDoUpdate)
+      (ms ^. msAdminState . rebuildData . rdDoRollback)
     )
     password
   pure (adminEvent (EventRebuildStarted rebuildPo password))
@@ -211,11 +201,11 @@ updateEvent ms _ (EventRebuildStarted pd password) =
   Transition
       (  ms
       &  msAdminState
-      .  asRebuildData
+      .  rebuildData
       .  rdBuildState
       ?~ BuildState 0 pd password
       &  msAdminState
-      .  asRebuildData
+      .  rebuildData
       .  rdProcessOutput
       .~ mempty
       )
@@ -224,11 +214,11 @@ updateEvent ms _ (EventGarbageStarted pd password) =
   Transition
       (  ms
       &  msAdminState
-      .  asGarbageData
+      .  garbageData
       .  gdBuildState
       ?~ BuildState 0 pd password
       &  msAdminState
-      .  asGarbageData
+      .  garbageData
       .  gdProcessOutput
       .~ mempty
       )
@@ -237,11 +227,11 @@ updateEvent ms _ (EventGarbageWatch priorOutput pd) =
   Transition
       (  ms
       &  msAdminState
-      .  asGarbageData
+      .  garbageData
       .  gdProcessOutput
       .~ priorOutput
       &  msAdminState
-      .  asGarbageData
+      .  garbageData
       .  gdBuildState
       .  traversed
       .  bsCounter
@@ -260,11 +250,11 @@ updateEvent ms _ (EventRebuildWatch password priorOutput pd) =
   Transition
       (  ms
       &  msAdminState
-      .  asRebuildData
+      .  rebuildData
       .  rdProcessOutput
       .~ priorOutput
       &  msAdminState
-      .  asRebuildData
+      .  rebuildData
       .  rdBuildState
       .  traversed
       .  bsCounter
@@ -286,11 +276,11 @@ updateEvent ms _ (EventRebuildWatch password priorOutput pd) =
 updateEvent ms _ (EventGarbageFinished totalOutput exitCode) = pureTransition
   (  ms
   &  msAdminState
-  .  asGarbageData
+  .  garbageData
   .  gdBuildState
   .~ Nothing
   &  msAdminState
-  .  asGarbageData
+  .  garbageData
   .  gdProcessOutput
   .~ (   totalOutput
      &   poStdout
@@ -301,18 +291,18 @@ updateEvent ms _ (EventRebuildFinished totalOutput exitCode) =
   Transition
       (  ms
       &  msAdminState
-      .  asRebuildData
+      .  rebuildData
       .  rdBuildState
       .~ Nothing
       &  msAdminState
-      .  asRebuildData
+      .  rebuildData
       .  rdProcessOutput
       .~ (   totalOutput
          &   poStdout
          <>~ ("\nFinished with " <> formatExitCode exitCode)
          )
       &  msAdminState
-      .  asChanges
+      .  changes
       .~ NoChanges
       )
     $ pure (packagesEvent PackagesEvent.EventReload)
@@ -320,39 +310,39 @@ updateEvent ms _ (EventRebuildModeIdxChanged newIdx) =
   pureTransition
     $  ms
     &  msAdminState
-    .  asRebuildData
+    .  rebuildData
     .  rdActiveRebuildModeIdx
     .~ newIdx
 updateEvent ms _ (EventRebuildChangeDetails newDetails) = pureTransition
-  (ms & msAdminState . asRebuildData . rdDetailsState .~ newDetails)
+  (ms & msAdminState . rebuildData . rdDetailsState .~ newDetails)
 updateEvent ms _ (EventGarbageChangeDetails newDetails) = pureTransition
-  (ms & msAdminState . asGarbageData . gdDetailsState .~ newDetails)
+  (ms & msAdminState . garbageData . gdDetailsState .~ newDetails)
 updateEvent ms _ EventReload =
   Transition ms $ adminEvent . EventReloadFinished <$> determineChanges
 updateEvent ms _ (EventReloadFinished newChanges) =
-  pureTransition (ms & msAdminState . asChanges .~ newChanges)
+  pureTransition (ms & msAdminState . changes .~ newChanges)
 updateEvent ms _ (EventRebuildDoUpdateChanged newUpdate) = pureTransition
   (  ms
   &  msAdminState
-  .  asRebuildData
+  .  rebuildData
   .  rdDoUpdate
   .~ newUpdate
   &  msAdminState
-  .  asRebuildData
+  .  rebuildData
   .  rdDoRollback
   .~ False
   )
 updateEvent ms _ (EventRebuildDoRollbackChanged newRollback) = pureTransition
   (  ms
   &  msAdminState
-  .  asRebuildData
+  .  rebuildData
   .  rdDoUpdate
   .~ False
   &  msAdminState
-  .  asRebuildData
+  .  rebuildData
   .  rdDoRollback
   .~ newRollback
   )
 updateEvent ms _ (EventGarbageOlderGenerationsChanged newOldGen) =
   pureTransition
-    (ms & msAdminState . asGarbageData . gdOlderGenerations .~ newOldGen)
+    (ms & msAdminState . garbageData . gdOlderGenerations .~ newOldGen)

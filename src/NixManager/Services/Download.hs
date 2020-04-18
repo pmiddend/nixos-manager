@@ -31,7 +31,6 @@ import           NixManager.Process             ( runProcessToFinish
                                                 )
 import           NixManager.NixServiceOption    ( desiredOptionsFileLocation )
 import           Control.Exception              ( try
-                                                , Exception
                                                 , SomeException
                                                 )
 import           Control.Concurrent.MVar        ( MVar

@@ -1,20 +1,26 @@
+{-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-|
   Description: The root of the view hierarchy
 
 The root of the view hierarchy
   -}
-{-# LANGUAGE OverloadedLabels #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE OverloadedLists #-}
-{-# LANGUAGE OverloadedStrings #-}
 module NixManager.View.Root
   ( view'
   )
 where
 
+import           NixManager.ProgramArguments    ( ProgramArguments
+                                                , paUseHomeManager
+                                                )
 import qualified NixManager.Packages.View      as PackagesView
 import qualified NixManager.Services.View      as ServicesView
 import qualified NixManager.Admin.View         as AdminView
+import qualified NixManager.HMServices.View    as HMServicesView
+import qualified NixManager.HMPackages.View    as HMPackagesView
+import qualified NixManager.HMAdmin.View       as HMAdminView
 import           GI.Gtk.Declarative             ( Attribute((:=))
                                                 , on
                                                 , bin
@@ -37,6 +43,7 @@ import           NixManager.ManagerEvent        ( ManagerEvent
                                                   )
                                                 )
 import           Data.Vector                    ( Vector )
+import           Control.Lens                   ( (^.) )
 
 -- | The main window’s attributes
 windowAttributes :: Vector (Attribute Gtk.Window ManagerEvent)
@@ -56,26 +63,41 @@ imagedLabel iconProps text = container
   ]
 
 -- | The root view function
-view' :: ManagerState -> AppView Gtk.Window ManagerEvent
-view' s =
-  let windowContents = notebook
-        []
-        [ pageWithTab
-          (imagedLabel
-            (IconProps Gtk.IconSizeButton IconName.ApplicationsSystem)
-            "Administration"
-          )
-          (AdminView.adminBox s)
-        , pageWithTab
-          (imagedLabel (IconProps Gtk.IconSizeButton IconName.PackageXGeneric)
-                       "Add/Remove Software"
-          )
-          (PackagesView.packagesBox s)
-        , pageWithTab
-          (imagedLabel
-            (IconProps Gtk.IconSizeButton IconName.PreferencesOther)
-            "Configure your system"
-          )
-          (ServicesView.servicesBox s)
-        ]
+view' :: ProgramArguments -> ManagerState -> AppView Gtk.Window ManagerEvent
+view' pa s =
+  let adminTab = pageWithTab
+        (imagedLabel
+          (IconProps Gtk.IconSizeButton IconName.ApplicationsSystem)
+          "Administration"
+        )
+        (AdminView.adminBox s)
+      packagesTab = pageWithTab
+        (imagedLabel (IconProps Gtk.IconSizeButton IconName.PackageXGeneric)
+                     "Add/Remove Software"
+        )
+        (PackagesView.packagesBox s)
+      servicesTab = pageWithTab
+        (imagedLabel (IconProps Gtk.IconSizeButton IconName.PreferencesOther)
+                     "Configure your system"
+        )
+        (ServicesView.servicesBox s)
+      hmAdminTab = pageWithTab
+        (imagedLabel
+          (IconProps Gtk.IconSizeButton IconName.ApplicationsSystem)
+          "Home Administration"
+        )
+        (HMAdminView.adminBox s)
+      hmPackagesTab = pageWithTab
+        (imagedLabel (IconProps Gtk.IconSizeButton IconName.PackageXGeneric)
+                     "Add/Remove Software"
+        )
+        (HMPackagesView.packagesBox s)
+      hmServicesTab = pageWithTab
+        (imagedLabel (IconProps Gtk.IconSizeButton IconName.UserHome)
+                     "Configure your Home"
+        )
+        (HMServicesView.servicesBox s)
+      windowContents = if pa ^. paUseHomeManager
+        then notebook [] [hmAdminTab, hmPackagesTab, hmServicesTab]
+        else notebook [] [adminTab, packagesTab, servicesTab]
   in  bin Gtk.Window windowAttributes windowContents

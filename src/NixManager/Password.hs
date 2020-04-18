@@ -1,5 +1,6 @@
 {-|
   Description: Provides the 'Password' type to wrap over 'Text'
+Provides the 'Password' type to wrap over 'Text'
   -}
 module NixManager.Password
   ( Password(..)

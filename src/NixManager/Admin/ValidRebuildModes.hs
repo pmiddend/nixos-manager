@@ -1,5 +1,6 @@
 {-|
   Description: Contains a subset of 'NixRebuildMode' deemed “sensible” for the Manager
+Contains a subset of 'NixRebuildMode' deemed “sensible” for the Manager
   -}
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.Admin.ValidRebuildModes
@@ -17,8 +18,6 @@ import           Control.Lens                   ( Iso'
 import           Data.List                      ( elemIndex )
 import           NixManager.NixRebuildMode      ( NixRebuildMode
                                                   ( NixRebuildSwitch
-                                                  , NixRebuildBoot
-                                                  , NixRebuildTest
                                                   , NixRebuildDryBuild
                                                   , NixRebuildDryActivate
                                                   )

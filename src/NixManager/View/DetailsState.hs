@@ -1,7 +1,8 @@
 {-|
   Description: Contains "DetailsState" to signify if a GTK expander is contracted
+Contains "DetailsState" to signify if a GTK expander is contracted
   -}
-module NixManager.Admin.DetailsState
+module NixManager.View.DetailsState
   ( DetailsState(..)
   , detailsBool
   )

@@ -5,6 +5,7 @@ Provides a thin layer above "System.Process" - there’s probably something nice
   -}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE OverloadedStrings #-}
 module NixManager.Process
   ( ProcessOutput
   , ProcessData
@@ -38,10 +39,12 @@ import           System.Process                 ( ProcessHandle
                                                 , Pid
                                                 , getPid
                                                 , CreateProcess(..)
-                                                , CmdSpec(ShellCommand, RawCommand)
+                                                , CmdSpec
+                                                  ( ShellCommand
+                                                  , RawCommand
+                                                  )
                                                 , StdStream(CreatePipe)
                                                 , terminateProcess
-                                                , interruptProcessGroupOf
                                                 , waitForProcess
                                                 )
 import           System.IO                      ( Handle )
@@ -51,6 +54,8 @@ import           NixManager.Bash                ( Expr(Command)
                                                 , evalExpr
                                                 )
 import           Data.Text                      ( unpack )
+import           Data.Text.IO                   ( putStrLn )
+import           Prelude                 hiding ( putStrLn )
 
 -- | Represents all the data needed to handle a running process
 data ProcessData = ProcessData {
@@ -83,7 +88,8 @@ terminate = terminateProcess . view pdProcessHandle
 
 -- | Convert a Bash expression (see the corresponding module) to a "System.Process" 'CmdSpec'
 exprToCmdSpec :: Expr -> CmdSpec
-exprToCmdSpec (Command x args) = RawCommand (unpack x) (unpack . argText <$> args)
+exprToCmdSpec (Command x args) =
+  RawCommand (unpack x) (unpack . argText <$> args)
 exprToCmdSpec x = ShellCommand (unpack (evalExpr x))
 
 -- | Signify “I don’t want to pass anything on stdin”. Yeah, I was too lazy for a separate data type here.
@@ -103,6 +109,7 @@ runProcessToFinish stdinString command = do
 -- | Start a process, potentially feeding a constant amount of data into stdin, and return the data to manage it further.
 runProcess :: Maybe ByteString -> Expr -> IO ProcessData
 runProcess stdinString command = do
+  putStrLn ("Executing: " <> evalExpr command)
   (Just hin, Just hout, Just herr, ph) <- createProcess $ CreateProcess
     { cmdspec            = exprToCmdSpec command
     , cwd                = Nothing

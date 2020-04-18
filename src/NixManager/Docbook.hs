@@ -14,7 +14,6 @@ import           Data.Text                      ( Text
                                                 , replace
                                                 )
 import           Text.XML                       ( parseText
-                                                , psDecodeEntities
                                                 , Element
                                                 , Document
                                                 , Node

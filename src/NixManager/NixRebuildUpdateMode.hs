@@ -1,5 +1,6 @@
 {-|
   Description: Provides an enum for the mode of operation for rebuild in the GUI
+Provides an enum for the mode of operation for rebuild in the GUI
   -}
 module NixManager.NixRebuildUpdateMode
   ( NixRebuildUpdateMode(..)

@@ -1,5 +1,6 @@
 {-|
   Description: Contains all data for the rebuild GUI
+Contains all data for the rebuild GUI
   -}
 {-# LANGUAGE TemplateHaskell #-}
 module NixManager.Admin.RebuildData
@@ -17,7 +18,7 @@ where
 import           Control.Lens                   ( makeLenses )
 import           NixManager.Process             ( ProcessOutput )
 import           NixManager.Admin.BuildState    ( BuildState )
-import           NixManager.Admin.DetailsState  ( DetailsState
+import           NixManager.View.DetailsState   ( DetailsState
                                                   ( DetailsContracted
                                                   )
                                                 )
