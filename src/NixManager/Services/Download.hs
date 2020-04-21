@@ -17,6 +17,7 @@ import           Network.HTTP.Client            ( HttpException )
 import           Prelude                 hiding ( writeFile )
 import           System.FilePath                ( dropFileName )
 import           System.Directory               ( createDirectoryIfMissing )
+import           System.Process                 ( readProcess )
 import           NixManager.NixServiceOption    ( desiredOptionsFileLocation )
 import           Control.Exception              ( try
                                                 , Exception
@@ -83,19 +84,12 @@ start :: IO DownloadState
 start = do
   resultVar      <- newEmptyMVar
   resultThreadId <- forkIO $ do
-    r' <- tryDownload
-    case r' of
-      Left ex -> putMVar resultVar (Left ("I/O error: " <> showText ex))
-      Right response ->
-        let sc = response ^. responseStatus . statusCode
-        in  if sc == 200
-              then do
-                optLoc <- desiredOptionsFileLocation
-                createDirectoryIfMissing True (dropFileName optLoc)
-                writeFile optLoc (response ^. responseBody)
-                putMVar resultVar (Right optLoc)
-              else putMVar resultVar
-                           (Left ("HTTP error, status code: " <> showText sc))
+    optLoc <- desiredOptionsFileLocation
+    createDirectoryIfMissing True (dropFileName optLoc)
+    readProcess "nix-build"
+      [ "--out-link", optLoc, "-E"
+      , "with import <nixpkgs> {}; let eval = import (pkgs.path + \"/nixos/lib/eval-config.nix\") { modules = []; }; opts = (nixosOptionsDoc { options = eval.options; }).optionsJSON; in runCommandLocal \"options.json\" { opts = opts; } '' cp \"$opts/share/doc/nixos/options.json\" $out ''" ] ""
+    putMVar resultVar (Right optLoc)
   pure (DownloadState resultVar resultThreadId)
 
 -- | Cancel a started download
