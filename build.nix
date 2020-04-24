@@ -31,7 +31,6 @@ rec
       p."nixos-manager"
     ];
     buildInputs = with pkgs.haskellPackages; [
-      brittany
       cabal-install
       hlint
       pkgs.gksu
