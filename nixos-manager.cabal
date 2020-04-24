@@ -73,10 +73,7 @@ executable nixos-manager
                      , containers
                      , gi-gdk
                      , word-wrap
-                     , http-client
-                     , wreq
                      , pipes
-                     , brotli
                      , scientific
                      , gi-gobject
                      , lens

@@ -13,21 +13,26 @@ module NixManager.Services.Download
   )
 where
 
-import           Network.HTTP.Client            ( HttpException )
+import           System.Exit                    ( ExitCode
+                                                  ( ExitSuccess
+                                                  , ExitFailure
+                                                  )
+                                                )
 import           Prelude                 hiding ( writeFile )
 import           System.FilePath                ( dropFileName )
 import           System.Directory               ( createDirectoryIfMissing )
-import           System.Process                 ( readProcess )
+import           NixManager.Bash                ( Expr(Command)
+                                                , Arg(RawArg)
+                                                )
+import           NixManager.Process             ( runProcessToFinish
+                                                , noStdin
+                                                , poStderr
+                                                , poResult
+                                                )
 import           NixManager.NixServiceOption    ( desiredOptionsFileLocation )
 import           Control.Exception              ( try
                                                 , Exception
                                                 , SomeException
-                                                )
-import           Network.Wreq                   ( get
-                                                , Response
-                                                , responseStatus
-                                                , responseBody
-                                                , statusCode
                                                 )
 import           Control.Concurrent.MVar        ( MVar
                                                 , newEmptyMVar
@@ -39,16 +44,20 @@ import           Control.Concurrent             ( forkIO
                                                 , killThread
                                                 )
 import           NixManager.Util                ( TextualError
+                                                , decodeUtf8
                                                 , showText
                                                 )
 import           Control.Lens                   ( makeLenses
                                                 , view
+                                                , to
                                                 , (^.)
+                                                , (^?!)
                                                 )
 import           Data.ByteString.Lazy           ( ByteString
                                                 , writeFile
                                                 )
-import           Codec.Compression.Brotli       ( decompress )
+import           Data.Text                      ( pack )
+import           Data.Monoid                    ( getFirst )
 
 -- | When the download finishes, this type contains either an error or the filepath to the downloaded file
 type DownloadResult = TextualError FilePath
@@ -64,21 +73,6 @@ data DownloadState = DownloadState {
 
 makeLenses ''DownloadState
 
--- | Try to decompress the received data (it’s Brotli compressed nowadays)
-tryDecompress
-  :: Response ByteString -> IO (Either SomeException (Response ByteString))
-tryDecompress bs = try (pure (decompress <$> bs))
-
--- | Try to download and decompress the options file
-tryDownload :: IO (Either SomeException (Response ByteString))
-tryDownload = do
-  errorOrResponse <- try
-    (get "https://channels.nixos.org/nixos-19.09/options.json.br")
-  case errorOrResponse of
-    -- FIXME: This is pretty ugly.
-    Left  e -> pure (Left e)
-    Right v -> tryDecompress v
-
 -- | Start the download, return its state
 start :: IO DownloadState
 start = do
@@ -86,10 +80,23 @@ start = do
   resultThreadId <- forkIO $ do
     optLoc <- desiredOptionsFileLocation
     createDirectoryIfMissing True (dropFileName optLoc)
-    readProcess "nix-build"
-      [ "--out-link", optLoc, "-E"
-      , "with import <nixpkgs> {}; let eval = import (pkgs.path + \"/nixos/lib/eval-config.nix\") { modules = []; }; opts = (nixosOptionsDoc { options = eval.options; }).optionsJSON; in runCommandLocal \"options.json\" { opts = opts; } '' cp \"$opts/share/doc/nixos/options.json\" $out ''" ] ""
-    putMVar resultVar (Right optLoc)
+    po <- runProcessToFinish noStdin $ Command
+      "nix-build"
+      (RawArg
+      <$> [ "--out-link"
+          , pack optLoc
+          , "-E"
+          , "with import <nixpkgs> {}; let eval = import (pkgs.path + \"/nixos/lib/eval-config.nix\") { modules = []; }; opts = (nixosOptionsDoc { options = eval.options; }).optionsJSON; in runCommandLocal \"options.json\" { opts = opts; } '' cp \"$opts/share/doc/nixos/options.json\" $out ''"
+          ]
+      )
+    putMVar resultVar $ case po ^?! poResult . to getFirst of
+      Just ExitSuccess        -> Right optLoc
+      Just (ExitFailure code) -> Left
+        (  "Building the options file failed with error code "
+        <> showText code
+        <> ", standard error was:\n\n"
+        <> (po ^. poStderr . decodeUtf8)
+        )
   pure (DownloadState resultVar resultThreadId)
 
 -- | Cancel a started download

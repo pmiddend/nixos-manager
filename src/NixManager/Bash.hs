@@ -9,6 +9,7 @@ module NixManager.Bash
   , appendArgs
   , devNullify
   , (&&.)
+  , argText
   , (||.)
   , (>>.)
   )
@@ -68,6 +69,11 @@ maybeSurround :: Arg -> Text
 maybeSurround (RawArg t) = t
 maybeSurround (LiteralArg t) | specialChar t = surround "\"" (escape t)
                              | otherwise     = escape t
+
+-- | Return the argument’s content, disregarding quoting
+argText :: Arg -> Text
+argText (RawArg t) = t
+argText (LiteralArg t) = t
 
 -- | Evaluate an expression to a bash string.
 evalExpr :: Expr -> Text

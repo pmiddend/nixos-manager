@@ -12,8 +12,6 @@ let
 
       gi-gtk-declarative-app-simple = pkgs.haskell.lib.markUnbroken su.gi-gtk-declarative-app-simple;
 
-      brotli = su.callPackage ./nix/brotli.nix { brotli-pkg = pkgs.brotli; };
-
       "nixos-manager" =
         se.callCabal2nix
           "nixos-manager"

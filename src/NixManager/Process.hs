@@ -38,7 +38,7 @@ import           System.Process                 ( ProcessHandle
                                                 , Pid
                                                 , getPid
                                                 , CreateProcess(..)
-                                                , CmdSpec(ShellCommand)
+                                                , CmdSpec(ShellCommand, RawCommand)
                                                 , StdStream(CreatePipe)
                                                 , terminateProcess
                                                 , interruptProcessGroupOf
@@ -46,7 +46,8 @@ import           System.Process                 ( ProcessHandle
                                                 )
 import           System.IO                      ( Handle )
 import           System.Exit                    ( ExitCode )
-import           NixManager.Bash                ( Expr
+import           NixManager.Bash                ( Expr(Command)
+                                                , argText
                                                 , evalExpr
                                                 )
 import           Data.Text                      ( unpack )
@@ -82,6 +83,7 @@ terminate = terminateProcess . view pdProcessHandle
 
 -- | Convert a Bash expression (see the corresponding module) to a "System.Process" 'CmdSpec'
 exprToCmdSpec :: Expr -> CmdSpec
+exprToCmdSpec (Command x args) = RawCommand (unpack x) (unpack . argText <$> args)
 exprToCmdSpec x = ShellCommand (unpack (evalExpr x))
 
 -- | Signify “I don’t want to pass anything on stdin”. Yeah, I was too lazy for a separate data type here.
