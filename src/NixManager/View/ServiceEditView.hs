@@ -168,7 +168,6 @@ buildServiceRow svc =
 rowSelectionHandler :: Maybe Gtk.ListBoxRow -> Gtk.ListBox -> IO EditViewEvent
 rowSelectionHandler (Just row) _ = do
   selectedIndex <- Gtk.listBoxRowGetIndex row
-  print selectedIndex
   if selectedIndex == -1
     then pure (EditViewSelected Nothing)
     else pure (EditViewSelected (Just (fromIntegral selectedIndex)))
