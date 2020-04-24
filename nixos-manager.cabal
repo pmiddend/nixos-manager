@@ -98,33 +98,33 @@ executable nixos-manager
                      , NixManager.View.ProgressBar
                      , NixManager.View.Root
                      , NixManager.View.ServiceEditView
-  build-depends:       base
+  build-depends:       aeson
+                     , base
+                     , bifunctors
+                     , bytestring
                      , containers
+                     , data-default
+                     , directory
+                     , filepath
                      , gi-gdk
-                     , word-wrap
+                     , gi-gobject
+                     , gi-gtk
+                     , gi-gtk-declarative
+                     , gi-gtk-declarative-app-simple
+                     , haskell-gi-base
+                     , lens
+                     , lens-aeson
+                     , megaparsec
                      , pipes
                      , pretty-relative-time
-                     , scientific
-                     , gi-gobject
-                     , lens
-                     , text
-                     , xml-lens
-                     , xml-conduit
-                     , data-default
-                     , bytestring
-                     , time
-                     , bifunctors
                      , process
-                     , aeson
+                     , scientific
+                     , text
+                     , time
                      , vector
-                     , lens-aeson
-                     , gi-gtk
-                     , haskell-gi-base
-                     , megaparsec
-                     , gi-gtk-declarative-app-simple
-                     , gi-gtk-declarative
-                     , filepath
-                     , directory
+                     , word-wrap
+                     , xml-conduit
+                     , xml-lens
   hs-source-dirs:    src
   default-language:  Haskell2010
   build-tools:       hlint, cabal-install
