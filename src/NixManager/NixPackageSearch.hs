@@ -8,6 +8,7 @@ module NixManager.NixPackageSearch
   )
 where
 
+import Data.Validation(Validation(Failure))
 import           Data.Text                      ( Text )
 import           NixManager.Bash                ( Expr(Command)
                                                 , Arg(LiteralArg)
@@ -54,7 +55,7 @@ searchPackages t = do
     ExitSuccess      -> pure processedResult
     ExitFailure 1    -> pure processedResult
     ExitFailure code -> pure
-      (Left
+      (Failure
         (  "Error executing \"nix search\" command (exit code "
         <> showText code
         <> "): standard error output: "

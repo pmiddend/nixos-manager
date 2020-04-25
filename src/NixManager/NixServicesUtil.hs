@@ -17,6 +17,7 @@ module NixManager.NixServicesUtil
   )
 where
 
+import Data.Validation(Validation(Failure))
 import           Data.Text.Lens                 ( unpacked )
 import           System.Environment             ( getEnv )
 import           Control.Monad                  ( unless )
@@ -121,7 +122,7 @@ locateLocalServicesFileMaybeCreate = do
 readHMOptionsFile :: IO (TextualError NixExpr)
 readHMOptionsFile = locateHMOptionsFile >>= \case
   Nothing -> pure
-    (Left
+    (Failure
       "Couldn't find the options.json path in the manifest.nix file. Have you installed home-manager correctly?"
     )
   Just svcsFile ->

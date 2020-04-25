@@ -32,7 +32,7 @@ import           System.Directory               ( doesFileExist
                                                 , createDirectoryIfMissing
                                                 )
 import           NixManager.Util                ( showText
-                                                , fromEither
+                                                , parseSafe
                                                 , TextualError
                                                 )
 import           Data.Bifunctor                 ( first )
@@ -254,17 +254,15 @@ exprParser =
 
 -- | Parses a 'Text' into a Nix expression (or an error)
 parseNixString :: Text -> TextualError NixExpr
-parseNixString =
-  fromEither . first errorBundlePretty . parse exprParser "string expression"
+parseNixString = parseSafe exprParser "string expression"
 
 -- | Parses a file (which may not exist, in which case a default is returned), returns the containing Nix expression or an error. 
 parseNixFile :: FilePath -> NixExpr -> IO (TextualError NixExpr)
 parseNixFile fn defExpr = do
   exists <- doesFileExist fn
   if exists
-    then
-      fromEither . first errorBundlePretty . parse exprParser fn <$> readFile fn
-    else pure (Right defExpr)
+    then parseSafe exprParser fn <$> readFile fn
+    else pure (pure defExpr)
 
 -- | Write a Nix expression to a file, creating the corresponding directory if it’s missing.
 writeNixFile :: FilePath -> NixExpr -> IO ()

@@ -15,6 +15,7 @@ module NixManager.HMAdmin.GenerationsView
   )
 where
 
+import Data.Validation(Validation(Failure, Success))
 import           GI.Gtk.Declarative.App.Simple  ( Transition(Transition) )
 import           Data.Default                   ( def )
 import           Data.Vector.Lens               ( toVectorOf )
@@ -194,8 +195,8 @@ updateEvent gd EventActivate = Transition
       Just genLine -> do
         activateGeneration genLine
         readGenerations >>= \case
-          Left  e              -> pure (Just (EventGenerationsInvalid e))
-          Right newGenerations -> pure
+          Failure  e              -> pure (Just (EventGenerationsInvalid e))
+          Success newGenerations -> pure
             (Just
               (EventActivationFinished (genLine ^. glId . decodeUtf8)
                                        newGenerations
@@ -209,8 +210,8 @@ updateEvent gd EventRemove = Transition
       Just genLine -> do
         removeGeneration genLine
         readGenerations >>= \case
-          Left e -> pure (Just (EventGenerationsInvalid e))
-          Right newGenerations ->
+          Failure e -> pure (Just (EventGenerationsInvalid e))
+          Success newGenerations ->
             pure
               (Just
                 (EventRemoveFinished (genLine ^. glId . decodeUtf8)
@@ -220,8 +221,8 @@ updateEvent gd EventRemove = Transition
 updateEvent gd EventReload =
   Transition gd (pure . EventReloadFinished <$> readGenerations)
 updateEvent gd (EventReloadFinished newGenerations') = case newGenerations' of
-  Left  e              -> Transition (InvalidGenerationsState e) (pure Nothing)
-  Right newGenerations -> Transition
+  Failure  e              -> Transition (InvalidGenerationsState e) (pure Nothing)
+  Success newGenerations -> Transition
     (  gd
     &  _ValidGenerationsState
     .  gdGenerations

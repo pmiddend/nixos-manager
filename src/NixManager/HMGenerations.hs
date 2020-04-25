@@ -16,6 +16,7 @@ module NixManager.HMGenerations
   )
 where
 
+import Data.Validation(Validation(Failure))
 import           System.Exit                    ( ExitCode(ExitFailure) )
 import           NixManager.Process             ( runProcessToFinish
                                                 , noStdin
@@ -34,7 +35,7 @@ import           NixManager.Bash                ( Expr(Command)
                                                 , Arg(LiteralArg)
                                                 )
 import           NixManager.Util                ( TextualError
-                                                , fromEither
+                                                , parseSafe
                                                 , showText
                                                 , decodeUtf8
                                                 , addToError
@@ -119,7 +120,7 @@ generationLineParser now = do
 
 -- | Parse @home-manager generations@, given the current date, time and time zone
 parseGenerations :: ZonedTime -> ByteString -> TextualError [GenerationLine]
-parseGenerations now = fromEither . first errorBundlePretty . parse
+parseGenerations now = parseSafe
   (generationLineParser now `sepEndBy` newline)
   "home-manager generations"
 
@@ -143,7 +144,7 @@ readGenerations = do
   po <- runProcessToFinish noStdin (Command "home-manager" ["generations"])
   case po ^?! poResult . to getFirst . folded of
     ExitFailure code -> pure
-      (Left
+      (Failure
         (  "Error executing generations query for home-manager. Exit code was: "
         <> showText code
         <> ". The stderr output was:\n\n"

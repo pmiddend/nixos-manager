@@ -16,6 +16,7 @@ module NixManager.Services.State
   )
 where
 
+import Data.Validation(Validation(Success, Failure))
 import           Control.Lens                   ( makePrisms
                                                 , makeLenses
                                                 )
@@ -53,11 +54,11 @@ initState = do
     Just optionsFile -> do
       options' <- readOptionsFile optionsFile
       case options' of
-        Left  e       -> pure (StateInvalidOptions (Just e))
-        Right options -> do
+        Failure  e       -> pure (StateInvalidOptions (Just e))
+        Success options -> do
           services' <- readLocalServiceFile
           case services' of
-            Left e -> pure (StateInvalidExpr e)
-            Right services ->
+            Failure e -> pure (StateInvalidExpr e)
+            Success services ->
               pure $ StateDone
                 (StateData (makeServices options) Nothing services mempty 0)

@@ -16,7 +16,7 @@ module NixManager.NixPackage
 where
 
 import           NixManager.Util                ( TextualError
-                                                , fromEither
+                                                , fromStringEither
                                                 )
 import           Data.ByteString.Lazy           ( ByteString )
 import           Data.Map.Strict                ( Map
@@ -55,7 +55,7 @@ makeLenses ''NixPackage
 -- | Read a package list from a 'ByteString'
 readPackagesJson :: ByteString -> TextualError [NixPackage]
 readPackagesJson =
-  (sortOn _npName <$>) . (packagesFromMap <$>) . fromEither . eitherDecode
+  (sortOn _npName <$>) . (packagesFromMap <$>) . fromStringEither . eitherDecode
 
 -- | Convert a map (like the one @nix search@ returns) into a package list
 packagesFromMap :: Map Text NixPackageMeta -> [NixPackage]

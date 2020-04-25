@@ -13,6 +13,7 @@ module NixManager.Services.Download
   )
 where
 
+import Data.Validation(Validation(Success, Failure))
 import           System.Exit                    ( ExitCode
                                                   ( ExitSuccess
                                                   , ExitFailure
@@ -89,8 +90,8 @@ start = do
           ]
       )
     putMVar resultVar $ case po ^?! poResult . to getFirst of
-      Just ExitSuccess        -> Right optLoc
-      Just (ExitFailure code) -> Left
+      Just ExitSuccess        -> Success optLoc
+      Just (ExitFailure code) -> Failure
         (  "Building the options file failed with error code "
         <> showText code
         <> ", standard error was:\n\n"

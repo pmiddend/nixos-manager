@@ -13,6 +13,7 @@ module NixManager.HMPackages.Update
   )
 where
 
+import Data.Validation(Validation(Failure, Success))
 import           Control.Lens                   ( (&)
                                                 , (^?)
                                                 , (?~)
@@ -113,12 +114,12 @@ updateEvent s (EventPackageEditView (PEV.EventInstall installationType)) =
       do
         installResult <- installPackage selected
         cacheResult   <- readPackageCache
-        case installResult >>= const cacheResult of
-          Right newCache ->
+        case installResult *> cacheResult of
+          Success newCache ->
             pure
               (hmPackagesEvent (EventInstallCompleted newCache installationType)
               )
-          Left e -> pure
+          Failure e -> pure
             (hmPackagesEvent
               (EventOperationCompleted
                 (errorMessage ("Install failed: " <> e))
@@ -133,13 +134,13 @@ updateEvent s (EventPackageEditView (PEV.EventUninstall installationType)) =
       do
         uninstallResult <- uninstallPackage selected
         cacheResult     <- readPackageCache
-        case uninstallResult >>= const cacheResult of
-          Right newCache ->
+        case uninstallResult *> cacheResult of
+          Success newCache ->
             pure
               (hmPackagesEvent
                 (EventUninstallCompleted newCache installationType)
               )
-          Left e -> pure
+          Failure e -> pure
             (hmPackagesEvent
               (EventOperationCompleted
                 (errorMessage ("Uninstall failed: " <> e))
@@ -151,8 +152,8 @@ updateEvent s EventReload = Transition
   do
     cacheResult <- readPackageCache
     case cacheResult of
-      Right newCache -> pure (hmPackagesEvent (EventReloadFinished newCache))
-      Left  e        -> pure
+      Success newCache -> pure (hmPackagesEvent (EventReloadFinished newCache))
+      Failure  e        -> pure
         (hmPackagesEvent
           (EventOperationCompleted
             (errorMessage ("Couldn't reload packages cache: " <> e))

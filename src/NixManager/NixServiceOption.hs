@@ -30,7 +30,7 @@ import           Prelude                 hiding ( readFile )
 import           Data.Map.Strict                ( Map )
 import           NixManager.Util                ( TextualError
                                                 , addToError
-                                                , fromEither
+                                                , fromStringEither
                                                 )
 import           Data.ByteString.Lazy           ( ByteString
                                                 , readFile
@@ -54,7 +54,7 @@ import           Data.Aeson                     ( FromJSON
 data NixServiceOption = NixServiceOption {
    _optionDescription :: Text -- ^ The option description
   , _optionLoc :: NixLocation -- ^ The option location
-  , _optionType :: Either Text NixServiceOptionType -- ^ The type, possibly parsed
+  , _optionType :: TextualError NixServiceOptionType -- ^ The type, possibly parsed
   , _optionValue :: Maybe NixExpr -- ^ The option value, if present
   } deriving(Show)
 
@@ -74,7 +74,7 @@ instance FromJSON NixServiceOption where
 decodeOptions :: ByteString -> TextualError (Map Text NixServiceOption)
 decodeOptions =
   ( addToError "Couldn't read the options JSON file. The error was: "
-    . fromEither
+    . fromStringEither
     )
     . eitherDecode
 

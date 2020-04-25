@@ -102,6 +102,7 @@ executable nixos-manager
                      , base
                      , bifunctors
                      , bytestring
+                     , composition
                      , containers
                      , data-default
                      , directory
@@ -121,6 +122,7 @@ executable nixos-manager
                      , scientific
                      , text
                      , time
+                     , validation
                      , vector
                      , word-wrap
                      , xml-conduit

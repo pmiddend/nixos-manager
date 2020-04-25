@@ -16,6 +16,7 @@ module NixManager.HMPackagesUtil
   )
 where
 
+import Data.Validation(Validation(Success, Failure))
 import           Control.Monad                  ( void )
 import           NixManager.NixPackageSearch    ( searchPackages )
 import           NixManager.Constants           ( appName )
@@ -154,7 +155,7 @@ removePackage p e = e & packageLens . _NixList %~ filter
 modifyPendingPackagesExpr f = ifSuccessIO parsePendingPackagesExpr $ \expr ->
   do
     writePendingPackagesExpr (f expr)
-    pure (Right ())
+    pure (Success ())
 
 -- | Mark a package for installation by writing it into the local packages file.
 installPackage :: NixPackage -> IO (TextualError ())
@@ -168,15 +169,15 @@ uninstallPackage p = modifyPendingPackagesExpr (removePackage p)
 parsePackages :: FilePath -> IO (TextualError [NixLocation])
 parsePackages fp = ifSuccessIO (parsePackagesExpr fp) $ \expr ->
   case expr ^? packageLens of
-    Just packages -> pure (Right (locationFromText <$> evalSymbols packages))
-    Nothing -> pure (Left "Couldn't find packages node in packages.nix file.")
+    Just packages -> pure (Success (locationFromText <$> evalSymbols packages))
+    Nothing -> pure (Failure "Couldn't find packages node in packages.nix file.")
 
 -- | Run an action returning a file path to a Nix file, parse that file and return the contained packages.
 packagesOrEmpty :: IO FilePath -> IO (TextualError [NixLocation])
 packagesOrEmpty fp' = do
   fp       <- fp'
   fpExists <- doesFileExist fp
-  if fpExists then parsePackages fp else pure (Right [])
+  if fpExists then parsePackages fp else pure (Success [])
 
 -- | Read pending Nix package expression
 readPendingPackages :: IO (TextualError [NixLocation])
@@ -201,7 +202,7 @@ readPackageCache = ifSuccessIO (searchPackages "") $ \cache ->
       let addedPackages   = pendingPackages \\ installedPackages
           removedPackages = installedPackages \\ pendingPackages
       pure
-        $   Right
+        $   Success
         $   (\ip -> set
               npStatus
               (evaluateStatus (ip ^. npPath . to (replaceFirstComponent "pkgs"))

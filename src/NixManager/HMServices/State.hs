@@ -17,6 +17,7 @@ import           NixManager.HMServicesUtil      ( readPendingServicesFile
 import           Data.Text                      ( Text )
 import           NixManager.Util                ( showText )
 import           Control.Lens                   ( makePrisms )
+import Data.Validation(Validation(Success, Failure))
 
 data State = NoHomeManager
            | InvalidHomeManager Text
@@ -28,7 +29,7 @@ initState :: IO State
 initState = locateOptionsFile >>= \case
   Nothing              -> pure NoHomeManager
   Just optionsFileName -> readOptionsFile optionsFileName >>= \case
-    Left e -> pure
+    Failure e -> pure
       (InvalidHomeManager
         ("Your local options JSON file is corrupted. Please fix it, or delete it and run “home-manager switch” again. It’s stored in\n\n<tt>"
         <> showText optionsFileName
@@ -37,15 +38,15 @@ initState = locateOptionsFile >>= \case
         <> "</tt>"
         )
       )
-    Right options -> readPendingServicesFile >>= \case
-      Left e -> pure
+    Success options -> readPendingServicesFile >>= \case
+      Failure e -> pure
         (InvalidHomeManager
           ("Your local service Nix configuration is corrupted. Please fix it. The error is: <tt>"
           <> e
           <> "</tt>"
           )
         )
-      Right services -> pure
+      Success services -> pure
         (HomeManagerPresent
           (StateData (makeServices options) Nothing services mempty 0)
         )

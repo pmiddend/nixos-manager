@@ -12,6 +12,7 @@ module NixManager.ManagerMain
   )
 where
 
+import Data.Validation(Validation(Failure, Success))
 import           NixManager.ProgramArguments    ( parseArguments
                                                 , ProgramArguments
                                                 , paUseHomeManager
@@ -53,7 +54,7 @@ initState args
     adminState     <- AdminState.initState
     hmServiceState <- HMServicesState.initState
     hmAdminState   <- HMAdminState.initState
-    pure $ Right $ ManagerState { _msPackagesState   = PackagesState.emptyState
+    pure $ pure $ ManagerState { _msPackagesState   = PackagesState.emptyState
                                 , _msServiceState    = serviceState
                                 , _msAdminState      = adminState
                                 , _msHMServiceState  = hmServiceState
@@ -66,7 +67,7 @@ initState args
     adminState     <- AdminState.initState
     hmServiceState <- HMServicesState.initState
     hmAdminState   <- HMAdminState.initState
-    pure $ Right $ ManagerState
+    pure $ pure $ ManagerState
       { _msPackagesState   = packagesState
       , _msServiceState    = serviceState
       , _msAdminState      = adminState
@@ -83,8 +84,8 @@ nixMain = do
   args          <- parseArguments
   initialState' <- initState args
   case initialState' of
-    Left  e -> runErrorDialog e
-    Right s -> void $ run App { view         = view' args
+    Failure  e -> runErrorDialog e
+    Success s -> void $ run App { view         = view' args
                               , update       = GlobalUpdate.update
                               , inputs       = []
                               , initialState = s

@@ -7,11 +7,14 @@ As a general rule, stuff defined here should not import anything from the manage
 {-# LANGUAGE RankNTypes #-}
 module NixManager.Util where
 
+import Data.Composition((.:.))
+import Text.Megaparsec(errorBundlePretty, parse, Parsec, Stream, ShowErrorComponent)
 import           Data.Char                      ( isUpper
                                                 , toLower
                                                 )
 import           Data.ByteString                ( ByteString )
 import qualified Data.ByteString.Lazy          as BSL
+import Control.Exception(Exception)
 import           Control.Concurrent             ( threadDelay )
 import           Data.String                    ( IsString )
 import           Data.Bifunctor                 ( first )
@@ -45,21 +48,23 @@ import           Control.Lens                   ( Getter
                                                 , to
                                                 )
 import qualified Data.Text.Encoding            as Encoding
+import Data.Validation(Validation(Failure), fromEither, liftError, validation)
+import Data.Foldable(find)
 
 -- | Since we’re working with 'Text' as much as possible, we’re using a text based error type instead of the customary 'Either String'
-type TextualError = Either Text
+type TextualError = Validation Text
 
 -- | Convert something showable to 'Text'. Notably 'String' and @Exception@ types.
-fromShowableError :: Show ex => Either ex e -> TextualError e
-fromShowableError = first showText
+fromExceptionEither :: Exception ex => Either ex e -> TextualError e
+fromExceptionEither = liftError showText
 
+-- | Convert an error to a value, possibly
 toMaybe :: TextualError a -> Maybe a
-toMaybe (Left  _) = Nothing
-toMaybe (Right v) = Just v
+toMaybe = find (const True)
 
 -- | Convert from a'String' error to 'Text'
-fromEither :: Either String e -> TextualError e
-fromEither = first pack
+fromStringEither :: Either String e -> TextualError e
+fromStringEither = liftError pack
 
 -- | More easily chain errors in IO computations
 ifSuccessIO
@@ -67,7 +72,10 @@ ifSuccessIO
   => m (TextualError t)
   -> (t -> m (TextualError a))
   -> m (TextualError a)
-ifSuccessIO v f = v >>= either (pure . Left) f
+ifSuccessIO v f = v >>= validation (pure . Failure) f
+
+parseSafe :: (Stream s, ShowErrorComponent e) => Parsec e s a -> String -> s -> TextualError a
+parseSafe = fromStringEither . first errorBundlePretty .:. parse
 
 -- | Add some (descriptive) prefix text to an error.
 addToError :: Text -> Endo (TextualError a)

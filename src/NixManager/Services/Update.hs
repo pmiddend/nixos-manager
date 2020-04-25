@@ -7,6 +7,7 @@ module NixManager.Services.Update
   )
 where
 
+import Data.Validation(Validation(Failure, Success))
 import           NixManager.ManagerEvent        ( servicesEvent
                                                 , pureTransition
                                                 , ManagerEvent
@@ -81,9 +82,9 @@ updateEvent s (EventDownloadCheck var) =
   Transition (s & msServiceState . _StateDownloading . sddCounter +~ 1) $ do
     downloadResult <- ServiceDownload.result var
     case downloadResult of
-      Just (Left e) ->
+      Just (Failure e) ->
         pure (servicesEvent (EventStateResult (StateInvalidOptions (Just e))))
-      Just (Right _) -> pure (servicesEvent EventStateReload)
+      Just (Success _) -> pure (servicesEvent EventStateReload)
       Nothing ->
         threadDelayMillis 500 >> pure (servicesEvent (EventDownloadCheck var))
 updateEvent s (EventDownloadStarted var) =

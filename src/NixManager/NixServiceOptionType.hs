@@ -31,7 +31,7 @@ import           Text.Megaparsec                ( Parsec
                                                 , (<|>)
                                                 , (<?>)
                                                 )
-import           NixManager.Util
+import           NixManager.Util(fromStringEither, TextualError, parseSafe)
 
 -- | The @options.json@ file contains a type for the option. This is a mini-DSL which is typed here.
 data NixServiceOptionType = NixServiceOptionInteger
@@ -178,9 +178,5 @@ serviceOptionTypeParser =
 
 -- | Parse an @options.json@ option type
 parseNixServiceOptionType :: Text -> TextualError NixServiceOptionType
-parseNixServiceOptionType t = fromEither
-  ( first errorBundlePretty
-  . parse serviceOptionTypeParser "NixOS type expression"
-  $ t
-  )
+parseNixServiceOptionType = parseSafe serviceOptionTypeParser "NixOS type expression"
 

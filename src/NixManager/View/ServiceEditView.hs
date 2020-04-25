@@ -14,6 +14,7 @@ module NixManager.View.ServiceEditView
   )
 where
 
+import Data.Validation(Validation(Success, Failure))
 import           NixManager.Constants           ( globalOptionsMagicString )
 import           NixManager.View.GtkUtil        ( paddedAround
                                                 , expandAndFill
@@ -241,8 +242,8 @@ buildOptionValueCell serviceExpression serviceOption =
     rawChangeEvent "" =
       EditViewSettingChanged (set (optionLens' optionPath) Nothing)
     rawChangeEvent v = case parseNixString v of
-      Left  _ -> EditViewDiscard
-      Right e -> EditViewSettingChanged (set (optionLens' optionPath) (Just e))
+      Failure  _ -> EditViewDiscard
+      Success e -> EditViewSettingChanged (set (optionLens' optionPath) (Just e))
     changeEvent v =
       EditViewSettingChanged (set (optionLens' optionPath) (Just v))
     textLikeEntry inL outL = widget
@@ -252,10 +253,10 @@ buildOptionValueCell serviceExpression serviceOption =
       ]
   in
     case serviceOption ^. optionType of
-      Left e -> widget
+      Failure e -> widget
         Gtk.Label
         [#label := ("Option value \"" <> e <> "\" not implemented yet")]
-      Right NixServiceOptionBoolean ->
+      Success NixServiceOptionBoolean ->
         let changeCallback :: Bool -> (Bool, EditViewEvent)
             changeCallback newValue =
                 (False, changeEvent (NixBoolean newValue))
@@ -265,7 +266,7 @@ buildOptionValueCell serviceExpression serviceOption =
                 := (optionValue ^. pre (traversed . _NixBoolean) . non False)
               , on #stateSet changeCallback
               ]
-      Right (NixServiceOptionOneOfString values) ->
+      Success (NixServiceOptionOneOfString values) ->
         let activeIndex :: Maybe Int
             activeIndex =
                 optionValue
@@ -285,11 +286,11 @@ buildOptionValueCell serviceExpression serviceOption =
               (ComboBoxProperties ("<no value>" : values)
                                   (fromMaybe 0 activeIndex)
               )
-      Right NixServiceOptionPackage   -> textLikeEntry NixSymbol _NixSymbol
-      Right NixServiceOptionSubmodule -> textLikeEntry NixSymbol _NixSymbol
-      Right NixServiceOptionPath      -> textLikeEntry NixSymbol _NixSymbol
-      Right NixServiceOptionString    -> textLikeEntry NixString _NixString
-      Right v                         -> container
+      Success NixServiceOptionPackage   -> textLikeEntry NixSymbol _NixSymbol
+      Success NixServiceOptionSubmodule -> textLikeEntry NixSymbol _NixSymbol
+      Success NixServiceOptionPath      -> textLikeEntry NixSymbol _NixSymbol
+      Success NixServiceOptionString    -> textLikeEntry NixString _NixString
+      Success v                         -> container
         Gtk.Box
         [#orientation := Gtk.OrientationVertical]
         [ widget
@@ -311,8 +312,8 @@ buildOptionValueCell serviceExpression serviceOption =
 -- | Convert the docbook documentation markup to GTK (pango) markup
 convertMarkup :: Text -> Text
 convertMarkup t = case parseDocbook t of
-  Left  e -> "error parsing description: " <> e
-  Right v -> docbookToPango v
+  Failure  e -> "error parsing description: " <> e
+  Success v -> docbookToPango v
 
 -- | Build all the option rows for a selected service, given the whole services Nix expression
 buildOptionRows :: NixExpr -> NixServiceOption -> BoxChild EditViewEvent

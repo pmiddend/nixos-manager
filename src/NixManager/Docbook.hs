@@ -27,7 +27,7 @@ import           Data.Default                   ( def )
 import           NixManager.Util                ( TextualError
                                                 , Endo
                                                 , surroundSimple
-                                                , fromShowableError
+                                                , fromExceptionEither
                                                 , addToError
                                                 )
 import           Control.Lens                   ( view
@@ -49,7 +49,7 @@ import           Data.Text.Lazy                 ( fromStrict )
 parseDocbook :: Text -> TextualError Document
 parseDocbook =
   addToError "error parsing documentation: "
-    . fromShowableError
+    . fromExceptionEither
     . parseText def
     . fromStrict
     . surroundSimple "root" -- the XML parser needs a root element

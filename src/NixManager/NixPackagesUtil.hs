@@ -22,6 +22,7 @@ module NixManager.NixPackagesUtil
   )
 where
 
+import Data.Validation(Validation(Success, Failure))
 import           Data.Text                      ( strip
                                                 , toLower
                                                 , pack
@@ -197,8 +198,8 @@ parsePackagesExpr fp =
 parsePackages :: FilePath -> IO (TextualError [NixLocation])
 parsePackages fp = ifSuccessIO (parsePackagesExpr fp) $ \expr ->
   case expr ^? packageLens of
-    Just packages -> pure (Right (locationFromText <$> evalSymbols packages))
-    Nothing -> pure (Left "Couldn't find packages node in packages.nix file.")
+    Just packages -> pure (Success (locationFromText <$> evalSymbols packages))
+    Nothing -> pure (Failure "Couldn't find packages node in packages.nix file.")
 
 -- | Parse the /local/ packages file, return the Nix expression. Possible creates the packages file.
 parseLocalPackagesExpr :: IO (TextualError NixExpr)
@@ -215,7 +216,7 @@ packagesOrEmpty :: IO FilePath -> IO (TextualError [NixLocation])
 packagesOrEmpty fp' = do
   fp       <- fp'
   fpExists <- doesFileExist fp
-  if fpExists then parsePackages fp else pure (Right [])
+  if fpExists then parsePackages fp else pure (Success [])
 
 -- | Read the /root/ packages file and return the contained packages.
 readInstalledPackages :: IO (TextualError [NixLocation])
@@ -226,21 +227,21 @@ readPendingPackages :: IO (TextualError [NixLocation])
 readPendingPackages =
   ifSuccessIO (packagesOrEmpty locateLocalPackagesFile) $ \local ->
     ifSuccessIO (packagesOrEmpty locateRootPackagesFile)
-      $ \root -> pure (Right (local \\ root))
+      $ \root -> pure (Success (local \\ root))
 
 -- | Read the local and root packages file, compare them and return the packages that are pending uninstallation.
 readPendingUninstallPackages :: IO (TextualError [NixLocation])
 readPendingUninstallPackages =
   ifSuccessIO (packagesOrEmpty locateLocalPackagesFile) $ \local ->
     ifSuccessIO (packagesOrEmpty locateRootPackagesFile)
-      $ \root -> pure (Right (root \\ local))
+      $ \root -> pure (Success (root \\ local))
 
 -- | Mark a package for installation by writing it into the local packages file.
 installPackage :: NixPackage -> IO (TextualError ())
 installPackage p = ifSuccessIO parseLocalPackagesExpr $ \expr -> do
   writeLocalPackages
     (expr & packageLens . _NixList <>~ [NixSymbol (p ^. npPath . flattened)])
-  pure (Right ())
+  pure (Success ())
 
 -- | Mark a package for uninstallation by removing it from the local packages file.
 uninstallPackage :: NixPackage -> IO (TextualError ())
@@ -249,7 +250,7 @@ uninstallPackage p = ifSuccessIO parseLocalPackagesExpr $ \expr -> do
     (expr & packageLens . _NixList %~ filter
       (hasn't (_NixSymbol . only (p ^. npPath . flattened)))
     )
-  pure (Right ())
+  pure (Success ())
 
 -- | Evaluate a package's status given all the packages lists (pending, installed, ...)
 evaluateStatus
@@ -272,7 +273,7 @@ readPackageCache = ifSuccessIO (searchPackages "") $ \cache ->
     ifSuccessIO readPendingPackages $ \pendingPackages ->
       ifSuccessIO readPendingUninstallPackages $ \pendingUninstallPackages ->
         pure
-          $   Right
+          $   Success
           $   (\ip ->
                 ip
                   &  npStatus

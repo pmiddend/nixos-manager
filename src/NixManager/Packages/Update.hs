@@ -11,6 +11,8 @@ module NixManager.Packages.Update
   )
 where
 
+import Data.Functor(($>))
+import Data.Validation(Validation(Failure, Success), bindValidation)
 import           Control.Lens                   ( (&)
                                                 , (?~)
                                                 , (.~)
@@ -109,25 +111,25 @@ updateEvent s (EventPackageEditView (PEV.EventInstall installationType)) =
     Just selected -> Transition s $ do
       installResult <- installPackage selected
       cacheResult   <- readPackageCache
-      case installResult >>= const cacheResult of
-        Right newCache ->
-          pure (packagesEvent (EventInstallCompleted newCache installationType))
-        Left e -> pure
-          (packagesEvent
-            (EventOperationCompleted (errorMessage ("Install failed: " <> e))
-                                     PEV.CompletionReload
+      case installResult *> cacheResult of
+          Success newCache ->
+            pure (packagesEvent (EventInstallCompleted newCache installationType))
+          Failure e -> pure
+            (packagesEvent
+             (EventOperationCompleted (errorMessage ("Install failed: " <> e))
+               PEV.CompletionReload
+             )
             )
-          )
 updateEvent s (EventPackageEditView (PEV.EventUninstall installationType)) =
   case s ^? msPackagesState . PEV.psSelectedPackage of
     Nothing       -> pureTransition s
     Just selected -> Transition s $ do
       uninstallResult <- uninstallPackage selected
       cacheResult     <- readPackageCache
-      case uninstallResult >>= const cacheResult of
-        Right newCache -> pure
+      case uninstallResult *> cacheResult of
+        Success newCache -> pure
           (packagesEvent (EventUninstallCompleted newCache installationType))
-        Left e -> pure
+        Failure e -> pure
           (packagesEvent
             (EventOperationCompleted
               (errorMessage ("Uninstall failed: " <> e))
@@ -137,8 +139,8 @@ updateEvent s (EventPackageEditView (PEV.EventUninstall installationType)) =
 updateEvent s EventReload = Transition s $ do
   cacheResult <- readPackageCache
   case cacheResult of
-    Right newCache -> pure (packagesEvent (EventReloadFinished newCache))
-    Left  e        -> pure
+    Success newCache -> pure (packagesEvent (EventReloadFinished newCache))
+    Failure  e        -> pure
       (packagesEvent
         (EventOperationCompleted
           (errorMessage ("Couldn't reload packages cache: " <> e))

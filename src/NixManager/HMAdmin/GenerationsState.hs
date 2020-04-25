@@ -21,6 +21,7 @@ import           NixManager.HMAdmin.GenerationsData
                                                 )
 import           Data.Text                      ( Text )
 import           Control.Lens                   ( makePrisms )
+import Data.Validation(Validation(Failure, Success))
 
 -- | Current state of the generations view (depends on the success of the @home-manager generations@ call)
 data GenerationsState = ValidGenerationsState GenerationsData
@@ -31,5 +32,5 @@ makePrisms ''GenerationsState
 -- | Initial state for the generations view (tries to read the generations, hence the side-effect)
 initGenerationsState :: IO GenerationsState
 initGenerationsState = readGenerations >>= \case
-  Left  e -> pure (InvalidGenerationsState ("Couldn't read generations: " <> e))
-  Right g -> pure (ValidGenerationsState (GenerationsData Nothing Nothing g))
+  Failure  e -> pure $ InvalidGenerationsState ("Couldn't read generations: " <> e)
+  Success g -> pure $ ValidGenerationsState (GenerationsData Nothing Nothing g)
