@@ -31,8 +31,6 @@ import           System.Exit                    ( ExitCode
                                                 )
 import           NixManager.Process             ( updateProcess
                                                 , terminate
-                                                , poResult
-                                                , poStdout
                                                 )
 import           NixManager.ChangeType          ( ChangeType(Changes, NoChanges)
                                                 )
@@ -44,10 +42,7 @@ import           NixManager.HMAdmin.State       ( rebuildData
                                                 , garbageData
                                                 , changes
                                                 )
-import           NixManager.HMAdmin.GarbageData ( gdBuildState
-                                                , gdProcessOutput
-                                                , gdDetailsState
-                                                )
+import           NixManager.HMAdmin.GarbageData ( GarbageData )
 import           Data.Monoid                    ( getFirst )
 import           Control.Lens                   ( (^.)
                                                 , from
@@ -80,25 +75,14 @@ import           NixManager.HMAdmin.Event       ( Event
                                                   , EventRebuildModeIdxChanged
                                                   )
                                                 )
-import           NixManager.ManagerState        ( ManagerState(..)
-                                                , msHMAdminState
-                                                )
+import           NixManager.ManagerState        ( ManagerState(..) )
 import           NixManager.Util                ( threadDelayMillis )
 import           NixManager.HMRebuild           ( rebuild )
 import           GI.Gtk.Declarative.App.Simple  ( Transition(Transition) )
 import           Prelude                 hiding ( length
                                                 , putStrLn
                                                 )
-import           NixManager.HMAdmin.RebuildData ( rdBuildState
-                                                , rdProcessOutput
-                                                , rdActiveRebuildModeIdx
-                                                , rdDetailsState
-                                                )
-import           NixManager.HMAdmin.BuildState  ( bsProcessData
-                                                , bsCounter
-                                                , bsProcessData
-                                                , BuildState(BuildState)
-                                                )
+import           NixManager.HMAdmin.BuildState  ( BuildState(BuildState) )
 import           NixManager.HMRebuildMode       ( rebuildModeIdx )
 import           NixManager.HMGarbage           ( collectGarbage )
 
@@ -111,23 +95,23 @@ formatExitCode ExitSuccess        = "success"
 updateEvent :: ManagerState -> Event -> Transition ManagerState ManagerEvent
 updateEvent ms (EventGenerations e) = liftUpdate
   GenerationsView.updateEvent
-  (msHMAdminState . generationsState)
+  (#hmAdminState . #generationsState)
   (ManagerEventHMAdmin . EventGenerations)
   ms
   e
 updateEvent ms EventReload =
   Transition ms $ hmAdminEvent . EventReloadFinished <$> determineChanges
 updateEvent ms (EventReloadFinished newChanges) = Transition
-  (ms & msHMAdminState . changes .~ newChanges)
+  (ms & #hmAdminState . #changes .~ newChanges)
   (pure (hmAdminEvent (EventGenerations GenerationsView.EventReload)))
 updateEvent ms EventRebuild = Transition
   ms
   do
     processData <- rebuild
       (  ms
-      ^. msHMAdminState
-      .  rebuildData
-      .  rdActiveRebuildModeIdx
+      ^. #hmAdminState
+      .  #rebuildData
+      .  #activeRebuildModeIdx
       .  from rebuildModeIdx
       )
     pure (hmAdminEvent (EventRebuildStarted processData))
@@ -137,76 +121,64 @@ updateEvent ms EventGarbage = Transition
     processData <- collectGarbage
     pure (hmAdminEvent (EventGarbageStarted processData))
 updateEvent ms EventRebuildCancel = Transition
-  (ms & msHMAdminState . rebuildData . rdBuildState .~ Nothing)
+  (ms & #hmAdminState . #rebuildData . #buildState .~ Nothing)
   do
     for_
-      (  ms
-      ^? msHMAdminState
-      .  rebuildData
-      .  rdBuildState
-      .  folded
-      .  bsProcessData
-      )
+      (ms ^? #hmAdminState . #rebuildData . #buildState . folded . #processData)
       terminate
     pure Nothing
 updateEvent ms EventGarbageCancel = Transition
-  (ms & msHMAdminState . garbageData . gdBuildState .~ Nothing)
+  (ms & #hmAdminState . #garbageData . #buildState .~ Nothing)
   do
     for_
-      (  ms
-      ^? msHMAdminState
-      .  garbageData
-      .  gdBuildState
-      .  folded
-      .  bsProcessData
-      )
+      (ms ^? #hmAdminState . #garbageData . #buildState . folded . #processData)
       terminate
     pure Nothing
 updateEvent ms (EventRebuildStarted pd) =
   Transition
       (  ms
-      &  msHMAdminState
-      .  rebuildData
-      .  rdBuildState
+      &  #hmAdminState
+      .  #rebuildData
+      .  #buildState
       ?~ BuildState 0 pd
-      &  msHMAdminState
-      .  rebuildData
-      .  rdProcessOutput
+      &  #hmAdminState
+      .  #rebuildData
+      .  #processOutput
       .~ mempty
       )
     $ pure (hmAdminEvent (EventRebuildWatch mempty pd))
 updateEvent ms (EventGarbageStarted pd) =
   Transition
       (  ms
-      &  msHMAdminState
-      .  garbageData
-      .  gdBuildState
+      &  #hmAdminState
+      .  #garbageData
+      .  #buildState
       ?~ BuildState 0 pd
-      &  msHMAdminState
-      .  garbageData
-      .  gdProcessOutput
+      &  #hmAdminState
+      .  #garbageData
+      .  #processOutput
       .~ mempty
       )
     $ pure (hmAdminEvent (EventGarbageWatch mempty pd))
 updateEvent ms (EventGarbageWatch priorOutput pd) =
   Transition
       (  ms
-      &  msHMAdminState
-      .  garbageData
-      .  gdProcessOutput
+      &  #hmAdminState
+      .  #garbageData
+      .  #processOutput
       .~ priorOutput
-      &  msHMAdminState
-      .  garbageData
-      .  gdBuildState
+      &  #hmAdminState
+      .  #garbageData
+      .  #buildState
       .  traversed
-      .  bsCounter
+      .  #counter
       +~ 1
       )
     $ do
         -- See the readme about an explanation of why we do this “watch” event stuff
         updates <- updateProcess pd
         let newOutput = priorOutput <> updates
-        case updates ^. poResult . to getFirst of
+        case updates ^. #result . to getFirst of
           Nothing -> do
             threadDelayMillis 500
             pure (hmAdminEvent (EventGarbageWatch newOutput pd))
@@ -215,22 +187,22 @@ updateEvent ms (EventGarbageWatch priorOutput pd) =
 updateEvent ms (EventRebuildWatch priorOutput pd) =
   Transition
       (  ms
-      &  msHMAdminState
-      .  rebuildData
-      .  rdProcessOutput
+      &  #hmAdminState
+      .  #rebuildData
+      .  #processOutput
       .~ priorOutput
-      &  msHMAdminState
-      .  rebuildData
-      .  rdBuildState
+      &  #hmAdminState
+      .  #rebuildData
+      .  #buildState
       .  traversed
-      .  bsCounter
+      .  #counter
       +~ 1
       )
     $ do
         -- See the readme about an explanation of why we do this “watch” event stuff
         updates <- updateProcess pd
         let newOutput = priorOutput <> updates
-        case updates ^. poResult . to getFirst of
+        case updates ^. #result . to getFirst of
           Nothing -> do
             threadDelayMillis 500
             pure (hmAdminEvent (EventRebuildWatch newOutput pd))
@@ -238,33 +210,33 @@ updateEvent ms (EventRebuildWatch priorOutput pd) =
             pure (hmAdminEvent (EventRebuildFinished newOutput code))
 updateEvent ms (EventGarbageFinished totalOutput exitCode) = pureTransition
   (  ms
-  &  msHMAdminState
-  .  garbageData
-  .  gdBuildState
+  &  #hmAdminState
+  .  #garbageData
+  .  #buildState
   .~ Nothing
-  &  msHMAdminState
-  .  garbageData
-  .  gdProcessOutput
+  &  #hmAdminState
+  .  #garbageData
+  .  #processOutput
   .~ (   totalOutput
-     &   poStdout
+     &   #stdout
      <>~ ("\nFinished with " <> formatExitCode exitCode)
      )
   )
 updateEvent ms (EventRebuildFinished totalOutput exitCode) =
   Transition
       (  ms
-      &  msHMAdminState
-      .  rebuildData
-      .  rdBuildState
+      &  #hmAdminState
+      .  #rebuildData
+      .  #buildState
       .~ Nothing
-      &  msHMAdminState
-      .  changes
+      &  #hmAdminState
+      .  #changes
       .~ (if exitCode == ExitSuccess then NoChanges else Changes)
-      &  msHMAdminState
-      .  rebuildData
-      .  rdProcessOutput
+      &  #hmAdminState
+      .  #rebuildData
+      .  #processOutput
       .~ (   totalOutput
-         &   poStdout
+         &   #stdout
          <>~ ("\nFinished with " <> formatExitCode exitCode)
          )
       )
@@ -272,11 +244,11 @@ updateEvent ms (EventRebuildFinished totalOutput exitCode) =
 updateEvent ms (EventRebuildModeIdxChanged newIdx) =
   pureTransition
     $  ms
-    &  msHMAdminState
-    .  rebuildData
-    .  rdActiveRebuildModeIdx
+    &  #hmAdminState
+    .  #rebuildData
+    .  #activeRebuildModeIdx
     .~ newIdx
 updateEvent ms (EventRebuildChangeDetails newDetails) = pureTransition
-  (ms & msHMAdminState . rebuildData . rdDetailsState .~ newDetails)
+  (ms & #hmAdminState . #rebuildData . #detailsState .~ newDetails)
 updateEvent ms (EventGarbageChangeDetails newDetails) = pureTransition
-  (ms & msHMAdminState . garbageData . gdDetailsState .~ newDetails)
+  (ms & #hmAdminState . #garbageData . #detailsState .~ newDetails)

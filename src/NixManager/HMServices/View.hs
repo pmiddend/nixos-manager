@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedLists #-}
 module NixManager.HMServices.View
@@ -32,7 +33,6 @@ import           NixManager.HMServices.State    ( State
                                                 )
 import           NixManager.View.ServiceEditView
                                                 ( editView )
-import           NixManager.ManagerState        ( msHMServiceState )
 
 servicesBox' NoHomeManager _ = bin Gtk.ScrolledWindow [] $ noticeBox
   IconName.DialogError
@@ -54,4 +54,4 @@ servicesBox' (HomeManagerPresent sd) s =
 servicesBox s = container
   Gtk.Box
   []
-  [BoxChild expandAndFill (servicesBox' (s ^. msHMServiceState) s)]
+  [BoxChild expandAndFill (servicesBox' (s ^. #hmServiceState) s)]

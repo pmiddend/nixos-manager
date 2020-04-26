@@ -2,8 +2,9 @@
   Description: Contains all functions relating to the service JSON download
 Contains all functions relating to the service JSON download
   -}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedLabels #-}
 module NixManager.Services.Download
   ( result
   , start
@@ -13,7 +14,8 @@ module NixManager.Services.Download
   )
 where
 
-import Data.Validation(Validation(Success, Failure))
+import           GHC.Generics                   ( Generic )
+import           Data.Validation                ( Validation(Success, Failure) )
 import           System.Exit                    ( ExitCode
                                                   ( ExitSuccess
                                                   , ExitFailure
@@ -27,8 +29,6 @@ import           NixManager.Bash                ( Expr(Command)
                                                 )
 import           NixManager.Process             ( runProcessToFinish
                                                 , noStdin
-                                                , poStderr
-                                                , poResult
                                                 )
 import           NixManager.NixServiceOption    ( desiredOptionsFileLocation )
 import           Control.Exception              ( try
@@ -47,8 +47,7 @@ import           NixManager.Util                ( TextualError
                                                 , decodeUtf8
                                                 , showText
                                                 )
-import           Control.Lens                   ( makeLenses
-                                                , view
+import           Control.Lens                   ( view
                                                 , to
                                                 , (^.)
                                                 , (^?!)
@@ -67,11 +66,9 @@ type DownloadVar = MVar DownloadResult
 
 -- | The current state of the download
 data DownloadState = DownloadState {
-    _sdsVar :: DownloadVar -- ^ The mutex to check
-  , _sdsThreadId :: ThreadId -- ^ The thread we started the download in
-  }
-
-makeLenses ''DownloadState
+    var :: DownloadVar -- ^ The mutex to check
+  , threadId :: ThreadId -- ^ The thread we started the download in
+  } deriving(Generic)
 
 -- | Start the download, return its state
 start :: IO DownloadState
@@ -89,20 +86,20 @@ start = do
           , "with import <nixpkgs> {}; let eval = import (pkgs.path + \"/nixos/lib/eval-config.nix\") { modules = []; }; opts = (nixosOptionsDoc { options = eval.options; }).optionsJSON; in runCommandLocal \"options.json\" { opts = opts; } '' cp \"$opts/share/doc/nixos/options.json\" $out ''"
           ]
       )
-    putMVar resultVar $ case po ^?! poResult . to getFirst of
+    putMVar resultVar $ case po ^?! #result . to getFirst of
       Just ExitSuccess        -> Success optLoc
       Just (ExitFailure code) -> Failure
         (  "Building the options file failed with error code "
         <> showText code
         <> ", standard error was:\n\n"
-        <> (po ^. poStderr . decodeUtf8)
+        <> (po ^. #stderr . decodeUtf8)
         )
   pure (DownloadState resultVar resultThreadId)
 
 -- | Cancel a started download
 cancel :: DownloadState -> IO ()
-cancel = killThread . view sdsThreadId
+cancel = killThread . view #threadId
 
 -- | Return the result of the download, maybe
 result :: DownloadState -> IO (Maybe DownloadResult)
-result = tryTakeMVar . view sdsVar
+result = tryTakeMVar . view #var

@@ -15,7 +15,7 @@ module NixManager.HMAdmin.GenerationsView
   )
 where
 
-import Data.Validation(Validation(Failure, Success))
+import           Data.Validation                ( Validation(Failure, Success) )
 import           GI.Gtk.Declarative.App.Simple  ( Transition(Transition) )
 import           Data.Default                   ( def )
 import           Data.Vector.Lens               ( toVectorOf )
@@ -23,6 +23,8 @@ import           GI.Gtk.Declarative             ( bin
                                                 , container
                                                 , onM
                                                 , Attribute((:=))
+                                                , Widget
+                                                , Bin
                                                 , widget
                                                 , BoxChild(BoxChild)
                                                 , on
@@ -50,22 +52,15 @@ import           NixManager.Message             ( infoMessage
                                                 , Message
                                                 )
 import           NixManager.HMAdmin.GenerationsData
-                                                ( gdGenerations
-                                                , gdMessage
-                                                , gdSelectedGenerationIdx
-                                                , gdSelectedGeneration
-                                                )
+                                                ( selectedGeneration )
 import           NixManager.HMAdmin.GenerationsState
                                                 ( GenerationsState
                                                   ( InvalidGenerationsState
                                                   , ValidGenerationsState
                                                   )
-                                                , _ValidGenerationsState
                                                 )
 import           NixManager.HMGenerations       ( GenerationLine
                                                 , readGenerations
-                                                , glId
-                                                , glDatePretty
                                                 , activateGeneration
                                                 , removeGeneration
                                                 )
@@ -83,11 +78,12 @@ data Event = EventActivate -- ^ Is emitted when the user clicks on the activate 
            | EventReloadFinished (TextualError [GenerationLine]) -- ^ Is emitted when the results of the aforementioned reload are in
 
 -- | Given a generations line, construct the corresponding row in the UI
+buildRow :: GenerationLine -> Bin Gtk.ListBoxRow Event
 buildRow gl =
   let labelText =
-          (  (surroundSimple "b" $ "Generation " <> (gl ^. glId . decodeUtf8))
+          (  (surroundSimple "b" $ "Generation " <> (gl ^. #genId . decodeUtf8))
           <> "\n"
-          <> (surroundSimple "i" $ (gl ^. glDatePretty))
+          <> (surroundSimple "i" $ (gl ^. #datePretty))
           )
       label        = widget Gtk.Label [#label := labelText, #useMarkup := True]
       rowContainer = container Gtk.Box
@@ -105,40 +101,44 @@ rowSelectionHandler _ _ = pure (EventSelectedChanged Nothing)
 
 -- | Constructs the real generations view (after we made sure that we have valid data)
 generationsValidView generationsData =
-  let rows =
-          toVectorOf (gdGenerations . traversed . to buildRow) generationsData
-      listBox =
-          container Gtk.ListBox [onM #rowSelected rowSelectionHandler] rows
-      itemSelected   = has gdSelectedGeneration generationsData
-      activateButton = imageButton
-        [ #label := "Activate"
-        , #alwaysShowImage := True
-        , on #clicked EventActivate
-        , #sensitive := itemSelected
-        , #hexpand := True
-        , #halign := Gtk.AlignFill
-        ]
-        IconName.EmblemDefault
-      removeButton = imageButton
-        [ #label := "Remove"
-        , #alwaysShowImage := True
-        , on #clicked EventRemove
-        , #sensitive := itemSelected
-        , #hexpand := True
-        , #halign := Gtk.AlignFill
-        ]
-        IconName.EditDelete
-      buttonRow = container
-        Gtk.Box
-        [#orientation := Gtk.OrientationHorizontal, #spacing := 5]
-        [ BoxChild expandAndFill activateButton
-        , BoxChild expandAndFill removeButton
-        ]
-      possibleMessage =
-          maybe [] (pure . messageWidget) (generationsData ^. gdMessage)
-  in  container Gtk.Box
-                [#orientation := Gtk.OrientationVertical, #spacing := 5]
-                ([buttonRow] <> possibleMessage <> [listBox])
+  let
+    rows = toVectorOf (#generations . traversed . to buildRow) generationsData
+    listBox = container Gtk.ListBox [onM #rowSelected rowSelectionHandler] rows
+    itemSelected = has selectedGeneration generationsData
+    activateButton = imageButton
+      [ #label := "Activate"
+      , #alwaysShowImage := True
+      , on #clicked EventActivate
+      , #sensitive := itemSelected
+      , #hexpand := True
+      , #halign := Gtk.AlignFill
+      ]
+      IconName.EmblemDefault
+    removeButton = imageButton
+      [ #label := "Remove"
+      , #alwaysShowImage := True
+      , on #clicked EventRemove
+      , #sensitive := itemSelected
+      , #hexpand := True
+      , #halign := Gtk.AlignFill
+      ]
+      IconName.EditDelete
+    buttonRow = container
+      Gtk.Box
+      [#orientation := Gtk.OrientationHorizontal, #spacing := 5]
+      [ BoxChild expandAndFill activateButton
+      , BoxChild expandAndFill removeButton
+      ]
+    possibleMessage =
+      maybe [] (pure . messageWidget) (generationsData ^. #message)
+  in
+    container
+      Gtk.Box
+      [#orientation := Gtk.OrientationVertical, #spacing := 5]
+      (  [BoxChild def buttonRow]
+      <> (BoxChild def <$> possibleMessage)
+      <> [BoxChild def listBox]
+      )
 
 -- | Constructs the generations view, which is possibly in an invalid state 
 generationsView (InvalidGenerationsState message) =
@@ -149,12 +149,12 @@ generationsView (ValidGenerationsState generationsData) =
 -- | Logic for updating the state given an event
 updateEvent :: GenerationsState -> Event -> Transition GenerationsState Event
 updateEvent gd (EventSelectedChanged i) = Transition
-  (set (_ValidGenerationsState . gdSelectedGenerationIdx) i gd)
+  (set (#_ValidGenerationsState . #selectedGenerationIdx) i gd)
   (pure Nothing)
 updateEvent _ (EventGenerationsInvalid errorMessage) =
   Transition (InvalidGenerationsState errorMessage) (pure Nothing)
 updateEvent gd (EventActivationFinished genId newGenerations) = Transition
-  (set (_ValidGenerationsState . gdGenerations) newGenerations gd)
+  (set (#_ValidGenerationsState . #generations) newGenerations gd)
   (pure
     (Just
       (EventDisplayMessage
@@ -164,11 +164,11 @@ updateEvent gd (EventActivationFinished genId newGenerations) = Transition
   )
 updateEvent gd (EventRemoveFinished genId newGenerations) = Transition
   (  gd
-  &  _ValidGenerationsState
-  .  gdGenerations
+  &  #_ValidGenerationsState
+  .  #generations
   .~ newGenerations
-  &  _ValidGenerationsState
-  .  gdSelectedGenerationIdx
+  &  #_ValidGenerationsState
+  .  #selectedGenerationIdx
   .~ Nothing
   )
   (pure
@@ -179,56 +179,55 @@ updateEvent gd (EventRemoveFinished genId newGenerations) = Transition
   )
 updateEvent gd (EventDisplayMessage m) = Transition
   (  gd
-  &  _ValidGenerationsState
-  .  gdMessage
+  &  #_ValidGenerationsState
+  .  #message
   ?~ m
-  &  _ValidGenerationsState
-  .  gdSelectedGenerationIdx
+  &  #_ValidGenerationsState
+  .  #selectedGenerationIdx
   .~ Nothing
   )
   (pure Nothing)
 updateEvent gd EventActivate = Transition
   gd
   do
-    case gd ^? _ValidGenerationsState . gdSelectedGeneration of
+    case gd ^? #_ValidGenerationsState . selectedGeneration of
       Nothing      -> pure Nothing
       Just genLine -> do
         activateGeneration genLine
         readGenerations >>= \case
-          Failure  e              -> pure (Just (EventGenerationsInvalid e))
+          Failure e              -> pure (Just (EventGenerationsInvalid e))
           Success newGenerations -> pure
             (Just
-              (EventActivationFinished (genLine ^. glId . decodeUtf8)
+              (EventActivationFinished (genLine ^. #genId . decodeUtf8)
                                        newGenerations
               )
             )
 updateEvent gd EventRemove = Transition
   gd
   do
-    case gd ^? _ValidGenerationsState . gdSelectedGeneration of
+    case gd ^? #_ValidGenerationsState . selectedGeneration of
       Nothing      -> pure Nothing
       Just genLine -> do
         removeGeneration genLine
         readGenerations >>= \case
-          Failure e -> pure (Just (EventGenerationsInvalid e))
-          Success newGenerations ->
-            pure
-              (Just
-                (EventRemoveFinished (genLine ^. glId . decodeUtf8)
-                                     newGenerations
-                )
+          Failure e              -> pure (Just (EventGenerationsInvalid e))
+          Success newGenerations -> pure
+            (Just
+              (EventRemoveFinished (genLine ^. #genId . decodeUtf8)
+                                   newGenerations
               )
+            )
 updateEvent gd EventReload =
   Transition gd (pure . EventReloadFinished <$> readGenerations)
 updateEvent gd (EventReloadFinished newGenerations') = case newGenerations' of
-  Failure  e              -> Transition (InvalidGenerationsState e) (pure Nothing)
+  Failure e -> Transition (InvalidGenerationsState e) (pure Nothing)
   Success newGenerations -> Transition
     (  gd
-    &  _ValidGenerationsState
-    .  gdGenerations
+    &  #_ValidGenerationsState
+    .  #generations
     .~ newGenerations
-    &  _ValidGenerationsState
-    .  gdSelectedGenerationIdx
+    &  #_ValidGenerationsState
+    .  #selectedGenerationIdx
     .~ Nothing
     )
     (pure Nothing)

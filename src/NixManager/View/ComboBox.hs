@@ -9,7 +9,6 @@ Declarative @ComboBoxText@ wrapper.
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 module NixManager.View.ComboBox
   ( comboBox
   , ComboBoxChangeEvent(ComboBoxChangeEvent)
@@ -40,18 +39,12 @@ import           GI.Gtk.Declarative             ( Widget(Widget)
                                                 )
 import           Data.Text                      ( Text )
 import qualified GI.Gtk                        as Gtk
-import           Control.Lens                   ( makeLenses
-                                                , (^.)
-                                                , to
-                                                )
 
 -- | The ComboBox properties
 data ComboBoxProperties = ComboBoxProperties {
-    _cbpValues :: [Text] -- ^ The possible values (note that, sadly, this isn't a list of pairs (T, Text) or something, just texts; patches welcome!)
-  , _cbpActive :: Int -- ^ The active index in the combobox.
+    values :: [Text] -- ^ The possible values (note that, sadly, this isn't a list of pairs (T, Text) or something, just texts; patches welcome!)
+  , active :: Int -- ^ The active index in the combobox.
   } deriving(Eq)
-
-makeLenses ''ComboBoxProperties
 
 -- | Triggered when the combobox changes its value to a new index
 newtype ComboBoxChangeEvent = ComboBoxChangeEvent Int
@@ -75,8 +68,8 @@ comboBox customAttributes customParams = Widget
   customCreate :: ComboBoxProperties -> IO (Gtk.ComboBoxText, ())
   customCreate props = do
     box <- Gtk.new Gtk.ComboBoxText []
-    forM_ (props ^. cbpValues) $ Gtk.comboBoxTextInsert box (-1) Nothing
-    Gtk.comboBoxSetActive box (props ^. cbpActive . to fromIntegral)
+    forM_ (values props) $ Gtk.comboBoxTextInsert box (-1) Nothing
+    Gtk.comboBoxSetActive box (fromIntegral (active props))
     pure (box, ())
   customSubscribe _params _internalState widget cb = do
     h <-
@@ -89,13 +82,9 @@ comboBox customAttributes customParams = Widget
   customPatch oldParams newParams _
     | oldParams == newParams = CustomKeep
     | otherwise = CustomModify $ \widget -> do
-      when ((oldParams ^. cbpValues) /= (newParams ^. cbpValues)) $ do
+      when (values oldParams /= values newParams) $ do
         Gtk.comboBoxTextRemoveAll widget
-        forM_ (newParams ^. cbpValues)
-          $ Gtk.comboBoxTextInsert widget (-1) Nothing
-      when ((oldParams ^. cbpActive) /= (newParams ^. cbpActive))
-        $ void
-            (Gtk.comboBoxSetActive widget
-                                   (newParams ^. cbpActive . to fromIntegral)
-            )
+        forM_ (values newParams) $ Gtk.comboBoxTextInsert widget (-1) Nothing
+      when (active oldParams /= active newParams) $ void
+        (Gtk.comboBoxSetActive widget (fromIntegral (active newParams)))
 

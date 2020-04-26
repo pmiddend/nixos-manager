@@ -2,34 +2,29 @@
   Description: Contains all data for the garbage collection GUI
 Contains all data for the garbage collection GUI
   -}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveGeneric #-}
 module NixManager.Admin.GarbageData
   ( GarbageData(..)
   , initialGarbageData
-  , gdBuildState
-  , gdProcessOutput
-  , gdDetailsState
-  , gdOlderGenerations
   )
 where
 
-import           Control.Lens                   ( makeLenses )
 import           NixManager.View.DetailsState   ( DetailsState
                                                   ( DetailsContracted
                                                   )
                                                 )
 import           NixManager.Process             ( ProcessOutput )
 import           NixManager.Admin.BuildState    ( BuildState )
+import           Data.Generics.Labels           ( )
+import           GHC.Generics                   ( Generic )
 
 -- | Contains all data for the garbage collection GUI
 data GarbageData = GarbageData {
-    _gdProcessOutput :: ProcessOutput -- ^ Output of the current or last garbage collection process (possibly empty)
-  , _gdBuildState :: Maybe BuildState -- ^ Contains the current build state of the garbage collection
-  , _gdDetailsState :: DetailsState -- ^ Are the Details expanded?
-  , _gdOlderGenerations :: Bool -- ^ Shall we delete older generations?
-  }
-
-makeLenses ''GarbageData
+    processOutput :: ProcessOutput -- ^ Output of the current or last garbage collection process (possibly empty)
+  , buildState :: Maybe BuildState -- ^ Contains the current build state of the garbage collection
+  , detailsState :: DetailsState -- ^ Are the Details expanded?
+  , olderGenerations :: Bool -- ^ Shall we delete older generations?
+  } deriving(Generic)
 
 -- | The initial garbage collection state
 initialGarbageData :: GarbageData

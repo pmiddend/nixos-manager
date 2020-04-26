@@ -3,8 +3,9 @@
 
 Provides a thin layer above "System.Process" - there’s probably something nice out that that can be used instead.
   -}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.Process
   ( ProcessOutput
@@ -16,9 +17,6 @@ module NixManager.Process
   , getProcessId
   , updateProcess
   , noStdin
-  , poResult
-  , poStderr
-  , poStdout
   )
 where
 
@@ -29,8 +27,7 @@ import           Data.ByteString                ( ByteString
                                                 , hPutStr
                                                 , hGetContents
                                                 )
-import           Control.Lens                   ( makeLenses
-                                                , view
+import           Control.Lens                   ( view
                                                 , (^.)
                                                 )
 import           System.Process                 ( ProcessHandle
@@ -56,22 +53,22 @@ import           NixManager.Bash                ( Expr(Command)
 import           Data.Text                      ( unpack )
 import           Data.Text.IO                   ( putStrLn )
 import           Prelude                 hiding ( putStrLn )
+import           GHC.Generics                   ( Generic )
+import           Data.Generics.Labels           ( )
 
 -- | Represents all the data needed to handle a running process
 data ProcessData = ProcessData {
-   _pdStdoutHandle :: Handle -- ^ The handle to stdout
-  , _pdStderrHandle :: Handle -- ^ The handle to stderr
-  , _pdProcessHandle :: ProcessHandle -- ^ The process handle
-  }
-
-makeLenses ''ProcessData
+    stdoutHandle :: Handle -- ^ The handle to stdout
+  , stderrHandle :: Handle -- ^ The handle to stderr
+  , processHandle :: ProcessHandle -- ^ The process handle
+  } deriving(Generic)
 
 -- | Represents output from a process (either “in total” or partially)
 data ProcessOutput = ProcessOutput {
-  _poStdout :: ByteString -- ^ A piece of stdout output
-  , _poStderr :: ByteString -- ^ A piece of stderr output
-  , _poResult :: First ExitCode -- ^ Optional exit code (type chosen so semigroup/monoid works)
-  }
+    stdout :: ByteString -- ^ A piece of stdout output
+  , stderr :: ByteString -- ^ A piece of stderr output
+  , result :: First ExitCode -- ^ Optional exit code (type chosen so semigroup/monoid works)
+  } deriving(Generic)
 
 instance Semigroup ProcessOutput where
   (ProcessOutput a b c) <> (ProcessOutput a' b' c') =
@@ -80,11 +77,9 @@ instance Semigroup ProcessOutput where
 instance Monoid ProcessOutput where
   mempty = ProcessOutput mempty mempty mempty
 
-makeLenses ''ProcessOutput
-
 -- | Terminate the process. In case you’re wondering why this isn’t actually used: I tried this on the sudo processes (like for rebuilding), and this terminate doesn’t throw an exception, /however/, it also doesn’t kill the process. This might just be my misunderstanding of Linux processes.
 terminate :: ProcessData -> IO ()
-terminate = terminateProcess . view pdProcessHandle
+terminate = terminateProcess . view #processHandle
 
 -- | Convert a Bash expression (see the corresponding module) to a "System.Process" 'CmdSpec'
 exprToCmdSpec :: Expr -> CmdSpec
@@ -98,7 +93,7 @@ noStdin = Nothing
 
 -- | Get the processe’s ID (potentially unsafe, though I don’t know under what circumstances)
 getProcessId :: ProcessData -> IO (Maybe Pid)
-getProcessId = getPid . view pdProcessHandle
+getProcessId = getPid . view #processHandle
 
 -- | Start a process, wait for it to finish, and return its result.
 runProcessToFinish :: Maybe ByteString -> Expr -> IO ProcessOutput
@@ -133,15 +128,15 @@ runProcess stdinString command = do
 -- | Wait for the process to finish, return all its (remaining) data.
 waitUntilFinished :: ProcessData -> IO ProcessOutput
 waitUntilFinished pd = do
-  stdout   <- hGetContents (pd ^. pdStdoutHandle)
-  stderr   <- hGetContents (pd ^. pdStderrHandle)
-  exitCode <- waitForProcess (pd ^. pdProcessHandle)
-  pure (ProcessOutput stdout stderr (First (Just exitCode)))
+  stdoutContent <- hGetContents (pd ^. #stdoutHandle)
+  stderrContent <- hGetContents (pd ^. #stderrHandle)
+  exitCode      <- waitForProcess (pd ^. #processHandle)
+  pure (ProcessOutput stdoutContent stderrContent (First (Just exitCode)))
 
 -- | Get some data from the process (for potentially the last time).
 updateProcess :: ProcessData -> IO ProcessOutput
 updateProcess pd = do
-  newStdout   <- hGetNonBlocking (pd ^. pdStdoutHandle) 1024
-  newStderr   <- hGetNonBlocking (pd ^. pdStderrHandle) 1024
-  newExitCode <- getProcessExitCode (pd ^. pdProcessHandle)
+  newStdout   <- hGetNonBlocking (pd ^. #stdoutHandle) 1024
+  newStderr   <- hGetNonBlocking (pd ^. #stderrHandle) 1024
+  newExitCode <- getProcessExitCode (pd ^. #processHandle)
   pure (ProcessOutput newStdout newStderr (First newExitCode))

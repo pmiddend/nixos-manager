@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-|
@@ -17,7 +18,7 @@ module NixManager.NixServicesUtil
   )
 where
 
-import Data.Validation(Validation(Failure))
+import           Data.Validation                ( Validation(Failure) )
 import           Data.Text.Lens                 ( unpacked )
 import           System.Environment             ( getEnv )
 import           Control.Monad                  ( unless )
@@ -46,9 +47,6 @@ import           NixManager.NixExpr             ( NixExpr
                                                   )
                                                 , NixFunction(NixFunction)
                                                 , parseNixFile
-                                                , _NixList
-                                                , _NixSet
-                                                , _NixString
                                                 , writeNixFile
                                                 )
 import           NixManager.Util                ( TextualError
@@ -87,17 +85,17 @@ locateHMOptionsFile = do
       let extractPath :: NixExpr -> Maybe FilePath
           extractPath x =
             x
-              ^? _NixList
+              ^? #_NixList
               .  folded
-              .  _NixSet
+              .  #_NixSet
               .  filteredBy
-                   (at "name" . folded . _NixString . only "home-manager-path")
+                   (at "name" . folded . #_NixString . only "home-manager-path")
               .  at "out"
               .  folded
-              .  _NixSet
+              .  #_NixSet
               .  at "outPath"
               .  folded
-              .  _NixString
+              .  #_NixString
               .  unpacked
           appendFileName :: FilePath -> FilePath
           appendFileName x =

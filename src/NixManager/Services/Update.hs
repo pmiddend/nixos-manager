@@ -2,28 +2,24 @@
   Description: Contains the update logic for the Services tab
 Contains the update logic for the Services tab
   -}
+{-# LANGUAGE OverloadedLabels #-}
 module NixManager.Services.Update
   ( updateEvent
   )
 where
 
-import Data.Validation(Validation(Failure, Success))
+import           Data.Validation                ( Validation(Failure, Success) )
 import           NixManager.ManagerEvent        ( servicesEvent
                                                 , pureTransition
                                                 , ManagerEvent
                                                 )
 import qualified NixManager.View.ServiceEditView
                                                as EditView
-import           NixManager.Services.StateData  ( sdExpression )
 import           NixManager.Services.State      ( State
                                                   ( StateDownloading
                                                   , StateInvalidOptions
                                                   )
-                                                , _StateDone
-                                                , _StateDownloading
-                                                , sddCounter
                                                 , initState
-                                                , sddVar
                                                 , StateDownloadingData
                                                   ( StateDownloadingData
                                                   )
@@ -38,9 +34,7 @@ import           Control.Lens                   ( over
                                                 , (%~)
                                                 , (^?!)
                                                 )
-import           NixManager.ManagerState        ( ManagerState(..)
-                                                , msServiceState
-                                                )
+import           NixManager.ManagerState        ( ManagerState(..) )
 import           NixManager.NixServicesUtil     ( writeLocalServiceFile )
 import           NixManager.Services.Event      ( Event
                                                   ( EventDownloadStart
@@ -64,22 +58,22 @@ updateEvent :: ManagerState -> Event -> Transition ManagerState ManagerEvent
 updateEvent s EventDownloadStart =
   Transition s (servicesEvent . EventDownloadStarted <$> ServiceDownload.start)
 updateEvent s (EventEditView (EditView.EditViewSettingChanged setter)) =
-  let newState = over (msServiceState . _StateDone . sdExpression) setter s
+  let newState = over (#serviceState . #_StateDone . #expression) setter s
   in  Transition newState $ do
         writeLocalServiceFile
-          (newState ^?! msServiceState . _StateDone . sdExpression)
+          (newState ^?! #serviceState . #_StateDone . #expression)
         pure Nothing
 updateEvent s (EventEditView e) =
-  pureTransition (s & msServiceState . _StateDone %~ EditView.updateEvent e)
+  pureTransition (s & #serviceState . #_StateDone %~ EditView.updateEvent e)
 updateEvent s EventDownloadCancel = Transition s $ do
-  for_ (s ^? msServiceState . _StateDownloading . sddVar) ServiceDownload.cancel
+  for_ (s ^? #serviceState . #_StateDownloading . #var) ServiceDownload.cancel
   pure (servicesEvent EventStateReload)
 updateEvent s (EventStateResult newServiceState) =
-  pureTransition (s & msServiceState .~ newServiceState)
+  pureTransition (s & #serviceState .~ newServiceState)
 updateEvent s EventStateReload =
   Transition s (servicesEvent . EventStateResult <$> initState)
 updateEvent s (EventDownloadCheck var) =
-  Transition (s & msServiceState . _StateDownloading . sddCounter +~ 1) $ do
+  Transition (s & #serviceState . #_StateDownloading . #counter +~ 1) $ do
     downloadResult <- ServiceDownload.result var
     case downloadResult of
       Just (Failure e) ->
@@ -89,7 +83,7 @@ updateEvent s (EventDownloadCheck var) =
         threadDelayMillis 500 >> pure (servicesEvent (EventDownloadCheck var))
 updateEvent s (EventDownloadStarted var) =
   Transition
-      (s & msServiceState .~ StateDownloading (StateDownloadingData 0 var))
+      (s & #serviceState .~ StateDownloading (StateDownloadingData 0 var))
     $ do
         threadDelayMillis 500
         pure (servicesEvent (EventDownloadCheck var))

@@ -7,14 +7,19 @@ As a general rule, stuff defined here should not import anything from the manage
 {-# LANGUAGE RankNTypes #-}
 module NixManager.Util where
 
-import Data.Composition((.:.))
-import Text.Megaparsec(errorBundlePretty, parse, Parsec, Stream, ShowErrorComponent)
+import           Data.Composition               ( (.:.) )
+import           Text.Megaparsec                ( errorBundlePretty
+                                                , parse
+                                                , Parsec
+                                                , Stream
+                                                , ShowErrorComponent
+                                                )
 import           Data.Char                      ( isUpper
                                                 , toLower
                                                 )
 import           Data.ByteString                ( ByteString )
 import qualified Data.ByteString.Lazy          as BSL
-import Control.Exception(Exception)
+import           Control.Exception              ( Exception )
 import           Control.Concurrent             ( threadDelay )
 import           Data.String                    ( IsString )
 import           Data.Bifunctor                 ( first )
@@ -48,8 +53,12 @@ import           Control.Lens                   ( Getter
                                                 , to
                                                 )
 import qualified Data.Text.Encoding            as Encoding
-import Data.Validation(Validation(Failure), fromEither, liftError, validation)
-import Data.Foldable(find)
+import           Data.Validation                ( Validation(Failure)
+                                                , fromEither
+                                                , liftError
+                                                , validation
+                                                )
+import           Data.Foldable                  ( find )
 
 -- | Since we’re working with 'Text' as much as possible, we’re using a text based error type instead of the customary 'Either String'
 type TextualError = Validation Text
@@ -74,7 +83,12 @@ ifSuccessIO
   -> m (TextualError a)
 ifSuccessIO v f = v >>= validation (pure . Failure) f
 
-parseSafe :: (Stream s, ShowErrorComponent e) => Parsec e s a -> String -> s -> TextualError a
+parseSafe
+  :: (Stream s, ShowErrorComponent e)
+  => Parsec e s a
+  -> String
+  -> s
+  -> TextualError a
 parseSafe = fromStringEither . first errorBundlePretty .:. parse
 
 -- | Add some (descriptive) prefix text to an error.

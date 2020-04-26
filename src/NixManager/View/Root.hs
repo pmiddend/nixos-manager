@@ -12,9 +12,7 @@ module NixManager.View.Root
   )
 where
 
-import           NixManager.ProgramArguments    ( ProgramArguments
-                                                , paUseHomeManager
-                                                )
+import           NixManager.ProgramArguments    ( ProgramArguments )
 import qualified NixManager.Packages.View      as PackagesView
 import qualified NixManager.Services.View      as ServicesView
 import qualified NixManager.Admin.View         as AdminView
@@ -97,7 +95,7 @@ view' pa s =
                      "Configure your Home"
         )
         (HMServicesView.servicesBox s)
-      windowContents = if pa ^. paUseHomeManager
+      windowContents = if pa ^. #useHomeManager
         then notebook [] [hmAdminTab, hmPackagesTab, hmServicesTab]
         else notebook [] [adminTab, packagesTab, servicesTab]
   in  bin Gtk.Window windowAttributes windowContents

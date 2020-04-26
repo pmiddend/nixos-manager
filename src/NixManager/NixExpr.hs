@@ -2,9 +2,8 @@
   Description: Parser and types for Nix expressions (will be superseded by hnix in due time)
   -}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE DeriveGeneric #-}
 module NixManager.NixExpr
   ( parseNixFile
   , parseNixString
@@ -12,17 +11,6 @@ module NixManager.NixExpr
   , evalSymbols
   , prettyPrintSingleLine
   , NixFunction(NixFunction)
-  , nfArgs
-  , nfExpr
-  , _NixNull
-  , _NixFunctionDecl
-  , _NixSymbol
-  , _NixList
-  , _NixString
-  , _NixBoolean
-  , _NixSet
-  , _NixInt
-  , _NixFloat
   , writeNixFile
   )
 where
@@ -81,13 +69,14 @@ import           Control.Lens                   ( makePrisms
                                                 , traversed
                                                 , (^.)
                                                 )
+import           GHC.Generics                   ( Generic )
+import           Data.Generics.Labels           ( )
 
 -- | All information pertaining to Nix functions. Arguments are simplified to strings here, since we don’t need more, currently.
 data NixFunction = NixFunction {
-    _nfArgs :: [Text]
-  , _nfExpr :: NixExpr
-  } deriving(Show)
-
+    functionArgs :: [Text]
+  , functionExpr :: NixExpr
+  } deriving(Show, Generic)
 
 -- | Type for Nix expressions
 data NixExpr = NixList [NixExpr] -- ^ Nix list, as in @[a b c]@
@@ -99,10 +88,7 @@ data NixExpr = NixList [NixExpr] -- ^ Nix list, as in @[a b c]@
              | NixInt Integer -- ^ Nix integers (is unbounded justified?)
              | NixFloat Double -- ^ Nix floating point values
              | NixNull -- ^ Nix null value
-             deriving(Show)
-
-makePrisms ''NixExpr
-makeLenses ''NixFunction
+             deriving(Show, Generic)
 
 -- | Extract all symbols from a Nix expression (reads all the packages, for example)
 evalSymbols :: NixExpr -> [Text]
@@ -125,9 +111,9 @@ prettyPrint (NixString  s    ) = "\"" <> s <> "\""
 prettyPrint (NixSymbol  s    ) = s
 prettyPrint (NixFunctionDecl fn) =
   "{ "
-    <> intercalate "," (fn ^. nfArgs)
+    <> intercalate "," (fn ^. #functionArgs)
     <> " }: "
-    <> (fn ^. nfExpr . to prettyPrint)
+    <> (fn ^. #functionExpr . to prettyPrint)
 prettyPrint (NixList xs) =
   "[ " <> unwords (xs ^.. traversed . to prettyPrint) <> " ]"
 prettyPrint (NixSet m) =

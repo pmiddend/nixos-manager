@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE RankNTypes #-}
 {-|
   Description: The "root" event type, to be used with the gi-gtk-declarative-app-simple model. The different tabs (notebook pages) use their own events, which are also manager events.
@@ -16,8 +16,7 @@ module NixManager.ManagerEvent
   )
 where
 
-import           Control.Lens                   ( makePrisms
-                                                , (^.)
+import           Control.Lens                   ( (^.)
                                                 , Lens'
                                                 , set
                                                 )
@@ -28,6 +27,7 @@ import qualified NixManager.HMAdmin.Event      as HMAdmin
 import qualified NixManager.HMPackages.Event   as HMPackages
 import qualified NixManager.HMServices.Event   as HMServices
 import           GI.Gtk.Declarative.App.Simple  ( Transition(Transition, Exit) )
+import           GHC.Generics                   ( Generic )
 
 -- | The root event type
 data ManagerEvent = ManagerEventClosed -- ^ Used only for closing the application
@@ -37,9 +37,8 @@ data ManagerEvent = ManagerEventClosed -- ^ Used only for closing the applicatio
                   | ManagerEventPackages Packages.Event -- ^ Specific event for the "Packages" tab (the second one) 
                   | ManagerEventHMServices HMServices.Event -- ^ Specific event for the "Home Manager Services" tab 
                   | ManagerEventHMAdmin HMAdmin.Event -- ^ Specific event for the "Home Manager Services" tab 
-                  | ManagerEventHMPackages HMPackages.Event -- ^ Specific event for the "Home Manager Packages" tab 
-
-makePrisms ''ManagerEvent
+                  | ManagerEventHMPackages HMPackages.Event -- ^ Specific event for the "Home Manager Packages" tab
+                  deriving(Generic)
 
 -- | Shortcut to construct an 'NixManager.Admin.Event' (in a 'Just', simply because of the way 'Transition' is defined)
 adminEvent :: Admin.Event -> Maybe ManagerEvent

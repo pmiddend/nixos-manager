@@ -5,7 +5,6 @@ An icon widget
   -}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedLists #-}
@@ -16,9 +15,6 @@ module NixManager.View.Icon
   )
 where
 
-import           Control.Lens                   ( makeLenses
-                                                , (^.)
-                                                )
 import           GI.Gtk.Declarative.Attributes.Internal
                                                 ( addSignalHandler )
 import           Data.Vector                    ( Vector )
@@ -43,11 +39,9 @@ import           NixManager.View.IconName       ( IconName
 
 -- | An icon’s properties
 data IconProps = IconProps {
-    _ipIconSize :: Gtk.IconSize -- ^ The icon’s desired size
-  , _ipIconName :: IconName -- ^ What icon to display
+    iconSize :: Gtk.IconSize -- ^ The icon’s desired size
+  , iconName :: IconName -- ^ What icon to display
   } deriving(Eq)
-
-makeLenses ''IconProps
 
 -- | Create an icon widget
 icon :: Vector (Attribute Gtk.Image e) -> IconProps -> Widget e
@@ -66,8 +60,8 @@ icon customAttributes customParams = Widget
   customCreate iconProps = do
     -- Taken from https://hackage.haskell.org/package/gi-gtk-3.0.32/docs/src/GI.Gtk.Enums.html#IconSize
     w <- Gtk.imageNewFromIconName
-      (Just (nameToGtk (iconProps ^. ipIconName)))
-      (fromIntegral (fromEnum (iconProps ^. ipIconSize)))
+      (Just (nameToGtk (iconName iconProps)))
+      (fromIntegral (fromEnum (iconSize iconProps)))
     pure (w, ())
   customSubscribe _params _currentImage widget cb =
     foldMap (addSignalHandler cb widget) customAttributes
@@ -75,7 +69,7 @@ icon customAttributes customParams = Widget
     | before == after = CustomKeep
     | otherwise = CustomModify $ \w -> do
       Gtk.imageSetFromIconName w
-                               (Just (nameToGtk (after ^. ipIconName)))
-                               (fromIntegral (fromEnum (after ^. ipIconSize)))
+                               (Just (nameToGtk (iconName after)))
+                               (fromIntegral (fromEnum (iconSize after)))
       pure ()
 

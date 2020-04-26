@@ -2,23 +2,20 @@
   Description: Contains "ProgramArguments" for the manager plus a parser for that
 Contains "ProgramArguments" for the manager plus a parser for that
   -}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE LambdaCase #-}
 module NixManager.ProgramArguments
   ( ProgramArguments
-  , paUseHomeManager
   , parseArguments
   )
 where
 
-import           Control.Lens                   ( makeLenses )
 import           System.Environment             ( getArgs )
+import           GHC.Generics                   ( Generic )
 
 newtype ProgramArguments = ProgramArguments {
-  _paUseHomeManager :: Bool
-  }
-
-makeLenses ''ProgramArguments
+  useHomeManager :: Bool
+  } deriving(Generic)
 
 parseArguments :: IO ProgramArguments
 parseArguments = getArgs >>= \case

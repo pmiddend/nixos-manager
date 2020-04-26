@@ -13,15 +13,13 @@ module NixManager.HMPackages.Update
   )
 where
 
-import Data.Validation(Validation(Failure, Success))
+import           Data.Validation                ( Validation(Failure, Success) )
 import           Control.Lens                   ( (&)
                                                 , (^?)
                                                 , (?~)
                                                 , (.~)
                                                 )
-import           NixManager.ManagerState        ( ManagerState(..)
-                                                , msHMPackagesState
-                                                )
+import           NixManager.ManagerState        ( ManagerState(..) )
 import           NixManager.HMPackages.Event    ( Event
                                                   ( EventOperationCompleted
                                                   , EventInstallCompleted
@@ -70,17 +68,17 @@ uninstallCompletedMessage PEV.Cancelled = infoMessage "Installation cancelled!"
 -- | The actual update function
 updateEvent :: ManagerState -> Event -> Transition ManagerState ManagerEvent
 updateEvent s (EventOperationCompleted e completionType) =
-  Transition (s & msHMPackagesState . PEV.psLatestMessage ?~ e)
+  Transition (s & #hmPackagesState . #latestMessage ?~ e)
     $ case completionType of
         PEV.CompletionReload -> pure (hmAdminEvent HMAdminEvent.EventReload)
         PEV.CompletionPass   -> pure Nothing
 updateEvent s (EventInstallCompleted cache installationType) = Transition
   (  s
-  &  msHMPackagesState
-  .  PEV.psPackageCache
+  &  #hmPackagesState
+  .  #packageCache
   .~ cache
-  &  msHMPackagesState
-  .  PEV.psSelectedIdx
+  &  #hmPackagesState
+  .  #selectedIdx
   .~ Nothing
   )
   (pure
@@ -92,11 +90,11 @@ updateEvent s (EventInstallCompleted cache installationType) = Transition
   )
 updateEvent s (EventUninstallCompleted cache installationType) = Transition
   (  s
-  &  msHMPackagesState
-  .  PEV.psPackageCache
+  &  #hmPackagesState
+  .  #packageCache
   .~ cache
-  &  msHMPackagesState
-  .  PEV.psSelectedIdx
+  &  #hmPackagesState
+  .  #selectedIdx
   .~ Nothing
   )
   (pure
@@ -107,7 +105,7 @@ updateEvent s (EventUninstallCompleted cache installationType) = Transition
     )
   )
 updateEvent s (EventPackageEditView (PEV.EventInstall installationType)) =
-  case s ^? msHMPackagesState . PEV.psSelectedPackage of
+  case s ^? #hmPackagesState . PEV.selectedPackage of
     Nothing       -> pureTransition s
     Just selected -> Transition
       s
@@ -127,7 +125,7 @@ updateEvent s (EventPackageEditView (PEV.EventInstall installationType)) =
               )
             )
 updateEvent s (EventPackageEditView (PEV.EventUninstall installationType)) =
-  case s ^? msHMPackagesState . PEV.psSelectedPackage of
+  case s ^? #hmPackagesState . PEV.selectedPackage of
     Nothing       -> pureTransition s
     Just selected -> Transition
       s
@@ -153,7 +151,7 @@ updateEvent s EventReload = Transition
     cacheResult <- readPackageCache
     case cacheResult of
       Success newCache -> pure (hmPackagesEvent (EventReloadFinished newCache))
-      Failure  e        -> pure
+      Failure e        -> pure
         (hmPackagesEvent
           (EventOperationCompleted
             (errorMessage ("Couldn't reload packages cache: " <> e))
@@ -161,10 +159,10 @@ updateEvent s EventReload = Transition
           )
         )
 updateEvent s (EventReloadFinished newCache) =
-  pureTransition (s & msHMPackagesState . PEV.psPackageCache .~ newCache)
+  pureTransition (s & #hmPackagesState . #packageCache .~ newCache)
 updateEvent s (EventPackageEditView e) = liftUpdate
   PEV.updateEvent
-  msHMPackagesState
+  #hmPackagesState
   (ManagerEventHMPackages . EventPackageEditView)
   s
   e

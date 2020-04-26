@@ -1,10 +1,9 @@
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.HMServices.State
   ( State(..)
   , initState
-  , _HomeManagerPresent
   )
 where
 
@@ -17,13 +16,13 @@ import           NixManager.HMServicesUtil      ( readPendingServicesFile
 import           Data.Text                      ( Text )
 import           NixManager.Util                ( showText )
 import           Control.Lens                   ( makePrisms )
-import Data.Validation(Validation(Success, Failure))
+import           Data.Validation                ( Validation(Success, Failure) )
+import           GHC.Generics                   ( Generic )
 
 data State = NoHomeManager
            | InvalidHomeManager Text
            | HomeManagerPresent StateData
-
-makePrisms ''State
+           deriving(Generic)
 
 initState :: IO State
 initState = locateOptionsFile >>= \case

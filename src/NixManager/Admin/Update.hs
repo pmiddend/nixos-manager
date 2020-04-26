@@ -36,8 +36,6 @@ import           System.Exit                    ( ExitCode
                                                 )
 import           NixManager.Process             ( updateProcess
                                                 , runProcessToFinish
-                                                , poResult
-                                                , poStdout
                                                 , getProcessId
                                                 )
 import           NixManager.Admin.State         ( State
@@ -45,11 +43,6 @@ import           NixManager.Admin.State         ( State
                                                 , rebuildData
                                                 , garbageData
                                                 , determineChanges
-                                                )
-import           NixManager.Admin.GarbageData   ( gdOlderGenerations
-                                                , gdBuildState
-                                                , gdProcessOutput
-                                                , gdDetailsState
                                                 )
 import           Data.Monoid                    ( getFirst )
 import           Control.Lens                   ( (^.)
@@ -86,9 +79,7 @@ import           NixManager.Admin.Event         ( Event
                                                   , EventAskPassWatch
                                                   )
                                                 )
-import           NixManager.ManagerState        ( ManagerState(..)
-                                                , msAdminState
-                                                )
+import           NixManager.ManagerState        ( ManagerState(..) )
 import           NixManager.Util                ( threadDelayMillis )
 import           NixManager.ChangeType          ( ChangeType(NoChanges) )
 import           NixManager.AskPass             ( askPass
@@ -108,19 +99,7 @@ import           NixManager.NixRebuildUpdateMode
                                                   , NixRebuildUpdateNone
                                                   )
                                                 )
-import           NixManager.Admin.RebuildData   ( rdBuildState
-                                                , rdProcessOutput
-                                                , rdActiveRebuildModeIdx
-                                                , rdDoUpdate
-                                                , rdDoRollback
-                                                , rdDetailsState
-                                                )
-import           NixManager.Admin.BuildState    ( bsProcessData
-                                                , bsCounter
-                                                , bsProcessData
-                                                , bsPassword
-                                                , BuildState(BuildState)
-                                                )
+import           NixManager.Admin.BuildState    ( BuildState(BuildState) )
 import           NixManager.Admin.ValidRebuildModes
                                                 ( validRebuildModeIdx )
 
@@ -138,12 +117,12 @@ formatExitCode ExitSuccess        = "success"
 -- | Kill a running process using good olde @kill -9@. You might be wondering why this is done. The thing is, simply terminating the process (via "System.Process") didn’t really /do/ anything to the process. Weird as it seems. This one works — hopefully.
 sudoKillProcess :: BuildState -> IO (Maybe ManagerEvent)
 sudoKillProcess bs = do
-  pid' <- getProcessId (bs ^. bsProcessData)
+  pid' <- getProcessId (bs ^. #processData)
   case pid' of
     Nothing  -> pure Nothing
     Just pid -> do
       _po <- runProcessToFinish
-        (Just (encodeUtf8 (getPassword (bs ^. bsPassword))))
+        (Just (encodeUtf8 (getPassword (bs ^. #password))))
         (sudoExpr (kill pid))
       pure Nothing
 
@@ -157,31 +136,31 @@ updateEvent ms _ EventGarbage = Transition
   ms
   (adminEvent . EventAskPassWatch EventGarbageWithPassword mempty <$> askPass)
 updateEvent ms _ EventRebuildCancel =
-  Transition (ms & msAdminState . rebuildData . rdBuildState .~ Nothing) $ maybe
+  Transition (ms & #adminState . #rebuildData . #buildState .~ Nothing) $ maybe
     (pure Nothing)
     sudoKillProcess
-    (ms ^. msAdminState . rebuildData . rdBuildState)
+    (ms ^. #adminState . #rebuildData . #buildState)
 updateEvent ms _ EventGarbageCancel =
-  Transition (ms & msAdminState . garbageData . gdBuildState .~ Nothing) $ maybe
+  Transition (ms & #adminState . #garbageData . #buildState .~ Nothing) $ maybe
     (pure Nothing)
     sudoKillProcess
-    (ms ^. msAdminState . garbageData . gdBuildState)
+    (ms ^. #adminState . #garbageData . #buildState)
 updateEvent ms _ (EventGarbageWithPassword password) = Transition ms $ do
   garbagePo <- collectGarbage
-    (ms ^. msAdminState . garbageData . gdOlderGenerations)
+    (ms ^. #adminState . #garbageData . #olderGenerations)
     password
   pure (adminEvent (EventGarbageStarted garbagePo password))
 updateEvent ms _ (EventRebuildWithPassword password) = Transition ms $ do
   rebuildPo <- rebuild
     (  ms
-    ^. msAdminState
-    .  rebuildData
-    .  rdActiveRebuildModeIdx
+    ^. #adminState
+    .  #rebuildData
+    .  #activeRebuildModeIdx
     .  from validRebuildModeIdx
     )
     (calculateRebuildUpdateMode
-      (ms ^. msAdminState . rebuildData . rdDoUpdate)
-      (ms ^. msAdminState . rebuildData . rdDoRollback)
+      (ms ^. #adminState . #rebuildData . #doUpdate)
+      (ms ^. #adminState . #rebuildData . #doRollback)
     )
     password
   pure (adminEvent (EventRebuildStarted rebuildPo password))
@@ -189,59 +168,58 @@ updateEvent ms _ (EventAskPassWatch andThen po pd) = Transition ms $ do
   -- See the readme about an explanation of why we do this “watch” event stuff
   newpo <- updateProcess pd
   let totalPo = po <> newpo
-  case totalPo ^. poResult . to getFirst of
+  case totalPo ^. #result . to getFirst of
     Nothing -> do
       threadDelayMillis 500
       pure (adminEvent (EventAskPassWatch andThen totalPo pd))
-    Just ExitSuccess ->
-      pure
-        (adminEvent (andThen (Password (totalPo ^. poStdout . to decodeUtf8))))
+    Just ExitSuccess -> pure
+      (adminEvent (andThen (Password (totalPo ^. #stdout . to decodeUtf8))))
     Just (ExitFailure _) -> pure Nothing
 updateEvent ms _ (EventRebuildStarted pd password) =
   Transition
       (  ms
-      &  msAdminState
-      .  rebuildData
-      .  rdBuildState
+      &  #adminState
+      .  #rebuildData
+      .  #buildState
       ?~ BuildState 0 pd password
-      &  msAdminState
-      .  rebuildData
-      .  rdProcessOutput
+      &  #adminState
+      .  #rebuildData
+      .  #processOutput
       .~ mempty
       )
     $ pure (adminEvent (EventRebuildWatch password mempty pd))
 updateEvent ms _ (EventGarbageStarted pd password) =
   Transition
       (  ms
-      &  msAdminState
-      .  garbageData
-      .  gdBuildState
+      &  #adminState
+      .  #garbageData
+      .  #buildState
       ?~ BuildState 0 pd password
-      &  msAdminState
-      .  garbageData
-      .  gdProcessOutput
+      &  #adminState
+      .  #garbageData
+      .  #processOutput
       .~ mempty
       )
     $ pure (adminEvent (EventGarbageWatch mempty pd))
 updateEvent ms _ (EventGarbageWatch priorOutput pd) =
   Transition
       (  ms
-      &  msAdminState
-      .  garbageData
-      .  gdProcessOutput
+      &  #adminState
+      .  #garbageData
+      .  #processOutput
       .~ priorOutput
-      &  msAdminState
-      .  garbageData
-      .  gdBuildState
+      &  #adminState
+      .  #garbageData
+      .  #buildState
       .  traversed
-      .  bsCounter
+      .  #counter
       +~ 1
       )
     $ do
         -- See the readme about an explanation of why we do this “watch” event stuff
         updates <- updateProcess pd
         let newOutput = priorOutput <> updates
-        case updates ^. poResult . to getFirst of
+        case updates ^. #result . to getFirst of
           Nothing -> do
             threadDelayMillis 500
             pure (adminEvent (EventGarbageWatch newOutput pd))
@@ -249,22 +227,22 @@ updateEvent ms _ (EventGarbageWatch priorOutput pd) =
 updateEvent ms _ (EventRebuildWatch password priorOutput pd) =
   Transition
       (  ms
-      &  msAdminState
-      .  rebuildData
-      .  rdProcessOutput
+      &  #adminState
+      .  #rebuildData
+      .  #processOutput
       .~ priorOutput
-      &  msAdminState
-      .  rebuildData
-      .  rdBuildState
+      &  #adminState
+      .  #rebuildData
+      .  #buildState
       .  traversed
-      .  bsCounter
+      .  #counter
       +~ 1
       )
     $ do
         -- See the readme about an explanation of why we do this “watch” event stuff
         updates <- updateProcess pd
         let newOutput = priorOutput <> updates
-        case updates ^. poResult . to getFirst of
+        case updates ^. #result . to getFirst of
           Nothing -> do
             threadDelayMillis 500
             pure (adminEvent (EventRebuildWatch password newOutput pd))
@@ -275,74 +253,74 @@ updateEvent ms _ (EventRebuildWatch password priorOutput pd) =
             pure (adminEvent (EventRebuildFinished newOutput code))
 updateEvent ms _ (EventGarbageFinished totalOutput exitCode) = pureTransition
   (  ms
-  &  msAdminState
-  .  garbageData
-  .  gdBuildState
+  &  #adminState
+  .  #garbageData
+  .  #buildState
   .~ Nothing
-  &  msAdminState
-  .  garbageData
-  .  gdProcessOutput
+  &  #adminState
+  .  #garbageData
+  .  #processOutput
   .~ (   totalOutput
-     &   poStdout
+     &   #stdout
      <>~ ("\nFinished with " <> formatExitCode exitCode)
      )
   )
 updateEvent ms _ (EventRebuildFinished totalOutput exitCode) =
   Transition
       (  ms
-      &  msAdminState
-      .  rebuildData
-      .  rdBuildState
+      &  #adminState
+      .  #rebuildData
+      .  #buildState
       .~ Nothing
-      &  msAdminState
-      .  rebuildData
-      .  rdProcessOutput
+      &  #adminState
+      .  #rebuildData
+      .  #processOutput
       .~ (   totalOutput
-         &   poStdout
+         &   #stdout
          <>~ ("\nFinished with " <> formatExitCode exitCode)
          )
-      &  msAdminState
-      .  changes
+      &  #adminState
+      .  #changes
       .~ NoChanges
       )
     $ pure (packagesEvent PackagesEvent.EventReload)
 updateEvent ms _ (EventRebuildModeIdxChanged newIdx) =
   pureTransition
     $  ms
-    &  msAdminState
-    .  rebuildData
-    .  rdActiveRebuildModeIdx
+    &  #adminState
+    .  #rebuildData
+    .  #activeRebuildModeIdx
     .~ newIdx
-updateEvent ms _ (EventRebuildChangeDetails newDetails) = pureTransition
-  (ms & msAdminState . rebuildData . rdDetailsState .~ newDetails)
-updateEvent ms _ (EventGarbageChangeDetails newDetails) = pureTransition
-  (ms & msAdminState . garbageData . gdDetailsState .~ newDetails)
+updateEvent ms _ (EventRebuildChangeDetails newDetails) =
+  pureTransition (ms & #adminState . #rebuildData . #detailsState .~ newDetails)
+updateEvent ms _ (EventGarbageChangeDetails newDetails) =
+  pureTransition (ms & #adminState . #garbageData . #detailsState .~ newDetails)
 updateEvent ms _ EventReload =
   Transition ms $ adminEvent . EventReloadFinished <$> determineChanges
 updateEvent ms _ (EventReloadFinished newChanges) =
-  pureTransition (ms & msAdminState . changes .~ newChanges)
+  pureTransition (ms & #adminState . #changes .~ newChanges)
 updateEvent ms _ (EventRebuildDoUpdateChanged newUpdate) = pureTransition
   (  ms
-  &  msAdminState
-  .  rebuildData
-  .  rdDoUpdate
+  &  #adminState
+  .  #rebuildData
+  .  #doUpdate
   .~ newUpdate
-  &  msAdminState
-  .  rebuildData
-  .  rdDoRollback
+  &  #adminState
+  .  #rebuildData
+  .  #doRollback
   .~ False
   )
 updateEvent ms _ (EventRebuildDoRollbackChanged newRollback) = pureTransition
   (  ms
-  &  msAdminState
-  .  rebuildData
-  .  rdDoUpdate
+  &  #adminState
+  .  #rebuildData
+  .  #doUpdate
   .~ False
-  &  msAdminState
-  .  rebuildData
-  .  rdDoRollback
+  &  #adminState
+  .  #rebuildData
+  .  #doRollback
   .~ newRollback
   )
 updateEvent ms _ (EventGarbageOlderGenerationsChanged newOldGen) =
   pureTransition
-    (ms & msAdminState . garbageData . gdOlderGenerations .~ newOldGen)
+    (ms & #adminState . #garbageData . #olderGenerations .~ newOldGen)

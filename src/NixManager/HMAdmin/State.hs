@@ -1,5 +1,5 @@
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-|
   Description: Contains all the state for the home-manager Administration tab
   -}
@@ -14,9 +14,9 @@ module NixManager.HMAdmin.State
   )
 where
 
+import           GHC.Generics                   ( Generic )
 import           NixManager.ChangeType          ( ChangeType(Changes, NoChanges)
                                                 )
-import           Control.Lens                   ( makeLenses )
 import           NixManager.HMAdmin.RebuildData ( RebuildData
                                                 , initialRebuildData
                                                 )
@@ -37,13 +37,11 @@ import           NixManager.HMAdmin.GenerationsState
 
 -- | Contains all the state for the administration tab
 data State = State {
-    _rebuildData :: RebuildData -- ^ The “Rebuild” GUI state
-  , _garbageData :: GarbageData -- ^ The “Collect garbage” GUI state
-  , _changes :: ChangeType -- ^ Information about whether we have unapplied changes
-  , _generationsState :: GenerationsState -- ^ Information about home-manager generations
-  }
-
-makeLenses ''State
+    rebuildData :: RebuildData -- ^ The “Rebuild” GUI state
+  , garbageData :: GarbageData -- ^ The “Collect garbage” GUI state
+  , changes :: ChangeType -- ^ Information about whether we have unapplied changes
+  , generationsState :: GenerationsState -- ^ Information about home-manager generations
+  } deriving(Generic)
 
 -- | Determine if there are changes that have to be applied.
 determineChanges :: IO ChangeType

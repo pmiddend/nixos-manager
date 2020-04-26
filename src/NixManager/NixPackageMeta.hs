@@ -3,32 +3,27 @@
 Metadata for a Nix package. This is a companion module to "NixManager.NixPackage"
   -}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveGeneric #-}
 module NixManager.NixPackageMeta
   ( NixPackageMeta(NixPackageMeta)
-  , npmName
-  , npmVersion
-  , npmDescription
   )
 where
 
 import           Control.Monad                  ( mzero )
-import           Control.Lens                   ( makeLenses )
 import           Data.Text                      ( Text )
 import           Data.Aeson                     ( FromJSON
                                                 , Value(Object)
                                                 , parseJSON
                                                 , (.:)
                                                 )
+import           GHC.Generics                   ( Generic )
 
 -- | Metadata for a Nix package. This is a companion module to "NixManager.NixPackage"
 data NixPackageMeta = NixPackageMeta {
-    _npmName :: Text -- ^ Package name
-  , _npmVersion :: Text -- ^ Package version
-  , _npmDescription :: Text -- ^ Package description
-  } deriving(Eq,Show)
-
-makeLenses ''NixPackageMeta
+    name :: Text -- ^ Package name
+  , version :: Text -- ^ Package version
+  , description :: Text -- ^ Package description
+  } deriving(Eq,Show, Generic)
 
 instance FromJSON NixPackageMeta where
   parseJSON (Object v) =

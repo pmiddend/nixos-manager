@@ -3,6 +3,7 @@
 Functions to process (install/uninstall, ...) Nix packages
   -}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module NixManager.NixPackagesUtil
@@ -22,7 +23,7 @@ module NixManager.NixPackagesUtil
   )
 where
 
-import Data.Validation(Validation(Success, Failure))
+import           Data.Validation                ( Validation(Success, Failure) )
 import           Data.Text                      ( strip
                                                 , toLower
                                                 , pack
@@ -71,14 +72,9 @@ import           NixManager.NixExpr             ( NixExpr
                                                   , NixFunctionDecl
                                                   )
                                                 , NixFunction(NixFunction)
-                                                , _NixFunctionDecl
-                                                , nfExpr
-                                                , _NixSymbol
                                                 , evalSymbols
-                                                , _NixSet
                                                 , parseNixFile
                                                 , writeNixFile
-                                                , _NixList
                                                 )
 import           Control.Exception              ( catch
                                                 , IOException
@@ -90,11 +86,7 @@ import           NixManager.NixPackageStatus    ( NixPackageStatus
                                                   , NixPackagePendingUninstall
                                                   )
                                                 )
-import           NixManager.NixPackage          ( NixPackage
-                                                , npPath
-                                                , npName
-                                                , npStatus
-                                                )
+import           NixManager.NixPackage          ( NixPackage )
 import           Control.Lens                   ( (^.)
                                                 , (.~)
                                                 , (^?)
@@ -125,7 +117,7 @@ matchName pkgName bins =
 -- | Build the package (invoking @nix-build@). The returned stdout can then be inspected for the path.
 dryInstall :: NixPackage -> IO ProcessData
 dryInstall pkg =
-  let realPath = pkg ^. npPath . flattenedTail
+  let realPath = pkg ^. #path . flattenedTail
   in  runProcess
         Nothing
         (Command "nix-build"
@@ -139,7 +131,7 @@ executablesFromStorePath pkg stdout = do
   let packagePath = stdout ^. decodeUtf8 . to strip . unpacked
   let binPath     = packagePath </> "bin"
   bins <- listDirectory binPath `catch` \(_ :: IOException) -> pure []
-  let normalizedName = pkg ^. npName . to toLower . unpacked
+  let normalizedName = pkg ^. #name . to toLower . unpacked
   case matchName normalizedName bins of
     Nothing      -> pure (binPath, bins)
     Just matched -> pure (binPath, [matched])
@@ -151,7 +143,7 @@ startProgram fn = void (runProcess Nothing (Command (pack fn) []))
 -- | Lens to extract the list of packages inside a Nix expression
 packageLens :: Traversal' NixExpr NixExpr
 packageLens =
-  _NixFunctionDecl . nfExpr . _NixSet . ix "environment.systemPackages"
+  #_NixFunctionDecl . #functionExpr . #_NixSet . ix "environment.systemPackages"
 
 -- | The initial, empty packages file (containing, of course, no packages)
 emptyPackagesFile :: NixExpr
@@ -199,7 +191,8 @@ parsePackages :: FilePath -> IO (TextualError [NixLocation])
 parsePackages fp = ifSuccessIO (parsePackagesExpr fp) $ \expr ->
   case expr ^? packageLens of
     Just packages -> pure (Success (locationFromText <$> evalSymbols packages))
-    Nothing -> pure (Failure "Couldn't find packages node in packages.nix file.")
+    Nothing ->
+      pure (Failure "Couldn't find packages node in packages.nix file.")
 
 -- | Parse the /local/ packages file, return the Nix expression. Possible creates the packages file.
 parseLocalPackagesExpr :: IO (TextualError NixExpr)
@@ -240,15 +233,15 @@ readPendingUninstallPackages =
 installPackage :: NixPackage -> IO (TextualError ())
 installPackage p = ifSuccessIO parseLocalPackagesExpr $ \expr -> do
   writeLocalPackages
-    (expr & packageLens . _NixList <>~ [NixSymbol (p ^. npPath . flattened)])
+    (expr & packageLens . #_NixList <>~ [NixSymbol (p ^. #path . flattened)])
   pure (Success ())
 
 -- | Mark a package for uninstallation by removing it from the local packages file.
 uninstallPackage :: NixPackage -> IO (TextualError ())
 uninstallPackage p = ifSuccessIO parseLocalPackagesExpr $ \expr -> do
   writeLocalPackages
-    (expr & packageLens . _NixList %~ filter
-      (hasn't (_NixSymbol . only (p ^. npPath . flattened)))
+    (expr & packageLens . #_NixList %~ filter
+      (hasn't (#_NixSymbol . only (p ^. #path . flattened)))
     )
   pure (Success ())
 
@@ -276,8 +269,8 @@ readPackageCache = ifSuccessIO (searchPackages "") $ \cache ->
           $   Success
           $   (\ip ->
                 ip
-                  &  npStatus
-                  .~ evaluateStatus (ip ^. npPath)
+                  &  #status
+                  .~ evaluateStatus (ip ^. #path)
                                     installedPackages
                                     pendingPackages
                                     pendingUninstallPackages

@@ -3,6 +3,7 @@
 Functions to process (install/uninstall, ...) home-manager packages
   -}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module NixManager.HMPackagesUtil
@@ -16,7 +17,7 @@ module NixManager.HMPackagesUtil
   )
 where
 
-import Data.Validation(Validation(Success, Failure))
+import           Data.Validation                ( Validation(Success, Failure) )
 import           Control.Monad                  ( void )
 import           NixManager.NixPackageSearch    ( searchPackages )
 import           NixManager.Constants           ( appName )
@@ -49,14 +50,9 @@ import           NixManager.NixExpr             ( NixExpr
                                                   , NixFunctionDecl
                                                   )
                                                 , NixFunction(NixFunction)
-                                                , _NixFunctionDecl
-                                                , nfExpr
-                                                , _NixSymbol
                                                 , evalSymbols
-                                                , _NixSet
                                                 , parseNixFile
                                                 , writeNixFile
-                                                , _NixList
                                                 )
 import           NixManager.NixPackageStatus    ( NixPackageStatus
                                                   ( NixPackageNothing
@@ -65,10 +61,7 @@ import           NixManager.NixPackageStatus    ( NixPackageStatus
                                                   , NixPackagePendingUninstall
                                                   )
                                                 )
-import           NixManager.NixPackage          ( NixPackage
-                                                , npPath
-                                                , npStatus
-                                                )
+import           NixManager.NixPackage          ( NixPackage )
 import           Control.Lens                   ( (^.)
                                                 , to
                                                 , set
@@ -130,24 +123,22 @@ writePendingPackagesExpr e = do
 
 -- | Lens to extract the list of packages inside a Nix expression
 packageLens :: Traversal' NixExpr NixExpr
-packageLens = _NixFunctionDecl . nfExpr . _NixSet . ix "home.packages"
+packageLens = #_NixFunctionDecl . #functionExpr . #_NixSet . ix "home.packages"
 
 -- | Append a package into the packages list
 appendPackage :: NixPackage -> Endo NixExpr
 appendPackage p e =
   e
     &   packageLens
-    .   _NixList
-    <>~ [ NixSymbol
-            (p ^. npPath . to (replaceFirstComponent "pkgs") . flattened)
-        ]
+    .   #_NixList
+    <>~ [NixSymbol (p ^. #path . to (replaceFirstComponent "pkgs") . flattened)]
 
 -- | Remove a package from a package Nix expxression
 removePackage :: NixPackage -> Endo NixExpr
-removePackage p e = e & packageLens . _NixList %~ filter
+removePackage p e = e & packageLens . #_NixList %~ filter
   (hasn't
-    ( _NixSymbol
-    . only (p ^. npPath . to (replaceFirstComponent "pkgs") . flattened)
+    ( #_NixSymbol
+    . only (p ^. #path . to (replaceFirstComponent "pkgs") . flattened)
     )
   )
 
@@ -170,7 +161,8 @@ parsePackages :: FilePath -> IO (TextualError [NixLocation])
 parsePackages fp = ifSuccessIO (parsePackagesExpr fp) $ \expr ->
   case expr ^? packageLens of
     Just packages -> pure (Success (locationFromText <$> evalSymbols packages))
-    Nothing -> pure (Failure "Couldn't find packages node in packages.nix file.")
+    Nothing ->
+      pure (Failure "Couldn't find packages node in packages.nix file.")
 
 -- | Run an action returning a file path to a Nix file, parse that file and return the contained packages.
 packagesOrEmpty :: IO FilePath -> IO (TextualError [NixLocation])
@@ -204,8 +196,8 @@ readPackageCache = ifSuccessIO (searchPackages "") $ \cache ->
       pure
         $   Success
         $   (\ip -> set
-              npStatus
-              (evaluateStatus (ip ^. npPath . to (replaceFirstComponent "pkgs"))
+              #status
+              (evaluateStatus (ip ^. #path . to (replaceFirstComponent "pkgs"))
                               installedPackages
                               addedPackages
                               removedPackages

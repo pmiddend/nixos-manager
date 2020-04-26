@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-|
   Description: Contains all the state for the Administration tab
@@ -6,9 +6,6 @@ Contains all the state for the Administration tab
   -}
 module NixManager.Admin.State
   ( State(..)
-  , changes
-  , rebuildData
-  , garbageData
   , initState
   , determineChanges
   )
@@ -16,7 +13,6 @@ where
 
 import           NixManager.ChangeType          ( ChangeType(Changes, NoChanges)
                                                 )
-import           Control.Lens                   ( makeLenses )
 import           NixManager.Admin.RebuildData   ( RebuildData
                                                 , initialRebuildData
                                                 )
@@ -30,16 +26,15 @@ import           NixManager.NixPackagesUtil     ( locateLocalPackagesFile
                                                 , locateRootPackagesFile
                                                 )
 import           NixManager.Util                ( determineFilesEqual )
+import           Data.Generics.Labels           ( )
+import           GHC.Generics                   ( Generic )
 
 -- | Contains all the state for the administration tab
 data State = State {
-    _rebuildData :: RebuildData -- ^ The “Rebuild” GUI state
-  , _garbageData :: GarbageData -- ^ The “Collect garbage” GUI state
-  , _changes :: ChangeType -- ^ Information about whether we have unapplied changes
-  }
-
-makeLenses ''State
-
+    rebuildData :: RebuildData -- ^ The “Rebuild” GUI state
+  , garbageData :: GarbageData -- ^ The “Collect garbage” GUI state
+  , changes :: ChangeType -- ^ Information about whether we have unapplied changes
+  } deriving(Generic)
 
 -- | Determine if there are changes that have to be applied.
 determineChanges :: IO ChangeType

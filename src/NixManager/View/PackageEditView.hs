@@ -3,10 +3,11 @@
 Contains the actual GUI (widgets) for the package edit tabs
   -}
 {-# LANGUAGE OverloadedLabels #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedLists #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 module NixManager.View.PackageEditView
@@ -15,31 +16,16 @@ module NixManager.View.PackageEditView
   , State(..)
   , InstallationType(..)
   , emptyState
+  , selectedPackage
   , CompletionType(..)
   , Event(..)
   , InstallingState(..)
   , initState
-  , psSearchString
-  , psSearchResult
-  , psSelectedPackage
-  , psLatestMessage
-  , isPackage
-  , isCounter
-  , isProcessData
-  , psInstallingPackage
-  , psPackageCache
-  , psCategory
-  , psSelectedIdx
-  , psCategoryIdx
   )
 where
 
-
-import           NixManager.Process             ( updateProcess
-                                                , poResult
-                                                , poStderr
-                                                , poStdout
-                                                )
+import           GHC.Generics                   ( Generic )
+import           NixManager.Process             ( updateProcess )
 import           Data.Monoid                    ( getFirst )
 import           NixManager.Message             ( errorMessage
                                                 , infoMessage
@@ -62,7 +48,6 @@ import           NixManager.Process             ( ProcessData
 import           NixManager.NixLocation         ( flattenedTail )
 import           NixManager.PackageCategory     ( packageCategories
                                                 , categoryToText
-                                                , categoryIdx
                                                 , PackageCategory
                                                   ( PackageCategoryAll
                                                   , PackageCategoryInstalled
@@ -70,6 +55,7 @@ import           NixManager.PackageCategory     ( packageCategories
                                                   , PackageCategoryPendingUninstall
                                                   )
                                                 )
+import qualified NixManager.PackageCategory    as PC
 import           NixManager.View.ComboBox       ( comboBox
                                                 , ComboBoxProperties
                                                   ( ComboBoxProperties
@@ -80,22 +66,14 @@ import           NixManager.View.ComboBox       ( comboBox
                                                 )
 import           NixManager.View.ProgressBar    ( progressBar )
 import qualified NixManager.View.IconName      as IconName
-import           NixManager.NixPackageStatus    ( _NixPackageInstalled
-                                                , _NixPackagePendingInstall
-                                                , _NixPackagePendingUninstall
-                                                , NixPackageStatus
+import           NixManager.NixPackageStatus    ( NixPackageStatus
                                                   ( NixPackageNothing
                                                   , NixPackageInstalled
                                                   , NixPackagePendingInstall
                                                   , NixPackagePendingUninstall
                                                   )
                                                 )
-import           NixManager.NixPackage          ( NixPackage
-                                                , npStatus
-                                                , npName
-                                                , npPath
-                                                , npDescription
-                                                )
+import           NixManager.NixPackage          ( NixPackage )
 import           Prelude                 hiding ( length
                                                 , null
                                                 , unlines
@@ -133,8 +111,8 @@ import qualified GI.Gtk                        as Gtk
 import           Data.GI.Base.Overloading       ( IsDescendantOf )
 import           System.FilePath                ( (</>) )
 import           Control.Lens                   ( (^.)
+                                                , Lens'
                                                 , Traversal'
-                                                , makeLenses
                                                 , (^?)
                                                 , (?~)
                                                 , (+~)
@@ -147,7 +125,6 @@ import           Control.Lens                   ( (^.)
                                                 , from
                                                 , to
                                                 , has
-                                                , Lens'
                                                 , folded
                                                 )
 import           NixManager.Util                ( replaceHtmlEntities
@@ -185,81 +162,69 @@ data Event = EventSearchChanged Text -- ^ Triggered whenever the search entry ch
 
 -- | This is only used when the “Try install” operation is in progress and cumulates all the state pertaining to that
 data InstallingState = InstallingState {
-    _isPackage :: NixPackage -- ^ Which package is being try-installed
-  , _isCounter :: Int  -- ^ This field is necessary to “pulse” the GTK progress bar while installing, see "NixManager.View.ProgressBar" for details
-  , _isProcessData :: ProcessData -- ^ The process data
-  }
-
-makeLenses ''InstallingState
+    package :: NixPackage -- ^ Which package is being try-installed
+  , counter :: Int  -- ^ This field is necessary to “pulse” the GTK progress bar while installing, see "NixManager.View.ProgressBar" for details
+  , processData :: ProcessData -- ^ The process data
+  } deriving(Generic)
 
 data State = State {
-    _psPackageCache :: [NixPackage] -- ^ Cache of all available Nix packages
-  , _psSearchString :: Text -- ^ Current search string
-  , _psSelectedIdx :: Maybe Int -- ^ Currently selected index
-  , _psInstallingPackage :: Maybe InstallingState -- ^ Only set if “Try install” is in progress
-  , _psLatestMessage :: Maybe Message -- ^ The latest message to display, if any (“Install successful” and stuff)
-  , _psCategoryIdx :: Int -- ^ Currently selected category
-  }
+    packageCache :: [NixPackage] -- ^ Cache of all available Nix packages
+  , searchString :: Text -- ^ Current search string
+  , selectedIdx :: Maybe Int -- ^ Currently selected index
+  , installingPackage :: Maybe InstallingState -- ^ Only set if “Try install” is in progress
+  , latestMessage :: Maybe Message -- ^ The latest message to display, if any (“Install successful” and stuff)
+  , categoryIdx :: Int -- ^ Currently selected category
+  } deriving(Generic)
 
-makeLenses ''State
-
-emptyState = State { _psPackageCache      = mempty
-                   , _psSearchString      = mempty
-                   , _psSelectedIdx       = Nothing
-                   , _psInstallingPackage = Nothing
-                   , _psLatestMessage     = Nothing
-                   , _psCategoryIdx       = 0
+emptyState = State { packageCache      = mempty
+                   , searchString      = mempty
+                   , selectedIdx       = Nothing
+                   , installingPackage = Nothing
+                   , latestMessage     = Nothing
+                   , categoryIdx       = 0
                    }
 
 initState :: [NixPackage] -> State
-initState cache = State { _psPackageCache      = cache
-                        , _psSearchString      = mempty
-                        , _psSelectedIdx       = Nothing
-                        , _psInstallingPackage = Nothing
-                        , _psLatestMessage     = Nothing
-                        , _psCategoryIdx       = 0
+initState cache = State { packageCache      = cache
+                        , searchString      = mempty
+                        , selectedIdx       = Nothing
+                        , installingPackage = Nothing
+                        , latestMessage     = Nothing
+                        , categoryIdx       = 0
                         }
 
 -- | Isomorphism between a category and its index in the list of all categories (needed for the combobox logic) 
-psCategory :: Lens' State PackageCategory
-psCategory = psCategoryIdx . from categoryIdx
+category :: Lens' State PackageCategory
+category = #categoryIdx . from PC.categoryIdx
 
 -- | Whether a package matches the given search string
 packageMatches :: Text -> NixPackage -> Bool
-packageMatches t p = toLower t `isInfixOf` (p ^. npName . to toLower)
+packageMatches t p = toLower t `isInfixOf` (p ^. #name . to toLower)
 
 -- | Whether a package matches the given category
 packageMatchesCategory :: PackageCategory -> NixPackage -> Bool
 packageMatchesCategory PackageCategoryAll _ = True
 packageMatchesCategory PackageCategoryInstalled pkg =
-  (pkg ^. npStatus) == NixPackageInstalled
+  (pkg ^. #status) == NixPackageInstalled
 packageMatchesCategory PackageCategoryPendingInstall pkg =
-  (pkg ^. npStatus) == NixPackagePendingInstall
+  (pkg ^. #status) == NixPackagePendingInstall
 packageMatchesCategory PackageCategoryPendingUninstall pkg =
-  (pkg ^. npStatus) == NixPackagePendingUninstall
+  (pkg ^. #status) == NixPackagePendingUninstall
 
 -- | Getter for the filtered search result
-psSearchResult :: Traversal' State NixPackage
--- psSearchResult = to
---   (\s ->
---     s
---       ^.. psPackageCache
---       .   folded
---       .   filtered (packageMatches (s ^. psSearchString))
---       .   filtered (packageMatchesCategory (s ^. psCategory))
---   )
-psSearchResult f s =
-  ( psPackageCache
+searchResult :: Traversal' State NixPackage
+searchResult f s =
+  ( #packageCache
     . traversed
-    . filtered (packageMatches (s ^. psSearchString))
-    . filtered (packageMatchesCategory (s ^. psCategory))
+    . filtered (packageMatches (s ^. #searchString))
+    . filtered (packageMatchesCategory (s ^. category))
     )
     f
     s
 
 -- | Getter for the selected package (if any)
-psSelectedPackage :: Traversal' State NixPackage
-psSelectedPackage = indirectIndexTraversal psSelectedIdx psSearchResult
+selectedPackage :: Traversal' State NixPackage
+selectedPackage = indirectIndexTraversal #selectedIdx searchResult
 
 -- | Callback for the search entry widget
 processSearchChange
@@ -294,7 +259,7 @@ searchBox s =
         , BoxChild def $ changeCallback <$> comboBox
           []
           (ComboBoxProperties (categoryToText <$> packageCategories)
-                              (s ^. psCategoryIdx)
+                              (s ^. #categoryIdx)
           )
         ]
 
@@ -302,14 +267,14 @@ searchBox s =
 formatPkgLabel :: NixPackage -> Text
 formatPkgLabel pkg =
   let
-    path      = pkg ^. npPath . flattenedTail
-    name      = pkg ^. npName
+    path      = pkg ^. #path . flattenedTail
+    name      = pkg ^. #name
     firstLine = ["<span size=\"x-large\">" <> name <> "</span>"]
     descriptionLine
-      | null (pkg ^. npDescription)
+      | null (pkg ^. #description)
       = []
       | otherwise
-      = [ "Description: " <> pkg ^. npDescription . to
+      = [ "Description: " <> pkg ^. #description . to
             (surroundSimple "i" . replaceHtmlEntities)
         ]
     pathLine = [ "Full Nix path: " <> surroundSimple "tt" path | path /= name ]
@@ -323,7 +288,7 @@ formatPkgLabel pkg =
     $ (  firstLine
       <> pathLine
       <> descriptionLine
-      <> (surroundSimple "b" <$> formatStatus (pkg ^. npStatus))
+      <> (surroundSimple "b" <$> formatStatus (pkg ^. #status))
       )
 
 
@@ -359,20 +324,21 @@ packagesBox
 packagesBox s =
   let
     searchValid =
-      ((s ^. psCategory) /= PackageCategoryAll)
-        || (s ^. psSearchString . to length)
+      ((s ^. category) /= PackageCategoryAll)
+        || (s ^. #searchString . to length)
         >= 2
     resultRows =
-      Vector.fromList (zipWith buildResultRow [0 ..] (s ^.. psSearchResult))
-    packageSelected      = has psSelectedPackage s
-    currentPackageStatus = psSelectedPackage . npStatus
+      Vector.fromList (zipWith buildResultRow [0 ..] (s ^.. searchResult))
+    packageSelected = has selectedPackage s
+    currentPackageStatus :: Traversal' State NixPackageStatus
+    currentPackageStatus = selectedPackage . #status
     currentPackageInstalled =
-      has (currentPackageStatus . _NixPackageInstalled) s
+      has (currentPackageStatus . #_NixPackageInstalled) s
     currentPackagePendingInstall =
-      has (currentPackageStatus . _NixPackagePendingInstall) s
+      has (currentPackageStatus . #_NixPackagePendingInstall) s
     currentPackagePendingUninstall =
-      has (currentPackageStatus . _NixPackagePendingUninstall) s
-    tryInstallCell = case s ^. psInstallingPackage of
+      has (currentPackageStatus . #_NixPackagePendingUninstall) s
+    tryInstallCell = case s ^. #installingPackage of
       Nothing -> BoxChild
         expandAndFill
         (imageButton
@@ -399,7 +365,7 @@ packagesBox s =
           IconName.ProcessStop
         , BoxChild expandAndFill $ progressBar
           [#showText := True, #text := "Downloading..."]
-          (is ^. isCounter)
+          (is ^. #counter)
         ]
     packageButtonRow = container
       Gtk.Box
@@ -473,7 +439,7 @@ packagesBox s =
       [#orientation := Gtk.OrientationVertical, #spacing := 10]
       ([BoxChild (def { padding = 5 }) (searchBox s), widget Gtk.HSeparator []]
       <> foldMap (\e -> [BoxChild def (messageWidget e)])
-                 (s ^. psLatestMessage)
+                 (s ^. #latestMessage)
 
       <> [ packageButtonRow
          , widget Gtk.HSeparator []
@@ -486,12 +452,11 @@ pureTransition s = Transition s (pure Nothing)
 -- | The actual update function
 updateEvent :: State -> Event -> Transition State Event
 updateEvent s (EventCategoryChanged newCategory) =
-  pureTransition (s & psCategoryIdx .~ newCategory)
-updateEvent s (EventPackageSelected i) =
-  pureTransition (s & psSelectedIdx .~ i)
+  pureTransition (s & #categoryIdx .~ newCategory)
+updateEvent s (EventPackageSelected i) = pureTransition (s & #selectedIdx .~ i)
 updateEvent s (EventSearchChanged t) =
-  pureTransition (s & psSearchString .~ t & psSelectedIdx .~ Nothing)
-updateEvent s EventTryInstall = case s ^? psSelectedPackage of
+  pureTransition (s & #searchString .~ t & #selectedIdx .~ Nothing)
+updateEvent s EventTryInstall = case s ^? selectedPackage of
   Nothing       -> pureTransition s
   Just selected -> Transition
     s
@@ -499,31 +464,31 @@ updateEvent s EventTryInstall = case s ^? psSelectedPackage of
       pd <- dryInstall selected
       pure (Just (EventTryInstallStarted selected pd))
 updateEvent s (EventTryInstallStarted pkg pd) = Transition
-  (s & psInstallingPackage ?~ InstallingState pkg 0 pd)
+  (s & #installingPackage ?~ InstallingState pkg 0 pd)
   (pure (Just (EventTryInstallWatch pd mempty)))
 updateEvent s (EventTryInstallFailed e) =
-  pureTransition (s & psLatestMessage ?~ e & psInstallingPackage .~ Nothing)
+  pureTransition (s & #latestMessage ?~ e & #installingPackage .~ Nothing)
 updateEvent s EventTryInstallSuccess = pureTransition
   (  s
-  &  psLatestMessage
+  &  #latestMessage
   ?~ infoMessage
        "Downloaded and started the application!\nIf nothing happens, it's probably a terminal application and cannot be started from NixOS manager."
-  &  psInstallingPackage
+  &  #installingPackage
   .~ Nothing
   )
 updateEvent s (EventTryInstallWatch pd po) = Transition
-  (s & psInstallingPackage . traversed . isCounter +~ 1)
+  (s & #installingPackage . traversed . #counter +~ 1)
   do
         -- See the readme about an explanation of why we do this “watch” event stuff
     newOutput <- (po <>) <$> updateProcess pd
-    case newOutput ^. poResult . to getFirst of
+    case newOutput ^. #result . to getFirst of
       Nothing -> do
         threadDelayMillis 500
         pure (Just (EventTryInstallWatch pd newOutput))
       Just ExitSuccess ->
         executablesFromStorePath
-            (s ^?! psInstallingPackage . folded . isPackage)
-            (newOutput ^. poStdout)
+            (s ^?! #installingPackage . folded . #package)
+            (newOutput ^. #stdout)
           >>= \case
                 (_, []) -> pure
                   (Just
@@ -552,7 +517,7 @@ updateEvent s (EventTryInstallWatch pd po) = Transition
               (  "Installing failed, exit code: "
               <> showText code
               <> ", standard error:\n<tt>"
-              <> replaceHtmlEntities (newOutput ^. poStderr . decodeUtf8)
+              <> replaceHtmlEntities (newOutput ^. #stderr . decodeUtf8)
               <> "</tt>"
               )
             )

@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedLabels #-}
 module NixManager.HMServices.Update
   ( updateEvent
   )
@@ -11,7 +12,6 @@ import           NixManager.HMServices.Event    ( Event
                                                 )
 import qualified NixManager.View.ServiceEditView
                                                as EditView
-import           NixManager.HMServices.State    ( _HomeManagerPresent )
 import           Control.Lens                   ( over
                                                 , (^?!)
                                                 , (%~)
@@ -19,10 +19,7 @@ import           Control.Lens                   ( over
                                                 )
 import           GI.Gtk.Declarative.App.Simple  ( Transition(Transition) )
 import           NixManager.HMServicesUtil      ( writePendingServicesFile )
-import           NixManager.Services.StateData  ( sdExpression )
-import           NixManager.ManagerState        ( ManagerState
-                                                , msHMServiceState
-                                                )
+import           NixManager.ManagerState        ( ManagerState )
 import           NixManager.ManagerEvent        ( ManagerEvent
                                                 , pureTransition
                                                 )
@@ -30,12 +27,12 @@ import           NixManager.ManagerEvent        ( ManagerEvent
 updateEvent :: ManagerState -> Event -> Transition ManagerState ManagerEvent
 updateEvent s (EventEditView (EditView.EditViewSettingChanged setter)) =
   let newState =
-          over (msHMServiceState . _HomeManagerPresent . sdExpression) setter s
+          over (#hmServiceState . #_HomeManagerPresent . #expression) setter s
   in  Transition newState $ do
         writePendingServicesFile
-          (newState ^?! msHMServiceState . _HomeManagerPresent . sdExpression)
+          (newState ^?! #hmServiceState . #_HomeManagerPresent . #expression)
         pure Nothing
 updateEvent s (EventEditView e) = pureTransition
-  (s & msHMServiceState . _HomeManagerPresent %~ EditView.updateEvent e)
+  (s & #hmServiceState . #_HomeManagerPresent %~ EditView.updateEvent e)
 updateEvent s EventReload       = pureTransition s
 updateEvent s (EventReloaded _) = pureTransition s

@@ -42,9 +42,6 @@ import           NixManager.NixExpr             ( NixExpr
                                                   )
                                                 , NixFunction(NixFunction)
                                                 , parseNixFile
-                                                , _NixList
-                                                , _NixSet
-                                                , _NixString
                                                 , writeNixFile
                                                 )
 import           NixManager.Util                ( TextualError

@@ -11,16 +11,16 @@ module NixManager.Packages.Update
   )
 where
 
-import Data.Functor(($>))
-import Data.Validation(Validation(Failure, Success), bindValidation)
+import           Data.Functor                   ( ($>) )
+import           Data.Validation                ( Validation(Failure, Success)
+                                                , bindValidation
+                                                )
 import           Control.Lens                   ( (&)
                                                 , (?~)
                                                 , (.~)
                                                 , (^?)
                                                 )
-import           NixManager.ManagerState        ( ManagerState(..)
-                                                , msPackagesState
-                                                )
+import           NixManager.ManagerState        ( ManagerState(..) )
 import           NixManager.Packages.Event      ( Event
                                                   ( EventOperationCompleted
                                                   , EventInstallCompleted
@@ -69,17 +69,16 @@ uninstallCompletedMessage PEV.Cancelled = infoMessage "Installation cancelled!"
 -- | The actual update function
 updateEvent :: ManagerState -> Event -> Transition ManagerState ManagerEvent
 updateEvent s (EventOperationCompleted e completionType) =
-  Transition (s & msPackagesState . PEV.psLatestMessage ?~ e)
-    $ case completionType of
-        PEV.CompletionReload -> pure (adminEvent AdminEvent.EventReload)
-        PEV.CompletionPass   -> pure Nothing
+  Transition (s & #packagesState . #latestMessage ?~ e) $ case completionType of
+    PEV.CompletionReload -> pure (adminEvent AdminEvent.EventReload)
+    PEV.CompletionPass   -> pure Nothing
 updateEvent s (EventInstallCompleted cache installationType) = Transition
   (  s
-  &  msPackagesState
-  .  PEV.psPackageCache
+  &  #packagesState
+  .  #packageCache
   .~ cache
-  &  msPackagesState
-  .  PEV.psSelectedIdx
+  &  #packagesState
+  .  #selectedIdx
   .~ Nothing
   )
   (pure
@@ -91,11 +90,11 @@ updateEvent s (EventInstallCompleted cache installationType) = Transition
   )
 updateEvent s (EventUninstallCompleted cache installationType) = Transition
   (  s
-  &  msPackagesState
-  .  PEV.psPackageCache
+  &  #packagesState
+  .  #packageCache
   .~ cache
-  &  msPackagesState
-  .  PEV.psSelectedIdx
+  &  #packagesState
+  .  #selectedIdx
   .~ Nothing
   )
   (pure
@@ -106,22 +105,22 @@ updateEvent s (EventUninstallCompleted cache installationType) = Transition
     )
   )
 updateEvent s (EventPackageEditView (PEV.EventInstall installationType)) =
-  case s ^? msPackagesState . PEV.psSelectedPackage of
+  case s ^? #packagesState . PEV.selectedPackage of
     Nothing       -> pureTransition s
     Just selected -> Transition s $ do
       installResult <- installPackage selected
       cacheResult   <- readPackageCache
       case installResult *> cacheResult of
-          Success newCache ->
-            pure (packagesEvent (EventInstallCompleted newCache installationType))
-          Failure e -> pure
-            (packagesEvent
-             (EventOperationCompleted (errorMessage ("Install failed: " <> e))
-               PEV.CompletionReload
-             )
+        Success newCache ->
+          pure (packagesEvent (EventInstallCompleted newCache installationType))
+        Failure e -> pure
+          (packagesEvent
+            (EventOperationCompleted (errorMessage ("Install failed: " <> e))
+                                     PEV.CompletionReload
             )
+          )
 updateEvent s (EventPackageEditView (PEV.EventUninstall installationType)) =
-  case s ^? msPackagesState . PEV.psSelectedPackage of
+  case s ^? #packagesState . PEV.selectedPackage of
     Nothing       -> pureTransition s
     Just selected -> Transition s $ do
       uninstallResult <- uninstallPackage selected
@@ -140,7 +139,7 @@ updateEvent s EventReload = Transition s $ do
   cacheResult <- readPackageCache
   case cacheResult of
     Success newCache -> pure (packagesEvent (EventReloadFinished newCache))
-    Failure  e        -> pure
+    Failure e        -> pure
       (packagesEvent
         (EventOperationCompleted
           (errorMessage ("Couldn't reload packages cache: " <> e))
@@ -148,10 +147,10 @@ updateEvent s EventReload = Transition s $ do
         )
       )
 updateEvent s (EventReloadFinished newCache) =
-  pureTransition (s & msPackagesState . PEV.psPackageCache .~ newCache)
+  pureTransition (s & #packagesState . #packageCache .~ newCache)
 updateEvent s (EventPackageEditView e) = liftUpdate
   PEV.updateEvent
-  msPackagesState
+  #packagesState
   (ManagerEventPackages . EventPackageEditView)
   s
   e

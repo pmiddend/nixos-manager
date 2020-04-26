@@ -14,7 +14,7 @@ module NixManager.View.ServiceEditView
   )
 where
 
-import Data.Validation(Validation(Success, Failure))
+import           Data.Validation                ( Validation(Success, Failure) )
 import           NixManager.Constants           ( globalOptionsMagicString )
 import           NixManager.View.GtkUtil        ( paddedAround
                                                 , expandAndFill
@@ -45,14 +45,8 @@ import           NixManager.NixExpr             ( NixExpr
                                                   , NixString
                                                   , NixSymbol
                                                   )
-                                                , _NixFunctionDecl
-                                                , nfExpr
                                                 , prettyPrintSingleLine
-                                                , _NixSet
                                                 , parseNixString
-                                                , _NixBoolean
-                                                , _NixString
-                                                , _NixSymbol
                                                 )
 import           NixManager.View.ComboBox       ( comboBox
                                                 , ComboBoxChangeEvent
@@ -71,18 +65,8 @@ import           NixManager.Util                ( showText
                                                 , surroundSimple
                                                 , Endo
                                                 )
-import           NixManager.Services.StateData  ( StateData
-                                                , sdCache
-                                                , sdSelectedIdx
-                                                , sdSearchString
-                                                , sdCategoryIdx
-                                                , sdExpression
-                                                )
-import           NixManager.NixServiceOption    ( optionType
-                                                , NixServiceOption
-                                                , optionLoc
-                                                , optionDescription
-                                                )
+import           NixManager.Services.StateData  ( StateData )
+import           NixManager.NixServiceOption    ( NixServiceOption )
 import           GI.Gtk.Declarative.Widget      ( Widget )
 import           GI.Gtk.Declarative.SingleWidget
                                                 ( SingleWidget )
@@ -124,10 +108,7 @@ import           Control.Lens                   ( (^.)
                                                 , (.~)
                                                 , (^?!)
                                                 )
-import           NixManager.NixService          ( NixService
-                                                , serviceLoc
-                                                , serviceOptions
-                                                )
+import           NixManager.NixService          ( NixService )
 import           NixManager.NixServiceOptionType
                                                 ( NixServiceOptionType
                                                   ( NixServiceOptionString
@@ -148,19 +129,19 @@ data EditViewEvent = EditViewSelected (Maybe Int)  -- ^ Triggered when the curre
 
 updateEvent :: EditViewEvent -> Endo StateData
 updateEvent (EditViewCategoryIdxChanged newCategory) sd =
-  sd & sdCategoryIdx .~ newCategory & sdSelectedIdx .~ Nothing
+  sd & #categoryIdx .~ newCategory & #selectedIdx .~ Nothing
 updateEvent (EditViewSearchChanged t) sd =
-  sd & sdSearchString .~ t & sdSelectedIdx .~ Nothing
-updateEvent (EditViewSelected i) sd = sd & sdSelectedIdx .~ i
+  sd & #searchString .~ t & #selectedIdx .~ Nothing
+updateEvent (EditViewSelected i) sd = sd & #selectedIdx .~ i
 updateEvent _                    sd = sd
 
 -- | Create a list box row widget from a service
 buildServiceRow
   :: FromWidget (Bin Gtk.ListBoxRow) target => NixService -> target event
 buildServiceRow svc =
-  let markedUp = if isSingleton (svc ^. serviceLoc)
+  let markedUp = if isSingleton (svc ^. #serviceLoc)
         then surroundSimple "b" globalOptionsMagicString
-        else svc ^. serviceLoc . flattenedTail
+        else svc ^. #serviceLoc . flattenedTail
   in  bin Gtk.ListBoxRow
           []
           (widget Gtk.Label [#label := markedUp, #useMarkup := True])
@@ -181,18 +162,18 @@ categoryMatches c loc = categoryToNixPrefix c == firstComponent loc
 -- | We need to filter some option categories, for example something like @service.<name>.bar@ or @service.*.bar@. At least until we can handle that, too.
 filterPredicate :: StateData -> NixService -> Bool
 filterPredicate sd =
-  (         (((sd ^. sdSearchString) `isInfixOf`) . flattenLocation)
+  (         (((sd ^. #searchString) `isInfixOf`) . flattenLocation)
     `predAnd` ((not . ("<" `isInfixOf`)) . flattenLocation)
     `predAnd` ((not . ("*" `isInfixOf`)) . flattenLocation)
-    `predAnd` categoryMatches (sd ^. sdCategoryIdx . from serviceCategoryIdx)
+    `predAnd` categoryMatches (sd ^. #categoryIdx . from serviceCategoryIdx)
     )
-    . view serviceLoc
+    . view #serviceLoc
 
 
 -- | The list of service rows (the left half of the tab, minus the search)
 serviceRows :: StateData -> Vector.Vector (Bin Gtk.ListBoxRow event)
 serviceRows sd = toVectorOf
-  (sdCache . folded . filtered (filterPredicate sd) . to buildServiceRow)
+  (#cache . folded . filtered (filterPredicate sd) . to buildServiceRow)
   sd
 
 -- | The left half of the tab
@@ -228,22 +209,24 @@ servicesLeftPane sd _ =
 
 -- | Given an option path, return a traversal for the corresponding attribute set element
 optionLens' :: Text -> Traversal' NixExpr (Maybe NixExpr)
-optionLens' optionPath = _NixFunctionDecl . nfExpr . _NixSet . at optionPath
+optionLens' optionPath =
+  #_NixFunctionDecl . #functionExpr . #_NixSet . at optionPath
 
 -- | Given the whole services Nix expression and a concrete service option, construct the edit widget for that option. This does some case analysis on the type, see 'NixManager.NixServiceOptionType'
 buildOptionValueCell :: NixExpr -> NixServiceOption -> Widget EditViewEvent
 buildOptionValueCell serviceExpression serviceOption =
   let
     optionPath :: Text
-    optionPath = serviceOption ^. optionLoc . flattened
+    optionPath = serviceOption ^. #optionLoc . flattened
     optionValue :: Maybe NixExpr
     optionValue = serviceExpression ^? optionLens' optionPath . folded
     rawChangeEvent :: Text -> EditViewEvent
     rawChangeEvent "" =
       EditViewSettingChanged (set (optionLens' optionPath) Nothing)
     rawChangeEvent v = case parseNixString v of
-      Failure  _ -> EditViewDiscard
-      Success e -> EditViewSettingChanged (set (optionLens' optionPath) (Just e))
+      Failure _ -> EditViewDiscard
+      Success e ->
+        EditViewSettingChanged (set (optionLens' optionPath) (Just e))
     changeEvent v =
       EditViewSettingChanged (set (optionLens' optionPath) (Just v))
     textLikeEntry inL outL = widget
@@ -252,7 +235,7 @@ buildOptionValueCell serviceExpression serviceOption =
       , onM #changed ((changeEvent . inL <$>) . Gtk.entryGetText)
       ]
   in
-    case serviceOption ^. optionType of
+    case serviceOption ^. #optionType of
       Failure e -> widget
         Gtk.Label
         [#label := ("Option value \"" <> e <> "\" not implemented yet")]
@@ -263,7 +246,7 @@ buildOptionValueCell serviceExpression serviceOption =
         in  widget
               Gtk.Switch
               [ #active
-                := (optionValue ^. pre (traversed . _NixBoolean) . non False)
+                := (optionValue ^. pre (traversed . #_NixBoolean) . non False)
               , on #stateSet changeCallback
               ]
       Success (NixServiceOptionOneOfString values) ->
@@ -271,7 +254,7 @@ buildOptionValueCell serviceExpression serviceOption =
             activeIndex =
                 optionValue
                   ^? folded
-                  .  _NixString
+                  .  #_NixString
                   .  to (`elemIndex` values)
                   .  folded
             changeCallback :: ComboBoxChangeEvent -> EditViewEvent
@@ -279,17 +262,17 @@ buildOptionValueCell serviceExpression serviceOption =
                 EditViewSettingChanged $ set (optionLens' optionPath) Nothing
             changeCallback (ComboBoxChangeEvent idx) = EditViewSettingChanged
               (set (optionLens' optionPath)
-                   (Just (values ^?! ix (fromIntegral idx) . re _NixString))
+                   (Just (values ^?! ix (fromIntegral idx) . re #_NixString))
               )
         in  changeCallback <$> comboBox
               []
               (ComboBoxProperties ("<no value>" : values)
                                   (fromMaybe 0 activeIndex)
               )
-      Success NixServiceOptionPackage   -> textLikeEntry NixSymbol _NixSymbol
-      Success NixServiceOptionSubmodule -> textLikeEntry NixSymbol _NixSymbol
-      Success NixServiceOptionPath      -> textLikeEntry NixSymbol _NixSymbol
-      Success NixServiceOptionString    -> textLikeEntry NixString _NixString
+      Success NixServiceOptionPackage   -> textLikeEntry NixSymbol #_NixSymbol
+      Success NixServiceOptionSubmodule -> textLikeEntry NixSymbol #_NixSymbol
+      Success NixServiceOptionPath      -> textLikeEntry NixSymbol #_NixSymbol
+      Success NixServiceOptionString    -> textLikeEntry NixString #_NixString
       Success v                         -> container
         Gtk.Box
         [#orientation := Gtk.OrientationVertical]
@@ -312,7 +295,7 @@ buildOptionValueCell serviceExpression serviceOption =
 -- | Convert the docbook documentation markup to GTK (pango) markup
 convertMarkup :: Text -> Text
 convertMarkup t = case parseDocbook t of
-  Failure  e -> "error parsing description: " <> e
+  Failure e -> "error parsing description: " <> e
   Success v -> docbookToPango v
 
 -- | Build all the option rows for a selected service, given the whole services Nix expression
@@ -329,7 +312,7 @@ buildOptionRows serviceExpression serviceOption =
       [ BoxChild expandAndFill $ widget
         Gtk.Label
         [ classes ["service-option-title"]
-        , #label := (serviceOption ^. optionLoc . to formatOptionName)
+        , #label := (serviceOption ^. #optionLoc . to formatOptionName)
         , #halign := Gtk.AlignStart
         ]
       , BoxChild defaultBoxChildProperties
@@ -342,7 +325,7 @@ buildOptionRows serviceExpression serviceOption =
       , widget
         Gtk.Label
         [ classes ["service-option-description"]
-        , #label := (serviceOption ^. optionDescription . to convertMarkup)
+        , #label := (serviceOption ^. #optionDescription . to convertMarkup)
         , #wrap := True
         , #useMarkup := True
         ]
@@ -358,14 +341,13 @@ servicesRightPane
   => StateData
   -> target EditViewEvent
 
-servicesRightPane sd = case sd ^. sdSelectedIdx of
+servicesRightPane sd = case sd ^. #selectedIdx of
   Nothing ->
     widget Gtk.Label [#label := "Please select a service from the left pane"]
   Just idx ->
     let
-      svc =
-        (sd ^.. sdCache . folded . filtered (filterPredicate sd)) ^?! ix idx
-      svcLabel = svc ^. serviceLoc . flattenedTail
+      svc = (sd ^.. #cache . folded . filtered (filterPredicate sd)) ^?! ix idx
+      svcLabel = svc ^. #serviceLoc . flattenedTail
       optBox =
         container Gtk.Box
                   [#orientation := Gtk.OrientationVertical, #spacing := 10]
@@ -375,8 +357,8 @@ servicesRightPane sd = case sd ^. sdSelectedIdx of
                   (widget Gtk.Label
                           [classes ["service-headline"], #label := svcLabel]
                   )
-              : (svc ^.. serviceOptions . folded . to
-                  (buildOptionRows (sd ^. sdExpression))
+              : (svc ^.. #serviceOptions . folded . to
+                  (buildOptionRows (sd ^. #expression))
                 )
               )
     in

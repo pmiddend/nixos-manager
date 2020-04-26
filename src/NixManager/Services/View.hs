@@ -45,20 +45,18 @@ import           NixManager.Services.State      ( State
                                                   , StateDone
                                                   , StateDownloading
                                                   )
-                                                , sddCounter
                                                 )
 import           NixManager.ManagerEvent        ( ManagerEvent
                                                   ( ManagerEventServices
                                                   )
                                                 )
-import           NixManager.ManagerState        ( msServiceState )
 
 --servicesBox :: ManagerState -> Widget ManagerEvent
 -- This extra container is there to circumvent a bug that switches to the next page when one page is replaced.
 servicesBox s = container
   Gtk.Box
   []
-  [BoxChild expandAndFill (servicesBox' (s ^. msServiceState) s)]
+  [BoxChild expandAndFill (servicesBox' (s ^. #serviceState) s)]
 
 -- | What to display when the service definitions couldn't be parsed
 invalidOptionsMessage :: Maybe Text -> Text
@@ -112,7 +110,7 @@ servicesBox' (StateDownloading ssdd) _ = container
   ]
   [ BoxChild defaultBoxChildProperties
              (widget Gtk.Label [#label := "Downloading services..."])
-  , BoxChild defaultBoxChildProperties (progressBar [] (ssdd ^. sddCounter))
+  , BoxChild defaultBoxChildProperties (progressBar [] (ssdd ^. #counter))
   , BoxChild
     defaultBoxChildProperties
     (container

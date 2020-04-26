@@ -4,7 +4,7 @@ Provides the type for a service option, as read from the @options.json@ file as 
   -}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module NixManager.NixServiceOption
   ( NixServiceOption
@@ -42,23 +42,21 @@ import           NixManager.NixServiceOptionType
                                                 , parseNixServiceOptionType
                                                 )
 import           NixManager.NixExpr             ( NixExpr )
-import           Control.Lens                   ( makeLenses )
 import           Data.Aeson                     ( FromJSON
                                                 , parseJSON
                                                 , Value(Object)
                                                 , (.:)
                                                 , eitherDecode
                                                 )
+import           GHC.Generics                   ( Generic )
 
 -- | Service option, as read from the @options.json@ file
 data NixServiceOption = NixServiceOption {
-   _optionDescription :: Text -- ^ The option description
-  , _optionLoc :: NixLocation -- ^ The option location
-  , _optionType :: TextualError NixServiceOptionType -- ^ The type, possibly parsed
-  , _optionValue :: Maybe NixExpr -- ^ The option value, if present
-  } deriving(Show)
-
-makeLenses ''NixServiceOption
+    optionDescription :: Text -- ^ The option description
+  , optionLoc :: NixLocation -- ^ The option location
+  , optionType :: TextualError NixServiceOptionType -- ^ The type, possibly parsed
+  , optionValue :: Maybe NixExpr -- ^ The option value, if present
+  } deriving(Show, Generic)
 
 instance FromJSON NixServiceOption where
   parseJSON (Object v) = do

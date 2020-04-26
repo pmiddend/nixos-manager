@@ -16,9 +16,7 @@ import qualified NixManager.HMPackages.Update  as HMPackagesUpdate
 import qualified NixManager.HMServices.Update  as HMServicesUpdate
 import qualified NixManager.HMAdmin.Update     as HMAdminUpdate
 import           Control.Lens                   ( (^.) )
-import           NixManager.ManagerState        ( ManagerState(..)
-                                                , msAdminState
-                                                )
+import           NixManager.ManagerState        ( ManagerState(..) )
 import           NixManager.ManagerEvent        ( ManagerEvent(..)
                                                 , pureTransition
                                                 )
@@ -31,7 +29,7 @@ import           Prelude                 hiding ( length
 -- | Process an event, change the state, and potentially emit an event and some side-effects
 update :: ManagerState -> ManagerEvent -> Transition ManagerState ManagerEvent
 update s (ManagerEventAdmin ae) =
-  AdminUpdate.updateEvent s (s ^. msAdminState) ae
+  AdminUpdate.updateEvent s (s ^. #adminState) ae
 update s (ManagerEventServices   se) = ServicesUpdate.updateEvent s se
 update s (ManagerEventHMServices se) = HMServicesUpdate.updateEvent s se
 update s (ManagerEventPackages   se) = PackagesUpdate.updateEvent s se

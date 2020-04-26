@@ -12,10 +12,9 @@ module NixManager.ManagerMain
   )
 where
 
-import Data.Validation(Validation(Failure, Success))
+import           Data.Validation                ( Validation(Failure, Success) )
 import           NixManager.ProgramArguments    ( parseArguments
                                                 , ProgramArguments
-                                                , paUseHomeManager
                                                 )
 import qualified NixManager.Update             as GlobalUpdate
 import qualified NixManager.Admin.State        as AdminState
@@ -48,33 +47,32 @@ import           Control.Lens                   ( (^.) )
 -- |Initialize the application state, optionally returning an error.
 initState :: ProgramArguments -> IO (TextualError ManagerState)
 initState args
-  | args ^. paUseHomeManager
-  = ifSuccessIO HMPackagesState.initState $ \hmPackagesState -> do
-    serviceState   <- ServicesState.initState
-    adminState     <- AdminState.initState
-    hmServiceState <- HMServicesState.initState
-    hmAdminState   <- HMAdminState.initState
-    pure $ pure $ ManagerState { _msPackagesState   = PackagesState.emptyState
-                                , _msServiceState    = serviceState
-                                , _msAdminState      = adminState
-                                , _msHMServiceState  = hmServiceState
-                                , _msHMAdminState    = hmAdminState
-                                , _msHMPackagesState = hmPackagesState
-                                }
+  | args ^. #useHomeManager
+  = ifSuccessIO HMPackagesState.initState $ \hmPackagesState' -> do
+    serviceState'   <- ServicesState.initState
+    adminState'     <- AdminState.initState
+    hmServiceState' <- HMServicesState.initState
+    hmAdminState'   <- HMAdminState.initState
+    pure $ pure $ ManagerState { packagesState   = PackagesState.emptyState
+                               , serviceState    = serviceState'
+                               , adminState      = adminState'
+                               , hmServiceState  = hmServiceState'
+                               , hmAdminState    = hmAdminState'
+                               , hmPackagesState = hmPackagesState'
+                               }
   | otherwise
-  = ifSuccessIO PackagesState.initState $ \packagesState -> do
-    serviceState   <- ServicesState.initState
-    adminState     <- AdminState.initState
-    hmServiceState <- HMServicesState.initState
-    hmAdminState   <- HMAdminState.initState
-    pure $ pure $ ManagerState
-      { _msPackagesState   = packagesState
-      , _msServiceState    = serviceState
-      , _msAdminState      = adminState
-      , _msHMServiceState  = hmServiceState
-      , _msHMAdminState    = hmAdminState
-      , _msHMPackagesState = HMPackagesState.emptyState
-      }
+  = ifSuccessIO PackagesState.initState $ \packagesState' -> do
+    serviceState'   <- ServicesState.initState
+    adminState'     <- AdminState.initState
+    hmServiceState' <- HMServicesState.initState
+    hmAdminState'   <- HMAdminState.initState
+    pure $ pure $ ManagerState { packagesState   = packagesState'
+                               , serviceState    = serviceState'
+                               , adminState      = adminState'
+                               , hmServiceState  = hmServiceState'
+                               , hmAdminState    = hmAdminState'
+                               , hmPackagesState = HMPackagesState.emptyState
+                               }
 
 -- |Initialize GTK, the application state (see "NixManager.ManagerState") and run the GTK main loop. See also: "NixManager.Update" and "NixManager.View.Root"
 nixMain :: IO ()
@@ -84,9 +82,9 @@ nixMain = do
   args          <- parseArguments
   initialState' <- initState args
   case initialState' of
-    Failure  e -> runErrorDialog e
+    Failure e -> runErrorDialog e
     Success s -> void $ run App { view         = view' args
-                              , update       = GlobalUpdate.update
-                              , inputs       = []
-                              , initialState = s
-                              }
+                                , update       = GlobalUpdate.update
+                                , inputs       = []
+                                , initialState = s
+                                }
