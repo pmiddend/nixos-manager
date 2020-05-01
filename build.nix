@@ -3,20 +3,26 @@
 let
   gitignore = pkgs.nix-gitignore.gitignoreSourcePure [ ./.gitignore ];
 
+  haskellLib = pkgs.haskell.lib;
+
   myHaskellPackages = pkgs.haskell.packages.${compiler}.override {
     overrides = se: su: {
 
-      gi-gtk-declarative = pkgs.haskell.lib.markUnbroken (su.gi-gtk-declarative.overrideAttrs (oldAttrs: {
+      gi-gtk-declarative = haskellLib.markUnbroken (su.gi-gtk-declarative.overrideAttrs (oldAttrs: {
         doCheck = false;
       }));
 
-      gi-gtk-declarative-app-simple = pkgs.haskell.lib.markUnbroken su.gi-gtk-declarative-app-simple;
+      gi-gtk-declarative-app-simple = haskellLib.markUnbroken su.gi-gtk-declarative-app-simple;
 
-      "nixos-manager" =
-        se.callCabal2nix
-          "nixos-manager"
-          (gitignore ./.)
-          {};
+      "nixos-manager" = haskellLib.overrideCabal
+        (se.callCabal2nix "nixos-manager" (gitignore ./.) {})
+        (drv: {
+          buildTools = drv.buildTools or [] ++ [ pkgs.makeWrapper ];
+          postFixup = ''
+            wrapProgram $out/bin/nixos-manager \
+            --prefix PATH : "${pkgs.lib.makeBinPath [pkgs.gksu]}"
+          '';
+        });
     };
   };
 
@@ -31,7 +37,6 @@ rec
     buildInputs = with pkgs.haskellPackages; [
       cabal-install
       hlint
-      pkgs.gksu
       pkgs.niv
       pkgs.nixpkgs-fmt
     ];
