@@ -72,9 +72,13 @@ After building it (see above), you have to tell home-manager to read nixos-manag
 
 #+begin_example
 imports = [ ./hm-extra-services.nix ./hm-extra-packages.nix ];
+
+manual.json.enable = true;
 #+end_example
 
-nixos-manager, when run in home-manager mode, will write these extra files. To run nixos-manager in home-manager mode, simply run it with the =--home-manager= argument. For example, if you built it with Nix, run:
+nixos-manager, when run in home-manager mode, will write these extra files. The second line enables JSON export of the available options in home-manager, which nixos-manager reads to generate the configuration UI.
+
+To run nixos-manager in home-manager mode, simply run it with the =--home-manager= argument. For example, if you built it with Nix, run:
 
 #+begin_example
 result/bin/nixos-manager --home-manager
